@@ -8,7 +8,7 @@ from langchain_groq import ChatGroq
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.memory import MemorySaver
-from app.tools import Search, Weather, Calculator, Stock_price
+from app.tools import Search, Weather, Calculator, Stock_price, DeepResearch
 from app.services.rag import has_document, retrieve_from_document
 from app.database import DatabaseConfig,MySQLCheckpointSaver,ThreadMetadata
 import os
@@ -23,7 +23,7 @@ model = ChatGroq(
     )
 
 # Available tools for the chatbot
-all_tools = [Search, Weather, Calculator, Stock_price]
+all_tools = [Search, Weather, Calculator, Stock_price, DeepResearch]
 
 
 class Chatstate(TypedDict):

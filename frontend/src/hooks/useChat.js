@@ -243,6 +243,55 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
         return;
       }
 
+      // Deep Research tool: show step-based progress
+      if (tools.includes('deep_research')) {
+        setStreamingProgress({
+          isStreaming: true,
+          toolName: 'deep_research',
+          steps: [
+            { label: 'Clarifying scope...', status: 'in-progress' },
+            { label: 'Writing research brief...', status: 'pending' },
+            { label: 'Researching...', status: 'pending' },
+            { label: 'Generating report...', status: 'pending' },
+          ],
+        });
+
+        let aiResponse = '';
+
+        const handleMessage = (data) => {
+          if (data.message_type === 'progress') {
+            if (data.node === 'clarify') {
+              updateProgressStep('Clarifying scope...', 'completed');
+              updateProgressStep('Writing research brief...', 'in-progress');
+            } else if (data.node === 'brief') {
+              updateProgressStep('Writing research brief...', 'completed');
+              updateProgressStep('Researching...', 'in-progress');
+            } else if (data.node === 'research') {
+              updateProgressStep('Researching...', 'completed');
+              updateProgressStep('Generating report...', 'in-progress');
+            }
+          } else if (data.message_type === 'ai') {
+            aiResponse += data.content;
+          }
+
+          if (data.done) {
+            if (data.thread_id && onThreadCreated && data.thread_id !== streamThreadId) {
+              onThreadCreated(data.thread_id);
+            }
+            setMessages(prev => [...prev, {
+              type: 'ai',
+              content: aiResponse,
+              timestamp: new Date().toISOString(),
+            }]);
+            setStreamingProgress(null);
+            setLoading(false);
+          }
+        };
+
+        eventSourceRef.current = chatService.streamMessage(streamThreadId, message, tools, handleMessage, handleError, isTempChat);
+        return;
+      }
+
       // Chatbot path: live thinking bar + token streaming into a placeholder message
       setStreamingProgress({
         isStreaming: true,
