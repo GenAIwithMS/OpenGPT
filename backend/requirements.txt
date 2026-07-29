@@ -1,8 +1,10 @@
 langchain-core
+langchain
 python-dotenv
 langchain-groq
 langgraph
 duckduckgo-search
+aiohttp
 langchain_community
 newsdataapi
 langchain-openai
