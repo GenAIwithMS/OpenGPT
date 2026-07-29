@@ -207,7 +207,7 @@ def supervisor_node(state: SupervisorState, config: RunnableConfig):
 
     # Bind tools for the supervisor (ConductResearch, ResearchComplete, think_tool)
     supervisor_tools = [ConductResearch, ResearchComplete, think_tool]
-    model_with_tools = model.bind_tools(supervisor_tools)
+    model_with_tools = model.bind_tools(supervisor_tools, tool_choice="auto")
 
     # Get model response
     input_messages = [SystemMessage(content=system_prompt), brief_message] + supervisor_messages
@@ -296,7 +296,7 @@ def researcher_node(state: ResearcherState, config: RunnableConfig):
             )
 
     # Bind tools and invoke
-    model_with_tools = model.bind_tools(all_tools)
+    model_with_tools = model.bind_tools(all_tools, tool_choice="auto")
     response = model_with_tools.invoke(researcher_messages_with_system)
 
     # Process tool calls

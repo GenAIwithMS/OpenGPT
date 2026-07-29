@@ -135,6 +135,37 @@ class ChatService:
                             "tool_used": "blogs"
                         }
             
+            # If deep_research tool is requested, use the deep research graph
+            if tools and "deep_research" in tools:
+                try:
+                    from app.tools.deep_research.deep_researcher import deep_researcher as deep_research_app
+
+                    deep_input = {
+                        "messages": [HumanMessage(content=message)]
+                    }
+
+                    deep_config = {
+                        "configurable": {"allow_clarification": False}
+                    }
+
+                    final_state = deep_research_app.invoke(deep_input, deep_config)
+
+                    touch_thread(thread_id)
+
+                    return {
+                        "response": final_state.get("final_report", "Deep research completed successfully"),
+                        "thread_id": thread_id,
+                        "tool_used": "deep_research"
+                    }
+                except Exception as deep_error:
+                    error_msg = str(deep_error)
+                    print(f"Error using deep research tool: {error_msg}")
+                    return {
+                        "response": f"⚠️ **Deep Research Failed**\n\nAn error occurred:\n```\n{error_msg}\n```",
+                        "thread_id": thread_id,
+                        "tool_used": "deep_research"
+                    }
+
             # Check if thread has a document
             doc_exists = has_document(thread_id)
             
@@ -442,6 +473,43 @@ class ChatService:
                         }
                     return
 
+            # If deep_research tool is requested, run the deep research graph
+            if tools and "deep_research" in tools:
+                try:
+                    from app.tools.deep_research.deep_researcher import deep_researcher as deep_research_app
+
+                    deep_input = {
+                        "messages": [HumanMessage(content=message)]
+                    }
+
+                    deep_config = {
+                        "configurable": {"allow_clarification": False}
+                    }
+
+                    for event in deep_research_app.stream(deep_input, deep_config, stream_mode="updates"):
+                        for node_name, node_output in event.items():
+                            if node_name == "clarify_with_user":
+                                yield {"content": "Scope clarified", "message_type": "progress", "node": "clarify"}
+                            elif node_name == "write_research_brief":
+                                yield {"content": "Research brief written", "message_type": "progress", "node": "brief"}
+                            elif node_name == "research_supervisor":
+                                yield {"content": "Research complete", "message_type": "progress", "node": "research"}
+                            elif node_name == "final_report_generation":
+                                if "final_report" in node_output:
+                                    yield {"content": node_output["final_report"], "message_type": "ai", "node": "report"}
+
+                    if not temporary:
+                        touch_thread(thread_id)
+                    return
+                except Exception as deep_error:
+                    error_msg = str(deep_error)
+                    print(f"Error streaming deep research: {error_msg}")
+                    yield {
+                        "content": f"⚠️ **Deep Research Failed**\n\nAn error occurred:\n```\n{error_msg}\n```",
+                        "message_type": "ai"
+                    }
+                    return
+
             # Check if thread has a document (skipped for temp chats — they
             # cannot have uploaded PDFs and must not touch document storage).
             doc_exists = False if temporary else has_document(thread_id)
@@ -551,6 +619,42 @@ class ChatService:
                             "content": f"⚠️ **Blog Generation Failed**\n\nAn error occurred while generating the blog:\n```\n{error_msg}\n```\n\nPlease try again or use the regular chat without the blog tool.",
                             "message_type": "ai",
                         }
+                    return
+
+            # If deep_research tool is requested, run the deep research graph
+            if tools and "deep_research" in tools:
+                try:
+                    from app.tools.deep_research.deep_researcher import deep_researcher as deep_research_app
+
+                    deep_input = {
+                        "messages": [HumanMessage(content=new_content)]
+                    }
+
+                    deep_config = {
+                        "configurable": {"allow_clarification": False}
+                    }
+
+                    for event in deep_research_app.stream(deep_input, deep_config, stream_mode="updates"):
+                        for node_name, node_output in event.items():
+                            if node_name == "clarify_with_user":
+                                yield {"content": "Scope clarified", "message_type": "progress", "node": "clarify"}
+                            elif node_name == "write_research_brief":
+                                yield {"content": "Research brief written", "message_type": "progress", "node": "brief"}
+                            elif node_name == "research_supervisor":
+                                yield {"content": "Research complete", "message_type": "progress", "node": "research"}
+                            elif node_name == "final_report_generation":
+                                if "final_report" in node_output:
+                                    yield {"content": node_output["final_report"], "message_type": "ai", "node": "report"}
+
+                    touch_thread(thread_id)
+                    return
+                except Exception as deep_error:
+                    error_msg = str(deep_error)
+                    print(f"Error editing deep research: {error_msg}")
+                    yield {
+                        "content": f"⚠️ **Deep Research Failed**\n\nAn error occurred:\n```\n{error_msg}\n```",
+                        "message_type": "ai"
+                    }
                     return
 
             yield from ChatService._stream_chatbot(chatbot, config, doc_exists, None)

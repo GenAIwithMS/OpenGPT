@@ -9,6 +9,7 @@ import {
   Search,
   FileEdit,
   FileText as BlogIcon,
+  BookOpen,
   X,
   Check,
 } from "lucide-react";
@@ -63,6 +64,15 @@ const MessageInput = ({
       iconClass: "text-purple-400",
       onClick: () => handleToolSelect("blogs"),
       active: selectedTools.includes("blogs"),
+    },
+    {
+      key: "deep_research",
+      label: "Deep Research",
+      description: "In-depth research report",
+      icon: BookOpen,
+      iconClass: "text-orange-400",
+      onClick: () => handleToolSelect("deep_research"),
+      active: selectedTools.includes("deep_research"),
     },
   ];
 
@@ -139,12 +149,14 @@ const MessageInput = ({
   const getToolIcon = (tool) => {
     if (tool === "search") return <Search size={14} />;
     if (tool === "blogs") return <FileEdit size={14} />;
+    if (tool === "deep_research") return <BookOpen size={14} />;
     return null;
   };
 
   const getToolLabel = (tool) => {
     if (tool === "search") return "Search";
     if (tool === "blogs") return "Blogs";
+    if (tool === "deep_research") return "Deep Research";
     return tool;
   };
 
