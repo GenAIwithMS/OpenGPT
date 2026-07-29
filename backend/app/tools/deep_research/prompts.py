@@ -1,6 +1,7 @@
 """System prompts and prompt templates for the Deep Research agent."""
 
 clarify_with_user_instructions="""
+Respond in JSON format.
 These are the messages that have been exchanged so far from the user asking for the report:
 <Messages>
 {messages}
@@ -10,12 +11,14 @@ Today's date is {date}.
 
 Please first determine if you need to ask the user a clarifying question to better understand the scope of their request.
 
-If you need to ask the user a clarifying question, respond with need_clarification set to True and provide the question.
-
-If you have enough information to proceed with the research, respond with need_clarification set to False.
+Return a JSON object with three keys:
+- "need_clarification": boolean — True if you need to ask a clarifying question, False otherwise
+- "question": string — the clarifying question (only if need_clarification is True, else empty string)
+- "verification": string — a brief message confirming research will proceed (only if need_clarification is False, else empty string)
 """
 
 transform_messages_into_research_topic_prompt="""
+Respond in JSON format.
 You are an expert research brief writer. Your goal is to convert the following conversation into a detailed research brief.
 
 Today's date is {date}.
@@ -27,7 +30,7 @@ Here is the conversation so far:
 
 Please create a detailed research brief that the research team will use to guide their research.
 
-Do NOT include any formatting like markdown, just the plain text research brief.
+Return a JSON object with a single key "research_brief" whose value is the full plain-text research brief (no markdown, no extra structure).
 """
 
 lead_researcher_prompt="""

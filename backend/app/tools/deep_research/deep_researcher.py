@@ -83,9 +83,14 @@ def _init_research_model(config: RunnableConfig, tags: list | None = None):
 
 
 def _init_research_model_structured(config: RunnableConfig, pydantic_cls, tags: list | None = None):
-    """Initialise the research model with a structured-output wrapper."""
+    """Initialise the research model with a structured-output wrapper.
+
+    Uses json_mode to avoid forcing a tool call — some API providers (e.g. Groq
+    with certain models) reject the default function_calling method when the
+    model returns text instead of calling the structured-output tool.
+    """
     model = _init_research_model(config, tags=tags)
-    return model.with_structured_output(pydantic_cls).with_retry(
+    return model.with_structured_output(pydantic_cls, method="json_mode").with_retry(
         stop_after_attempt=Configuration.from_runnable_config(config).max_structured_output_retries,
     )
 
