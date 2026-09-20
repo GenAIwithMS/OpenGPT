@@ -7,6 +7,7 @@ import ConfirmationModal from './components/ConfirmationModal';
 import { useThreads } from './hooks/useThreads';
 import { useChat } from './hooks/useChat';
 import { chatService } from './services/api';
+import { buildAttachmentPreview } from './lib/attachmentPreview';
 
 // Derive the active thread id from the URL path:
 //   /                 -> new chat
@@ -250,8 +251,10 @@ function App() {
     // renders the user message immediately and uploads the docs itself.
     try {
       setUploadingAttachment(true);
-      await sendMessage(message, tools, null, pending);
+      // The previews move into the chat with the message, so clear them from
+      // the input right away (restored below if the send fails).
       setPendingAttachments([]);
+      await sendMessage(message, tools, null, pending);
       // Refresh threads so a newly created chat (and updated titles) show in the
       // sidebar — skipped for temporary chats, which must not be persisted.
       if (!isTempChat) fetchThreads();
@@ -273,10 +276,15 @@ function App() {
       alert('Document upload is not available in Temporary Chat.');
       return;
     }
-    setPendingAttachments((prev) => [
-      ...prev,
-      { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, file },
-    ]);
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setPendingAttachments((prev) => [...prev, { id, file, previewLoading: true }]);
+    // Build the preview (PDF first page / text snippet) in the background and
+    // fill it into the card once ready.
+    buildAttachmentPreview(file).then((preview) => {
+      setPendingAttachments((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, preview, previewLoading: false } : a))
+      );
+    });
   };
 
   const handleRemoveAttachment = (id) => {

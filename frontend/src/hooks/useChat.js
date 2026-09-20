@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { chatService } from '../services/api';
+import { saveMessageAttachments, withStoredAttachments } from '../lib/attachmentPreview';
+
+const STATUS_LINE = /^(Thinking\.\.\.|Using .+\.\.\.|Finished using .+\.)$/;
 
 export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = false) => {
   const [messages, setMessages] = useState([]);
@@ -30,7 +33,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
     try {
       setLoading(true);
       const data = await chatService.getThreadMessages(threadId);
-      setMessages(data.messages || []);
+      setMessages(withStoredAttachments(threadId, data.messages || []));
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -79,14 +82,20 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
     }
 
     if (data.message_type === 'thinking') {
-      setStreamingProgress(prev =>
-        prev
-          ? { ...prev, current: data.content, thoughts: [...(prev.thoughts || []), data.content] }
-          : prev
-      );
+      // Thinking events are either short status lines ("Using search...") or
+      // token chunks of the model's reasoning. Status lines become the label;
+      // reasoning tokens are appended into one running text.
+      const isStatus = STATUS_LINE.test(data.content);
+      setStreamingProgress(prev => {
+        if (!prev) return prev;
+        return isStatus
+          ? { ...prev, current: data.content }
+          : { ...prev, reasoning: (prev.reasoning || '') + data.content };
+      });
     } else if (data.message_type === 'ai') {
+      // The answer has started — the thinking row steps aside.
       setStreamingProgress(prev =>
-        prev ? { ...prev, current: 'Generating response...' } : prev
+        prev && !prev.answering ? { ...prev, answering: true } : prev
       );
       setMessages(prev => {
         const copy = [...prev];
@@ -126,9 +135,15 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
       timestamp: new Date().toISOString(),
       tools: tools.length > 0 ? tools : undefined,
       attachments: attachments.length > 0
-        ? attachments.map((a) => ({ name: a.file?.name || a.name }))
+        ? attachments.map((a) => ({
+            name: a.file?.name || a.name,
+            size: a.file?.size,
+            file: a.file,
+            preview: a.preview,
+          }))
         : undefined,
     };
+    const humanIndex = messages.filter((m) => m.type === 'human').length;
     setMessages(prev => [...prev, userMessage]);
 
     try {
@@ -158,6 +173,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
         }
       }
       const streamThreadId = uploadThreadId;
+      saveMessageAttachments(streamThreadId, humanIndex, userMessage.attachments);
 
       // Blogs tool: keep the fixed-step progress UI
       if (tools.includes('blogs')) {
@@ -297,7 +313,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
         isStreaming: true,
         toolName: 'chat',
         current: 'Thinking...',
-        thoughts: [],
+        reasoning: '',
       });
 
       setMessages(prev => [
@@ -334,7 +350,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
         isStreaming: true,
         toolName: 'chat',
         current: 'Regenerating response...',
-        thoughts: [],
+        reasoning: '',
       });
 
       // Drop the trailing AI message and add a placeholder that fills live
@@ -381,7 +397,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
         isStreaming: true,
         toolName: 'chat',
         current: 'Updating...',
-        thoughts: [],
+        reasoning: '',
       });
 
       // Rewrite the edited message, drop everything after it, and add a

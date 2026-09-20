@@ -3,16 +3,15 @@ import {
   Send,
   Square,
   Paperclip,
-  FileText,
   Loader2,
   Plus,
   Search,
-  FileEdit,
-  FileText as BlogIcon,
+  PenLine,
   BookOpen,
   X,
   Check,
 } from "lucide-react";
+import AttachmentCard from "./AttachmentCard";
 import { PromptInput, PromptInputTextarea, PromptInputActions, PromptInputAction } from "./ui/prompt-input";
 
 const MessageInput = ({
@@ -41,36 +40,28 @@ const MessageInput = ({
     {
       key: "upload",
       label: "Upload Document",
-      description: "Attach a document",
       icon: Paperclip,
-      iconClass: "text-blue-400",
       onClick: () => fileInputRef.current?.click(),
       active: false,
     },
     {
       key: "search",
       label: "Search",
-      description: "Search the web",
       icon: Search,
-      iconClass: "text-emerald-400",
       onClick: () => handleToolSelect("search"),
       active: selectedTools.includes("search"),
     },
     {
       key: "blogs",
       label: "Blog",
-      description: "Generate a blog post",
-      icon: BlogIcon,
-      iconClass: "text-purple-400",
+      icon: PenLine,
       onClick: () => handleToolSelect("blogs"),
       active: selectedTools.includes("blogs"),
     },
     {
       key: "deep_research",
       label: "Deep Research",
-      description: "In-depth research report",
       icon: BookOpen,
-      iconClass: "text-orange-400",
       onClick: () => handleToolSelect("deep_research"),
       active: selectedTools.includes("deep_research"),
     },
@@ -135,29 +126,16 @@ const MessageInput = ({
     if (prompt) setMessage(prompt);
   };
 
+  // Search, Blog and Deep Research each route the message to a different
+  // pipeline on the backend, so only one can be active at a time. Picking a
+  // tool replaces the current one; picking the active tool turns it off.
   const handleToolSelect = (tool) => {
-    if (!selectedTools.includes(tool)) {
-      setSelectedTools([...selectedTools, tool]);
-    }
+    setSelectedTools(selectedTools.includes(tool) ? [] : [tool]);
     closeMenu();
   };
 
   const handleRemoveTool = (tool) => {
     setSelectedTools(selectedTools.filter((t) => t !== tool));
-  };
-
-  const getToolIcon = (tool) => {
-    if (tool === "search") return <Search size={14} />;
-    if (tool === "blogs") return <FileEdit size={14} />;
-    if (tool === "deep_research") return <BookOpen size={14} />;
-    return null;
-  };
-
-  const getToolLabel = (tool) => {
-    if (tool === "search") return "Search";
-    if (tool === "blogs") return "Blogs";
-    if (tool === "deep_research") return "Deep Research";
-    return tool;
   };
 
   const handleFileSelect = (file) => {
@@ -241,33 +219,16 @@ const MessageInput = ({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
       >
-        {/* Pending attachment chips (ChatGPT-style) — shown before sending */}
+        {/* Pending attachment previews — shown before sending */}
         {pendingAttachments.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 mx-1 mb-1">
-            {pendingAttachments.map((att) => {
-              const fname = att.file?.name || att.name || "document";
-              const ext = (fname.split(".").pop() || "doc").toUpperCase();
-              return (
-                <div
-                  key={att.id}
-                  className="flex items-center gap-2 bg-[#1f2026] border border-gray-600 rounded-lg pl-3 pr-2 py-2 text-sm max-w-[220px]"
-                >
-                  <FileText size={16} className="text-blue-400 shrink-0" />
-                  <span className="text-gray-200 truncate" title={fname}>
-                    {fname}
-                  </span>
-                  <span className="text-xs text-gray-400 shrink-0">{ext}</span>
-                  <button
-                    type="button"
-                    onClick={() => onRemoveAttachment(att.id)}
-                    aria-label={`Remove ${fname}`}
-                    className="shrink-0 flex items-center justify-center w-5 h-5 rounded-full text-gray-400 hover:text-gray-100 hover:bg-gray-700 transition-colors"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              );
-            })}
+          <div className="flex flex-wrap gap-2.5 mx-1 mt-1.5 mb-1">
+            {pendingAttachments.map((att) => (
+              <AttachmentCard
+                key={att.id}
+                attachment={att}
+                onRemove={() => onRemoveAttachment(att.id)}
+              />
+            ))}
           </div>
         )}
 
@@ -308,51 +269,49 @@ const MessageInput = ({
                   role="menu"
                   aria-label="Add"
                   onKeyDown={handleMenuKeyDown}
-                  className="absolute bottom-full left-0 mb-3 w-60 origin-bottom-left rounded-2xl bg-[#2a2b32] border border-gray-700/80 shadow-2xl shadow-black/40 p-1.5 z-50 animate-scale-in"
+                  className="absolute bottom-full left-0 mb-3 w-48 origin-bottom-left rounded-xl bg-[#2a2b32] border border-gray-700/80 shadow-2xl shadow-black/40 p-1 z-50 animate-scale-in"
                   style={{ transformOrigin: "bottom left" }}
                 >
                   {menuActions.map((action, index) => {
                     const Icon = action.icon;
                     const isActive = index === activeIndex;
                     return (
-                      <button
-                        key={action.key}
-                        ref={(el) => (menuItemsRef.current[index] = el)}
-                        role="menuitem"
-                        type="button"
-                        onClick={action.onClick}
-                        onMouseEnter={() => setActiveIndex(index)}
-                        onFocus={() => setActiveIndex(index)}
-                        tabIndex={isActive ? 0 : -1}
-                        className={[
-                          "group w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-left",
-                          "transition-colors duration-100",
-                          isActive ? "bg-gray-700/70" : "bg-transparent",
-                        ].join(" ")}
-                      >
-                        <span
+                      <React.Fragment key={action.key}>
+                        {index === 1 && (
+                          <div role="separator" className="my-1 mx-2 border-t border-gray-700/80" />
+                        )}
+                        <button
+                          ref={(el) => (menuItemsRef.current[index] = el)}
+                          role="menuitem"
+                          type="button"
+                          onClick={action.onClick}
+                          onMouseEnter={() => setActiveIndex(index)}
+                          onFocus={() => setActiveIndex(index)}
+                          tabIndex={isActive ? 0 : -1}
                           className={[
-                            "flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-lg bg-gray-700/60",
-                            "transition-colors duration-100 group-hover:bg-gray-600/70",
-                            action.iconClass,
+                            "group w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left",
+                            "transition-colors duration-100",
+                            isActive ? "bg-gray-700/70" : "bg-transparent",
                           ].join(" ")}
                         >
-                          <Icon size={18} strokeWidth={2} />
-                        </span>
-                        <span className="flex flex-col min-w-0">
-                          <span className="text-sm font-medium text-gray-100 leading-tight">
+                          <Icon
+                            size={16}
+                            strokeWidth={2}
+                            className={[
+                              "flex-shrink-0 transition-colors duration-100",
+                              isActive || action.active ? "text-gray-100" : "text-gray-400",
+                            ].join(" ")}
+                          />
+                          <span className="text-sm text-gray-100 truncate">
                             {action.label}
                           </span>
-                          <span className="text-xs text-gray-400 leading-tight truncate">
-                            {action.description}
-                          </span>
-                        </span>
-                        {action.active && (
-                          <span className="ml-auto flex-shrink-0 text-emerald-400">
-                            <Check size={16} />
-                          </span>
-                        )}
-                      </button>
+                          {action.active && (
+                            <span className="ml-auto flex-shrink-0 text-blue-400">
+                              <Check size={15} />
+                            </span>
+                          )}
+                        </button>
+                      </React.Fragment>
                     );
                   })}
                 </div>
@@ -360,22 +319,29 @@ const MessageInput = ({
             </div>
 
             {/* Selected Tools Chips */}
-            {selectedTools.map((tool) => (
-              <div
-                key={tool}
-                className="group flex items-center gap-1 bg-gray-600 border border-gray-500 rounded px-1.5 py-0.5 text-xs"
-              >
-                {getToolIcon(tool)}
-                <span className="text-gray-200">{getToolLabel(tool)}</span>
-                <button
-                  onClick={() => handleRemoveTool(tool)}
-                  className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-gray-500 rounded transition-all"
-                  title="Remove tool"
+            {selectedTools.map((tool) => {
+              const action = menuActions.find((a) => a.key === tool);
+              if (!action) return null;
+              const Icon = action.icon;
+              return (
+                <div
+                  key={tool}
+                  className="flex items-center gap-1.5 rounded-[10px] border border-blue-400/30 bg-blue-500/10 pl-2.5 pr-1.5 py-1.5 text-sm text-blue-300"
                 >
-                  <X size={10} className="text-gray-300" />
-                </button>
-              </div>
-            ))}
+                  <Icon size={15} className="shrink-0" />
+                  <span className="leading-none">{action.label}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveTool(tool)}
+                    aria-label={`Remove ${action.label}`}
+                    title="Remove tool"
+                    className="flex items-center justify-center w-5 h-5 rounded-md text-blue-300/70 hover:text-blue-100 hover:bg-blue-400/20 transition-colors"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              );
+            })}
           </div>
 
           {/* Send / Stop Button */}
