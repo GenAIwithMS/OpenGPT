@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { chatService } from '../services/api';
+import { saveMessageAttachments, withStoredAttachments } from '../lib/attachmentPreview';
 
 export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = false) => {
   const [messages, setMessages] = useState([]);
@@ -30,7 +31,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
     try {
       setLoading(true);
       const data = await chatService.getThreadMessages(threadId);
-      setMessages(data.messages || []);
+      setMessages(withStoredAttachments(threadId, data.messages || []));
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -126,9 +127,15 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
       timestamp: new Date().toISOString(),
       tools: tools.length > 0 ? tools : undefined,
       attachments: attachments.length > 0
-        ? attachments.map((a) => ({ name: a.file?.name || a.name }))
+        ? attachments.map((a) => ({
+            name: a.file?.name || a.name,
+            size: a.file?.size,
+            file: a.file,
+            preview: a.preview,
+          }))
         : undefined,
     };
+    const humanIndex = messages.filter((m) => m.type === 'human').length;
     setMessages(prev => [...prev, userMessage]);
 
     try {
@@ -158,6 +165,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
         }
       }
       const streamThreadId = uploadThreadId;
+      saveMessageAttachments(streamThreadId, humanIndex, userMessage.attachments);
 
       // Blogs tool: keep the fixed-step progress UI
       if (tools.includes('blogs')) {

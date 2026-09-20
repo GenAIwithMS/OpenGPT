@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
-import { Loader2, Copy, Check, ThumbsUp, ThumbsDown, RotateCcw, Pencil, FileText } from 'lucide-react';
+import { Loader2, Copy, Check, ThumbsUp, ThumbsDown, RotateCcw, Pencil } from 'lucide-react';
+import AttachmentCard from './AttachmentCard';
 import { CodeBlock, CodeBlockCode, CodeBlockGroup, CopyButton } from './ui/code-block';
 
 function nodeToString(node) {
@@ -354,27 +355,14 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
         <div key={index} className="py-4 px-4">
           <div className="max-w-3xl mx-auto flex justify-end">
             <div className="max-w-[80%] flex flex-col items-end gap-1">
-              <div className="w-full px-4 py-3 rounded-2xl bg-[#2a2b32] text-gray-100">
-                {attachments && attachments.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    {attachments.map((att, i) => {
-                      const fname = att.name || 'document';
-                      const ext = (fname.split('.').pop() || 'doc').toUpperCase();
-                      return (
-                        <div
-                          key={i}
-                          className="flex items-center gap-2 bg-[#1f2026] border border-gray-600 rounded-lg pl-3 pr-2 py-1.5 text-sm max-w-[220px]"
-                        >
-                          <FileText size={16} className="text-blue-400 shrink-0" />
-                          <span className="text-gray-200 truncate" title={fname}>
-                            {fname}
-                          </span>
-                          <span className="text-xs text-gray-400 shrink-0">{ext}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+              {attachments && attachments.length > 0 && (
+                <div className="flex flex-wrap justify-end gap-2.5 mb-1">
+                  {attachments.map((att, i) => (
+                    <AttachmentCard key={i} attachment={att} />
+                  ))}
+                </div>
+              )}
+              <div className="px-4 py-3 rounded-2xl bg-[#2a2b32] text-gray-100">
                 {bubbleInner}
               </div>
               <UserActions
