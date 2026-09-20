@@ -1,10 +1,59 @@
-# OpenGPT
+<div align="center">
 
-<p align="center">
-  <img src="OpenGPT.png" alt="OpenGPT" width="5000" />
+# ✦ OpenGPT ✦
+
+### An open-source, ChatGPT-style AI assistant powered by LangGraph
+
+Agentic tool use · Deep Research · Document Q&A (RAG) · Persistent multi-thread chats
+
+<br />
+
+<p>
+  <img src="https://img.shields.io/badge/Python-3.13-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.13" />
+  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/LangGraph-1C3C3C?style=for-the-badge&logo=langchain&logoColor=white" alt="LangGraph" />
+  <img src="https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React 18" />
+  <img src="https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite" />
+  <img src="https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind CSS" />
+  <img src="https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white" alt="MySQL" />
 </p>
 
-An AI chatbot built with LangGraph & RAG, featuring a FastAPI backend and React frontend with RAG capabilities, multi-threaded conversations, temporary (session-only) chats, and persistent MySQL storage.
+<p>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/GenAIwithMS/LangGraph-Chatbot?style=flat-square&color=22c55e" alt="License" /></a>
+  <a href="https://github.com/GenAIwithMS/LangGraph-Chatbot/stargazers"><img src="https://img.shields.io/github/stars/GenAIwithMS/LangGraph-Chatbot?style=flat-square&color=facc15" alt="Stars" /></a>
+  <a href="https://github.com/GenAIwithMS/LangGraph-Chatbot/network/members"><img src="https://img.shields.io/github/forks/GenAIwithMS/LangGraph-Chatbot?style=flat-square&color=60a5fa" alt="Forks" /></a>
+  <a href="https://github.com/GenAIwithMS/LangGraph-Chatbot/issues"><img src="https://img.shields.io/github/issues/GenAIwithMS/LangGraph-Chatbot?style=flat-square&color=f97316" alt="Issues" /></a>
+  <img src="https://img.shields.io/github/last-commit/GenAIwithMS/LangGraph-Chatbot?style=flat-square&color=a78bfa" alt="Last commit" />
+</p>
+
+<p>
+  <a href="#quick-start"><b>Quick Start</b></a> ·
+  <a href="#features"><b>Features</b></a> ·
+  <a href="#technology-stack"><b>Tech Stack</b></a> ·
+  <a href="#api-endpoints"><b>API</b></a> ·
+  <a href="#contributing"><b>Contributing</b></a>
+</p>
+
+<br />
+
+<img src="OpenGPT.png" alt="OpenGPT chat interface" width="92%" />
+
+</div>
+
+<br />
+
+<table>
+  <tr>
+    <td align="center" width="25%">🧠<br /><b>Agentic by design</b><br /><sub>LangGraph orchestrates search, weather, stocks &amp; calculator tools</sub></td>
+    <td align="center" width="25%">🔬<br /><b>Deep Research</b><br /><sub>Multi-step research that clarifies, plans, and writes a full report</sub></td>
+    <td align="center" width="25%">📄<br /><b>Chat with documents</b><br /><sub>Upload files and ask questions with FAISS-backed RAG</sub></td>
+    <td align="center" width="25%">💾<br /><b>Never lose a thread</b><br /><sub>MySQL-persisted conversations, plus temporary session-only chats</sub></td>
+  </tr>
+</table>
+
+## About
+
+OpenGPT is an AI chatbot built with LangGraph & RAG, featuring a FastAPI backend and React frontend with RAG capabilities, multi-threaded conversations, temporary (session-only) chats, and persistent MySQL storage.
 
 ## Features
 
