@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import { Loader2, Copy, Check, ThumbsUp, ThumbsDown, RotateCcw, Pencil } from 'lucide-react';
 import AttachmentCard from './AttachmentCard';
+import ThinkingIndicator from './ThinkingIndicator';
 import { CodeBlock, CodeBlockCode, CodeBlockGroup, CopyButton } from './ui/code-block';
 
 function nodeToString(node) {
@@ -285,7 +286,14 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
 
     const bubbleInner = (
       <div className="prose prose-invert max-w-none">
-        {message.streaming && streamingProgress?.isStreaming && (
+        {message.streaming && streamingProgress?.isStreaming && !streamingProgress.steps && !streamingProgress.answering && (
+          <ThinkingIndicator
+            label={streamingProgress.current}
+            reasoning={streamingProgress.reasoning}
+          />
+        )}
+
+        {message.streaming && streamingProgress?.isStreaming && streamingProgress.steps && (
           <div className="mb-3 rounded-md border border-gray-700 bg-[#1a1b1e]/60 p-3">
             <div className="flex items-center gap-2 text-sm text-gray-300">
               <Loader2 size={15} className="animate-spin text-blue-400 shrink-0" />
@@ -293,14 +301,6 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
                 {streamingProgress.current || 'Thinking...'}
               </span>
             </div>
-
-            {streamingProgress.thoughts?.length > 0 && (
-              <div className="mt-1.5 space-y-0.5 text-xs text-gray-500">
-                {streamingProgress.thoughts.map((t, i) => (
-                  <div key={i} className="truncate">• {t}</div>
-                ))}
-              </div>
-            )}
 
             {streamingProgress.steps?.length > 0 && (
               <div className="mt-1.5 space-y-1">
