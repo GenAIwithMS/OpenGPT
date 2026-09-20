@@ -326,7 +326,7 @@ const MessageInput = ({
               return (
                 <div
                   key={tool}
-                  className="flex items-center gap-1.5 rounded-[10px] border border-blue-400/30 bg-blue-500/10 pl-2.5 pr-1.5 py-1.5 text-sm text-blue-300"
+                  className="flex items-center gap-1.5 rounded-[20px] border border-blue-400/30 bg-blue-500/10 pl-2.5 pr-1.5 py-1.5 text-sm text-blue-300"
                 >
                   <Icon size={15} className="shrink-0" />
                   <span className="leading-none">{action.label}</span>
