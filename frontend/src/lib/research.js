@@ -35,3 +35,15 @@ export const currentActivity = (events = []) => {
       return 'Researching';
   }
 };
+
+// Title for a report: its first markdown heading, without styling marks
+export const reportTitle = (markdown = '', fallback = 'Research report') => {
+  const heading = markdown.match(/^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/m);
+  if (!heading) return fallback;
+  return (
+    heading[1]
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/[*_`~]/g, '')
+      .trim() || fallback
+  );
+};

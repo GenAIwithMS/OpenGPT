@@ -149,6 +149,13 @@ export const chatService = {
   },
 
   // Update thread title
+  // Save an edited deep research report (reportIndex: its position among the
+  // thread's deep research answers)
+  updateReport: async (threadId, reportIndex, content) => {
+    const response = await api.put(`/threads/${threadId}/reports/${reportIndex}`, { content });
+    return response.data;
+  },
+
   updateThreadTitle: async (threadId, title) => {
     const response = await api.put(`/threads/${threadId}/title`, { title });
     return response.data;

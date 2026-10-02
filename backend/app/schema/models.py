@@ -78,6 +78,12 @@ class UpdateTitleRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=100, description="New title for the thread")
 
 
+class UpdateReportRequest(BaseModel):
+    """Request model for saving an edited deep research report"""
+
+    content: str = Field(..., min_length=1, description="Edited report (markdown)")
+
+
 class NewThreadResponse(BaseModel):
     """Response model for creating a new thread"""
 

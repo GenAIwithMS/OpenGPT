@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
-  BookOpen,
   Check,
   ClipboardList,
   FileText,
@@ -10,9 +9,7 @@ import {
   Link2,
   Loader2,
   Telescope,
-  X,
 } from 'lucide-react';
-import { countSources } from '../lib/research';
 
 const hostOf = (url) => {
   try {
@@ -152,9 +149,9 @@ const ActivityItem = ({ event }) => {
   }
 };
 
-// Side panel with the live (or saved) activity of a deep research run:
-// each phase is a section listing what the agent thought, searched and found.
-const ResearchSidebar = ({ events = [], running, onClose }) => {
+// The live (or saved) activity of a deep research run: each phase is a section
+// listing what the agent thought, searched and found.
+const ResearchActivity = ({ events = [], running }) => {
   const scrollRef = useRef(null);
   const pinnedRef = useRef(true);
 
@@ -172,8 +169,6 @@ const ResearchSidebar = ({ events = [], running, onClose }) => {
     return out;
   }, [events]);
 
-  const sourceCount = useMemo(() => countSources(events), [events]);
-
   // Follow new activity unless the user has scrolled up to read
   useEffect(() => {
     const el = scrollRef.current;
@@ -186,64 +181,41 @@ const ResearchSidebar = ({ events = [], running, onClose }) => {
   };
 
   return (
-    <aside className="fixed inset-y-0 right-0 z-40 flex w-full max-w-md flex-col border-l border-gray-700 bg-sidebar-bg lg:static lg:z-auto lg:w-[380px] lg:max-w-none lg:shrink-0">
-      <div className="flex items-center justify-between gap-3 border-b border-gray-700 px-4 py-3">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <BookOpen size={17} className="shrink-0 text-gray-300" />
-          <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-gray-100">Deep Research</h3>
-            <p className="truncate text-xs text-gray-500">
-              {running ? 'In progress' : 'Completed'}
-              {sourceCount > 0 && ` · ${sourceCount} source${sourceCount === 1 ? '' : 's'}`}
-            </p>
-          </div>
+    <div ref={scrollRef} onScroll={handleScroll} className="thin-scroll h-full overflow-y-auto px-5 py-4">
+      {sections.length === 0 && (
+        <div className="flex items-center gap-2 text-sm text-gray-400">
+          <Loader2 size={14} className="animate-spin" /> Starting research...
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close research activity"
-          className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-700 hover:text-gray-100"
-        >
-          <X size={16} />
-        </button>
-      </div>
+      )}
 
-      <div ref={scrollRef} onScroll={handleScroll} className="thin-scroll flex-1 overflow-y-auto px-4 py-4">
-        {sections.length === 0 && (
-          <div className="flex items-center gap-2 text-sm text-gray-400">
-            <Loader2 size={14} className="animate-spin" /> Starting research...
-          </div>
-        )}
-
-        <div className="space-y-5">
-          {sections.map((section, i) => {
-            const active = running && i === sections.length - 1;
-            return (
-              <section key={i}>
-                <div className="mb-2.5 flex items-center gap-2">
-                  {active ? (
-                    <Loader2 size={14} className="shrink-0 animate-spin text-blue-400" />
-                  ) : (
-                    <Check size={14} className="shrink-0 text-emerald-400" />
-                  )}
-                  <h4 className={`text-sm font-medium ${active ? 'text-gray-100' : 'text-gray-300'}`}>
-                    {section.title}
-                  </h4>
-                </div>
-                {section.items.length > 0 && (
-                  <div className="ml-[6px] space-y-3 border-l border-gray-700 pl-4">
-                    {section.items.map((event) => (
-                      <ActivityItem key={event.id} event={event} />
-                    ))}
-                  </div>
+      <div className="space-y-5">
+        {sections.map((section, i) => {
+          const active = running && i === sections.length - 1;
+          return (
+            <section key={i}>
+              <div className="mb-2.5 flex items-center gap-2">
+                {active ? (
+                  <Loader2 size={14} className="shrink-0 animate-spin text-blue-400" />
+                ) : (
+                  <Check size={14} className="shrink-0 text-emerald-400" />
                 )}
-              </section>
-            );
-          })}
-        </div>
+                <h4 className={`text-sm font-medium ${active ? 'text-gray-100' : 'text-gray-300'}`}>
+                  {section.title}
+                </h4>
+              </div>
+              {section.items.length > 0 && (
+                <div className="ml-[6px] space-y-3 border-l border-gray-700 pl-4">
+                  {section.items.map((event) => (
+                    <ActivityItem key={event.id} event={event} />
+                  ))}
+                </div>
+              )}
+            </section>
+          );
+        })}
       </div>
-    </aside>
+    </div>
   );
 };
 
-export default ResearchSidebar;
+export default ResearchActivity;

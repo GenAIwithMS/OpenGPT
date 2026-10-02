@@ -11,6 +11,7 @@ from app.schema.models import (
     ThreadListResponse,
     ThreadHistoryResponse,
     UpdateTitleRequest,
+    UpdateReportRequest,
     NewThreadResponse,
     PDFUploadResponse,
     MessageResponse,
@@ -199,6 +200,13 @@ async def update_thread_title(thread_id: str, request: UpdateTitleRequest):
 
     except Exception as e:
         raise AppError(str(e)) from e
+
+
+@chat_router.put("/threads/{thread_id}/reports/{report_index}")
+async def update_research_report(thread_id: str, report_index: int, request: UpdateReportRequest):
+    if not ChatService.update_research_report(thread_id, report_index, request.content):
+        raise NotFoundError("Report not found")
+    return {"status": "success", "thread_id": thread_id, "report_index": report_index}
 
 
 @chat_router.post("/upload-pdf", response_model=PDFUploadResponse)

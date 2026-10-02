@@ -715,6 +715,33 @@ class ChatService:
             raise Exception(f"Failed to edit message: {str(e)}")
 
     @staticmethod
+    def update_research_report(thread_id: str, report_index: int, content: str) -> bool:
+        """Replace the text of a saved deep research report.
+
+        ``report_index`` is the report's position among the thread's deep
+        research answers. The activity log saved with it is kept.
+        """
+        config = {"configurable": {"thread_id": thread_id}}
+        state = chatbot.get_state(config)
+        messages = state.values.get("messages", []) if state and state.values else []
+        reports = [
+            m for m in messages
+            if isinstance(m, AIMessage) and m.additional_kwargs.get("tool_used") == "deep_research"
+        ]
+        if report_index < 0 or report_index >= len(reports):
+            return False
+
+        target = reports[report_index]
+        # A message with an existing id replaces the stored one
+        chatbot.update_state(
+            config,
+            {"messages": [AIMessage(id=target.id, content=content, additional_kwargs=target.additional_kwargs)]},
+            as_node="chat_node",
+        )
+        touch_thread(thread_id)
+        return True
+
+    @staticmethod
     def update_thread_title(thread_id: str, title: str) -> bool:
         """Update the title for a thread"""
         try:

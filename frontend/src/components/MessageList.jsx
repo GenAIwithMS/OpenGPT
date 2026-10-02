@@ -6,7 +6,7 @@ import { Loader2, Copy, Check, ThumbsUp, ThumbsDown, RotateCcw, Pencil } from 'l
 import AttachmentCard from './AttachmentCard';
 import ThinkingIndicator from './ThinkingIndicator';
 import ResearchCard from './ResearchCard';
-import DownloadMenu from './DownloadMenu';
+import ReportCard from './ReportCard';
 import { CodeBlock, CodeBlockCode, CodeBlockGroup, CopyButton } from './ui/code-block';
 
 function nodeToString(node) {
@@ -57,7 +57,7 @@ function UserActions({ content, onEdit }) {
   );
 }
 
-function MessageActions({ content, onRegenerate, downloadable }) {
+function MessageActions({ content, onRegenerate }) {
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState(null); // 'like' | 'dislike'
 
@@ -75,7 +75,6 @@ function MessageActions({ content, onRegenerate, downloadable }) {
 
   return (
     <div className="mt-2 flex items-center gap-1 justify-end">
-      {downloadable && <DownloadMenu content={content} />}
       <button
         type="button"
         onClick={handleCopy}
@@ -117,7 +116,7 @@ function MessageActions({ content, onRegenerate, downloadable }) {
   );
 }
 
-const markdownComponents = {
+export const markdownComponents = {
   pre: ({ children }) => <>{children}</>,
   code: ({ node, className, children, ...props }) => {
     const match = /language-(\w+)/.exec(className || '');
@@ -209,7 +208,7 @@ const markdownComponents = {
   br: () => <br />,
 };
 
-const MessageList = ({ messages, loading, streaming, streamingProgress, onRegenerate, onEditMessage, onOpenResearch }) => {
+const MessageList = ({ messages, loading, streaming, streamingProgress, onRegenerate, onEditMessage, onOpenResearch, openResearch }) => {
   const messagesEndRef = useRef(null);
   const previousLengthRef = useRef(0);
   const [editIndex, setEditIndex] = useState(null);
@@ -229,6 +228,10 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
   const renderMessage = (message, index) => {
     const isUser = message.type === 'human';
     const isResearch = !isUser && message.tool_used === 'deep_research' && !!message.research;
+    // A research report is shown as a card that opens in the side panel; a
+    // failed run's error text stays inline like a normal answer.
+    const asReportCard = isResearch && !!message.content.trim() && !message.content.startsWith('⚠️');
+    const openView = openResearch?.index === index ? openResearch.view : null;
 
     const commitEdit = () => {
       if (editIndex === null) return;
@@ -293,8 +296,18 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
         {isResearch && (
           <ResearchCard
             events={message.research}
-            running={!!message.streaming}
-            onOpen={() => onOpenResearch?.(index)}
+            running={!!message.streaming && !asReportCard}
+            active={openView === 'activity'}
+            onOpen={() => onOpenResearch?.(index, 'activity')}
+          />
+        )}
+
+        {asReportCard && (
+          <ReportCard
+            content={message.content}
+            writing={!!message.streaming}
+            active={openView === 'report'}
+            onOpen={() => onOpenResearch?.(index, 'report')}
           />
         )}
 
@@ -347,14 +360,16 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
           </div>
         )}
 
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          rehypePlugins={[rehypeRaw]}
-          components={markdownComponents}
-        >
-          {message.content}
-        </ReactMarkdown>
-        {message.streaming && (
+        {!asReportCard && (
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw]}
+            components={markdownComponents}
+          >
+            {message.content}
+          </ReactMarkdown>
+        )}
+        {message.streaming && !isResearch && (
           <span className="inline-block w-1.5 h-4 ml-0.5 align-middle bg-gray-400 animate-pulse" />
         )}
       </div>
@@ -395,11 +410,7 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
         <div className="max-w-3xl mx-auto flex justify-start">
           <div className="max-w-[80%] px-4 py-3 rounded-lg text-gray-100">
             {bubbleInner}
-            <MessageActions
-              content={message.content}
-              onRegenerate={onRegenerate}
-              downloadable={message.tool_used === 'deep_research' && !message.streaming && !!message.content}
-            />
+            <MessageActions content={message.content} onRegenerate={onRegenerate} />
           </div>
         </div>
       </div>

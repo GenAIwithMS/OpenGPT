@@ -423,8 +423,9 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
     setStreamingProgress(null);
     setMessages(prev => {
       const hadStreaming = prev.some(m => m.streaming);
-      // Keep the partial response, just stop the streaming indicator.
-      const next = prev.map(m => (m.streaming ? { ...m, streaming: false } : m));
+      // Keep the partial response, just stop the streaming indicator. A
+      // stopped run was never saved on the server, so mark it as such.
+      const next = prev.map(m => (m.streaming ? { ...m, streaming: false, unsaved: true } : m));
       // Drop the just-sent human message so the prompt returns to the input.
       if (hadStreaming && next.length && next[next.length - 1]?.type === 'human') {
         return next.slice(0, -1);
@@ -434,8 +435,22 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
     return lastPromptRef.current || '';
   };
 
+  // Replace a deep research report's text (edited in the side panel) and save
+  // it to the thread when the report exists there.
+  const updateReport = async (messageIndex, content) => {
+    const target = messages[messageIndex];
+    if (!target) return;
+    const isSavedReport = (m) => m.type === 'ai' && m.tool_used === 'deep_research' && !m.unsaved;
+    if (threadId && !isTempChat && isSavedReport(target)) {
+      const reportIndex = messages.slice(0, messageIndex).filter(isSavedReport).length;
+      await chatService.updateReport(threadId, reportIndex, content);
+    }
+    setMessages(prev => prev.map((m, i) => (i === messageIndex ? { ...m, content } : m)));
+  };
+
   return {
     messages,
+    updateReport,
     loading,
     error,
     sendMessage,

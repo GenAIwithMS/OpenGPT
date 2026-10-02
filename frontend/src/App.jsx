@@ -4,7 +4,7 @@ import Sidebar from './components/Sidebar';
 import MessageList from './components/MessageList';
 import MessageInput from './components/MessageInput';
 import ConfirmationModal from './components/ConfirmationModal';
-import ResearchSidebar from './components/ResearchSidebar';
+import ResearchPanel from './components/ResearchPanel';
 import { useThreads } from './hooks/useThreads';
 import { useChat } from './hooks/useChat';
 import { chatService } from './services/api';
@@ -127,23 +127,34 @@ function App() {
     sendMessage,
     regenerate,
     editMessage,
+    updateReport,
     loadMessages,
     streamingProgress,
     stop,
   } = useChat(currentThreadId, handleThreadCreated, skipLoadRef, isTempChat);
 
-  // Deep research activity panel: index of the message whose run is shown.
-  // It opens by itself when a run starts and can be reopened from the
-  // message's research card.
-  const [researchIndex, setResearchIndex] = useState(null);
-  const researchMessage = researchIndex !== null ? messages[researchIndex] : null;
+  // Deep research side panel: which message it shows and which view
+  // ('activity' while the agent works, 'report' to review the result). It
+  // opens by itself when a run starts, moves to the report once that is being
+  // written, and can be reopened from the cards in the message.
+  const [researchPanel, setResearchPanel] = useState(null);
+  const researchMessage = researchPanel ? messages[researchPanel.index] : null;
   const runningResearchIndex = messages.findIndex(
     (m) => m.streaming && m.tool_used === 'deep_research'
   );
+  const reportStarted = runningResearchIndex !== -1 && !!messages[runningResearchIndex].content;
 
   useEffect(() => {
-    if (runningResearchIndex !== -1) setResearchIndex(runningResearchIndex);
-  }, [runningResearchIndex]);
+    if (runningResearchIndex !== -1) {
+      setResearchPanel({ index: runningResearchIndex, view: reportStarted ? 'report' : 'activity' });
+    }
+  }, [runningResearchIndex, reportStarted]);
+
+  const handleOpenResearch = (index, view) => {
+    setResearchPanel((open) =>
+      open && open.index === index && open.view === view ? null : { index, view }
+    );
+  };
 
   // Centered layout (welcome heading + input in the middle of the viewport)
   // only when the conversation has no messages yet. Driven purely by message
@@ -182,7 +193,7 @@ function App() {
     setIsTempChat(false);
     setIsSidebarOpen(false);
     setPendingAttachments([]);
-    setResearchIndex(null);
+    setResearchPanel(null);
     navigate('/chat');
   };
 
@@ -195,7 +206,7 @@ function App() {
       const next = !prev;
       setCurrentThreadId(null);
       setIsSidebarOpen(false);
-      setResearchIndex(null);
+      setResearchPanel(null);
       // Reflect temp mode in the URL so it survives refresh and is shareable.
       navigate(next ? '/chat?temporary-chat=true' : '/chat');
       return next;
@@ -207,7 +218,7 @@ function App() {
     setCurrentThreadId(threadId);
     setIsSidebarOpen(false);
     setPendingAttachments([]);
-    setResearchIndex(null);
+    setResearchPanel(null);
     navigate(`/chat/${threadId}`);
   };
 
@@ -339,10 +350,8 @@ function App() {
       />
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex h-screen relative">
-          {/* Chat Section */}
-          <div ref={chatSectionRef} className="flex-1 min-w-0 flex flex-col relative">
-          {/* Header */}
+      <div className="flex-1 min-w-0 flex flex-col h-screen relative">
+          {/* Header — spans the full width, above both the chat and the research panel */}
           <div className="flex-shrink-0 px-4 py-3 bg-chat-bg">
             <div className="flex items-center justify-between">
               <span className="text-base font-semibold tracking-tight text-white select-none">
@@ -371,6 +380,9 @@ function App() {
             </div>
           </div>
 
+        <div className="flex-1 min-h-0 flex">
+          {/* Chat Section */}
+          <div ref={chatSectionRef} className="flex-1 min-w-0 flex flex-col relative">
           {/* Messages — scrolling area. Collapses to height 0 while centered so
               the input can occupy the full viewport; present otherwise. When not
               centered it reserves bottom space for the absolute input so the
@@ -386,7 +398,8 @@ function App() {
               streamingProgress={streamingProgress}
               onRegenerate={regenerate}
               onEditMessage={editMessage}
-              onOpenResearch={(index) => setResearchIndex((open) => (open === index ? null : index))}
+              onOpenResearch={handleOpenResearch}
+              openResearch={researchPanel}
             />
           </div>
 
@@ -442,14 +455,18 @@ function App() {
           )}
         </div>
 
-        {/* Deep research activity panel */}
+        {/* Deep research side panel (report review + activity) */}
         {researchMessage?.research && (
-          <ResearchSidebar
-            events={researchMessage.research}
-            running={!!researchMessage.streaming}
-            onClose={() => setResearchIndex(null)}
+          <ResearchPanel
+            key={researchPanel.index}
+            message={researchMessage}
+            view={researchPanel.view}
+            onViewChange={(view) => setResearchPanel((open) => (open ? { ...open, view } : open))}
+            onClose={() => setResearchPanel(null)}
+            onSaveReport={(content) => updateReport(researchPanel.index, content)}
           />
         )}
+        </div>
       </div>
 
       {/* Delete Confirmation Modal */}

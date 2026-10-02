@@ -8,8 +8,9 @@ const FORMATS = [
   { key: 'txt', label: 'Plain text', icon: FileText },
 ];
 
-// "Download" button with a small menu to save a report as PDF, Markdown or text
-const DownloadMenu = ({ content }) => {
+// Download icon with a small menu to save a report as PDF, Markdown or text.
+// `placement` says whether the menu opens above ("up") or below ("down").
+const DownloadMenu = ({ content, placement = 'up', buttonClassName = '' }) => {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(null);
   const rootRef = useRef(null);
@@ -44,22 +45,26 @@ const DownloadMenu = ({ content }) => {
   };
 
   return (
-    <div ref={rootRef} className="relative">
+    // Clicks stay inside so a surrounding clickable card is not triggered
+    <div ref={rootRef} className="relative" onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-gray-400 transition-colors hover:bg-white/5 hover:text-gray-200"
+        aria-label="Download report"
+        title="Download"
+        className={`flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-white/10 hover:text-gray-100 ${open ? 'bg-white/10 text-gray-100' : ''} ${buttonClassName}`}
       >
-        <Download size={15} />
-        Download
+        <Download size={16} />
       </button>
 
       {open && (
         <div
           role="menu"
-          className="absolute bottom-full right-0 z-30 mb-2 w-40 rounded-xl border border-gray-700/80 bg-[#2a2b32] p-1 shadow-2xl shadow-black/40"
+          className={`absolute right-0 z-50 w-40 rounded-xl border border-gray-700/80 bg-[#2a2b32] p-1 shadow-2xl shadow-black/40 ${
+            placement === 'down' ? 'top-full mt-2' : 'bottom-full mb-2'
+          }`}
         >
           {FORMATS.map(({ key, label, icon: Icon }) => (
             <button
