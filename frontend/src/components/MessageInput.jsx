@@ -5,7 +5,7 @@ import {
   Paperclip,
   Loader2,
   Plus,
-  Search,
+  Globe,
   PenLine,
   BookOpen,
   X,
@@ -47,7 +47,7 @@ const MessageInput = ({
     {
       key: "search",
       label: "Search",
-      icon: Search,
+      icon: Globe,
       onClick: () => handleToolSelect("search"),
       active: selectedTools.includes("search"),
     },
