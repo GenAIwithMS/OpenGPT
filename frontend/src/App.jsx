@@ -73,6 +73,25 @@ const TempChatCheckedIcon = (props) => (
   </svg>
 );
 
+// Welcome headings for an empty chat; one is picked at random each time
+const GREETINGS = [
+  'How can I help you today?',
+  'What are you working on?',
+  "What's on your mind today?",
+  'Where should we begin?',
+  'What would you like to explore?',
+  'Ready when you are.',
+  'What can I do for you?',
+  'How can I make your day easier?',
+  "Let's figure it out together.",
+  'What shall we dive into?',
+];
+
+const randomGreeting = (current) => {
+  const options = GREETINGS.filter((g) => g !== current);
+  return options[Math.floor(Math.random() * options.length)];
+};
+
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -160,6 +179,12 @@ function App() {
   // only when the conversation has no messages yet. Driven purely by message
   // count so it resets on new/temp chat and matches a refresh of an existing chat.
   const centered = messages.length === 0;
+
+  // A fresh greeting every time the empty (welcome) screen comes up
+  const [greeting, setGreeting] = useState(() => randomGreeting());
+  useEffect(() => {
+    if (centered) setGreeting((current) => randomGreeting(current));
+  }, [centered, currentThreadId]);
 
   // Smoothly slide the input between the centered (empty) and bottom states by
   // translating it up from the bottom. Only `transform` is animated so there is
@@ -430,7 +455,7 @@ function App() {
                   </p>
                 </>
               ) : (
-                <h1 className="text-2xl font-bold text-gray-100">How can I help you today?</h1>
+                <h1 className="text-2xl font-bold text-gray-100">{greeting}</h1>
               )}
             </div>
 
