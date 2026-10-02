@@ -5,6 +5,8 @@ import rehypeRaw from 'rehype-raw';
 import { Loader2, Copy, Check, ThumbsUp, ThumbsDown, RotateCcw, Pencil } from 'lucide-react';
 import AttachmentCard from './AttachmentCard';
 import ThinkingIndicator from './ThinkingIndicator';
+import ResearchCard from './ResearchCard';
+import ReportCard from './ReportCard';
 import { CodeBlock, CodeBlockCode, CodeBlockGroup, CopyButton } from './ui/code-block';
 
 function nodeToString(node) {
@@ -114,7 +116,7 @@ function MessageActions({ content, onRegenerate }) {
   );
 }
 
-const markdownComponents = {
+export const markdownComponents = {
   pre: ({ children }) => <>{children}</>,
   code: ({ node, className, children, ...props }) => {
     const match = /language-(\w+)/.exec(className || '');
@@ -206,7 +208,7 @@ const markdownComponents = {
   br: () => <br />,
 };
 
-const MessageList = ({ messages, loading, streaming, streamingProgress, onRegenerate, onEditMessage }) => {
+const MessageList = ({ messages, loading, streaming, streamingProgress, onRegenerate, onEditMessage, onOpenResearch, openResearch }) => {
   const messagesEndRef = useRef(null);
   const previousLengthRef = useRef(0);
   const [editIndex, setEditIndex] = useState(null);
@@ -225,6 +227,11 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
 
   const renderMessage = (message, index) => {
     const isUser = message.type === 'human';
+    const isResearch = !isUser && message.tool_used === 'deep_research' && !!message.research;
+    // A research report is shown as a card that opens in the side panel; a
+    // failed run's error text stays inline like a normal answer.
+    const asReportCard = isResearch && !!message.content.trim() && !message.content.startsWith('⚠️');
+    const openView = openResearch?.index === index ? openResearch.view : null;
 
     const commitEdit = () => {
       if (editIndex === null) return;
@@ -286,7 +293,25 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
 
     const bubbleInner = (
       <div className="prose prose-invert max-w-none">
-        {message.streaming && streamingProgress?.isStreaming && !streamingProgress.steps && !streamingProgress.answering && (
+        {isResearch && (
+          <ResearchCard
+            events={message.research}
+            running={!!message.streaming && !asReportCard}
+            active={openView === 'activity'}
+            onOpen={() => onOpenResearch?.(index, 'activity')}
+          />
+        )}
+
+        {asReportCard && (
+          <ReportCard
+            content={message.content}
+            writing={!!message.streaming}
+            active={openView === 'report'}
+            onOpen={() => onOpenResearch?.(index, 'report')}
+          />
+        )}
+
+        {message.streaming && streamingProgress?.toolName === 'chat' && !streamingProgress.answering && (
           <ThinkingIndicator
             label={streamingProgress.current}
             reasoning={streamingProgress.reasoning}
@@ -335,14 +360,16 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
           </div>
         )}
 
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          rehypePlugins={[rehypeRaw]}
-          components={markdownComponents}
-        >
-          {message.content}
-        </ReactMarkdown>
-        {message.streaming && (
+        {!asReportCard && (
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw]}
+            components={markdownComponents}
+          >
+            {message.content}
+          </ReactMarkdown>
+        )}
+        {message.streaming && !isResearch && (
           <span className="inline-block w-1.5 h-4 ml-0.5 align-middle bg-gray-400 animate-pulse" />
         )}
       </div>

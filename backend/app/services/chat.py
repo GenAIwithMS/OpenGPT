@@ -1,3 +1,4 @@
+import os
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, RemoveMessage
@@ -12,6 +13,11 @@ from app.services.chatbot import (
 )
 from app.services.thread import generate_thread_id, generate_id_name
 from app.services.rag import has_document
+
+# How much of the earlier conversation a deep research run receives as context
+DEEP_RESEARCH_HISTORY_MESSAGES = 6
+DEEP_RESEARCH_HISTORY_CHARS = 4000
+
 
 class ChatService:
     """Service class to handle chat-related business logic"""
@@ -72,16 +78,20 @@ class ChatService:
             
             formatted_messages = []
             for message in messages:
+                extra = message.additional_kwargs or {}
                 if isinstance(message, HumanMessage):
                     formatted_messages.append({
                         "content": message.content,
-                        "type": "human"
+                        "type": "human",
+                        "tools": extra.get("tools"),
                     })
                 elif isinstance(message, AIMessage):
                     if message.content:
                         formatted_messages.append({
                             "content": message.content,
-                            "type": "ai"
+                            "type": "ai",
+                            "tool_used": extra.get("tool_used"),
+                            "research": extra.get("research_activity"),
                         })
             
             return formatted_messages
@@ -393,6 +403,103 @@ class ChatService:
                 print(f"Error persisting final assistant message: {e}")
 
     @staticmethod
+    def _stream_deep_research(graph, config, message: str, human_in_state: bool = False):
+        """Run the deep research graph as a turn of the conversation.
+
+        Yields a ``research`` chunk for every step the agent takes (planning,
+        thinking, searches, sources, findings) and ``ai`` chunks with the
+        report as it is written. Earlier turns of the thread are passed in as
+        context, and the finished turn (prompt, report and its activity log) is
+        saved to the thread so it stays part of the conversation.
+
+        ``human_in_state`` is True when the prompt is already the thread's last
+        message (edit flow), so it is not appended a second time.
+        """
+        from app.tools.deep_research.deep_researcher import deep_researcher as deep_research_app
+
+        # Recent conversation, so the research can build on what was said before
+        try:
+            state = graph.get_state(config)
+            thread_messages = list(state.values.get("messages", [])) if state and state.values else []
+        except Exception:
+            thread_messages = []
+        if human_in_state and thread_messages and isinstance(thread_messages[-1], HumanMessage):
+            thread_messages = thread_messages[:-1]
+        history = [
+            type(m)(content=m.content[:DEEP_RESEARCH_HISTORY_CHARS])
+            for m in thread_messages
+            if isinstance(m, (HumanMessage, AIMessage)) and isinstance(m.content, str) and m.content
+        ][-DEEP_RESEARCH_HISTORY_MESSAGES:]
+
+        deep_input = {"messages": history + [HumanMessage(content=message)]}
+        # Same run limits as the DeepResearch chatbot tool
+        deep_config = {
+            "configurable": {
+                "allow_clarification": False,
+                "max_researcher_iterations": int(os.getenv("DEEP_RESEARCH_MAX_ITERATIONS", "3")),
+                "max_react_tool_calls": int(os.getenv("DEEP_RESEARCH_MAX_TOOL_CALLS", "6")),
+            }
+        }
+
+        activity = []
+        report_parts = []
+        final_report = ""
+        failed = False
+
+        try:
+            for namespace, mode, payload in deep_research_app.stream(
+                deep_input, deep_config, stream_mode=["updates", "custom", "messages"], subgraphs=True
+            ):
+                if mode == "custom":
+                    event = {"id": len(activity), **payload}
+                    activity.append(event)
+                    yield {"message_type": "research", "event": event}
+                elif mode == "messages":
+                    chunk, metadata = payload
+                    if (
+                        metadata.get("langgraph_node") == "final_report_generation"
+                        and isinstance(chunk.content, str)
+                        and chunk.content
+                    ):
+                        report_parts.append(chunk.content)
+                        yield {"content": chunk.content, "message_type": "ai", "node": "report"}
+                elif mode == "updates" and not namespace and "final_report_generation" in payload:
+                    final_report = payload["final_report_generation"].get("final_report", "")
+        except Exception as deep_error:
+            failed = True
+            error_msg = str(deep_error)
+            print(f"Error streaming deep research: {error_msg}")
+            event = {"id": len(activity), "kind": "error", "text": error_msg}
+            activity.append(event)
+            yield {"message_type": "research", "event": event}
+            final_report = f"⚠️ **Deep Research Failed**\n\nAn error occurred:\n```\n{error_msg}\n```"
+            report_parts = []
+
+        report = "".join(report_parts) or final_report
+        if not report_parts and report:
+            # Nothing was streamed token-by-token (or the run failed): send it whole
+            yield {"content": report, "message_type": "ai", "node": "report"}
+
+        if not failed:
+            event = {"id": len(activity), "kind": "done"}
+            activity.append(event)
+            yield {"message_type": "research", "event": event}
+
+        # Save the turn to the thread so it is part of the conversation
+        if report:
+            try:
+                turn = []
+                if not human_in_state:
+                    turn.append(HumanMessage(content=message, additional_kwargs={"tools": ["deep_research"]}))
+                turn.append(AIMessage(
+                    content=report,
+                    additional_kwargs={"tool_used": "deep_research", "research_activity": activity},
+                ))
+                graph.update_state(config, {"messages": turn}, as_node="chat_node")
+            except Exception as e:
+                print(f"Error saving deep research turn: {e}")
+
+    @staticmethod
     def stream_message(message: str, thread_id: str, tools: Optional[List[str]] = None, temporary: bool = False):
         # Temporary chats run on an in-memory checkpointer and never touch the
         # database. Use the memory-backed graph so nothing is persisted.
@@ -475,40 +582,10 @@ class ChatService:
 
             # If deep_research tool is requested, run the deep research graph
             if tools and "deep_research" in tools:
-                try:
-                    from app.tools.deep_research.deep_researcher import deep_researcher as deep_research_app
-
-                    deep_input = {
-                        "messages": [HumanMessage(content=message)]
-                    }
-
-                    deep_config = {
-                        "configurable": {"allow_clarification": False}
-                    }
-
-                    for event in deep_research_app.stream(deep_input, deep_config, stream_mode="updates"):
-                        for node_name, node_output in event.items():
-                            if node_name == "clarify_with_user":
-                                yield {"content": "Scope clarified", "message_type": "progress", "node": "clarify"}
-                            elif node_name == "write_research_brief":
-                                yield {"content": "Research brief written", "message_type": "progress", "node": "brief"}
-                            elif node_name == "research_supervisor":
-                                yield {"content": "Research complete", "message_type": "progress", "node": "research"}
-                            elif node_name == "final_report_generation":
-                                if "final_report" in node_output:
-                                    yield {"content": node_output["final_report"], "message_type": "ai", "node": "report"}
-
-                    if not temporary:
-                        touch_thread(thread_id)
-                    return
-                except Exception as deep_error:
-                    error_msg = str(deep_error)
-                    print(f"Error streaming deep research: {error_msg}")
-                    yield {
-                        "content": f"⚠️ **Deep Research Failed**\n\nAn error occurred:\n```\n{error_msg}\n```",
-                        "message_type": "ai"
-                    }
-                    return
+                yield from ChatService._stream_deep_research(graph, config, message)
+                if not temporary:
+                    touch_thread(thread_id)
+                return
 
             # Check if thread has a document (skipped for temp chats — they
             # cannot have uploaded PDFs and must not touch document storage).
@@ -554,7 +631,9 @@ class ChatService:
                 for m in messages[target_idx:]
                 if getattr(m, "id", None)
             ]
-            edit_ops.append(HumanMessage(content=new_content))
+            edit_ops.append(
+                HumanMessage(content=new_content, additional_kwargs={"tools": tools} if tools else {})
+            )
             chatbot.update_state(current.config, {"messages": edit_ops})
 
             # Blogs tool uses a separate, stateless graph keyed by topic
@@ -623,45 +702,44 @@ class ChatService:
 
             # If deep_research tool is requested, run the deep research graph
             if tools and "deep_research" in tools:
-                try:
-                    from app.tools.deep_research.deep_researcher import deep_researcher as deep_research_app
-
-                    deep_input = {
-                        "messages": [HumanMessage(content=new_content)]
-                    }
-
-                    deep_config = {
-                        "configurable": {"allow_clarification": False}
-                    }
-
-                    for event in deep_research_app.stream(deep_input, deep_config, stream_mode="updates"):
-                        for node_name, node_output in event.items():
-                            if node_name == "clarify_with_user":
-                                yield {"content": "Scope clarified", "message_type": "progress", "node": "clarify"}
-                            elif node_name == "write_research_brief":
-                                yield {"content": "Research brief written", "message_type": "progress", "node": "brief"}
-                            elif node_name == "research_supervisor":
-                                yield {"content": "Research complete", "message_type": "progress", "node": "research"}
-                            elif node_name == "final_report_generation":
-                                if "final_report" in node_output:
-                                    yield {"content": node_output["final_report"], "message_type": "ai", "node": "report"}
-
-                    touch_thread(thread_id)
-                    return
-                except Exception as deep_error:
-                    error_msg = str(deep_error)
-                    print(f"Error editing deep research: {error_msg}")
-                    yield {
-                        "content": f"⚠️ **Deep Research Failed**\n\nAn error occurred:\n```\n{error_msg}\n```",
-                        "message_type": "ai"
-                    }
-                    return
+                yield from ChatService._stream_deep_research(
+                    chatbot, config, new_content, human_in_state=True
+                )
+                touch_thread(thread_id)
+                return
 
             yield from ChatService._stream_chatbot(chatbot, config, doc_exists, None)
             touch_thread(thread_id)
         except Exception as e:
             print(f"Error editing message: {e}")
             raise Exception(f"Failed to edit message: {str(e)}")
+
+    @staticmethod
+    def update_research_report(thread_id: str, report_index: int, content: str) -> bool:
+        """Replace the text of a saved deep research report.
+
+        ``report_index`` is the report's position among the thread's deep
+        research answers. The activity log saved with it is kept.
+        """
+        config = {"configurable": {"thread_id": thread_id}}
+        state = chatbot.get_state(config)
+        messages = state.values.get("messages", []) if state and state.values else []
+        reports = [
+            m for m in messages
+            if isinstance(m, AIMessage) and m.additional_kwargs.get("tool_used") == "deep_research"
+        ]
+        if report_index < 0 or report_index >= len(reports):
+            return False
+
+        target = reports[report_index]
+        # A message with an existing id replaces the stored one
+        chatbot.update_state(
+            config,
+            {"messages": [AIMessage(id=target.id, content=content, additional_kwargs=target.additional_kwargs)]},
+            as_node="chat_node",
+        )
+        touch_thread(thread_id)
+        return True
 
     @staticmethod
     def update_thread_title(thread_id: str, title: str) -> bool:

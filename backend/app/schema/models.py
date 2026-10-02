@@ -60,6 +60,9 @@ class MessageResponse(BaseModel):
 
     content: str = Field(..., description="Message content")
     type: str = Field(..., description="Message type (human, ai, tool)")
+    tools: Optional[List[str]] = Field(None, description="Tools selected for a human message")
+    tool_used: Optional[str] = Field(None, description="Tool that produced an AI message")
+    research: Optional[List[Dict[str, Any]]] = Field(None, description="Deep research activity log")
 
 
 class ThreadHistoryResponse(BaseModel):
@@ -73,6 +76,12 @@ class UpdateTitleRequest(BaseModel):
     """Request model for updating thread title"""
 
     title: str = Field(..., min_length=1, max_length=100, description="New title for the thread")
+
+
+class UpdateReportRequest(BaseModel):
+    """Request model for saving an edited deep research report"""
+
+    content: str = Field(..., min_length=1, description="Edited report (markdown)")
 
 
 class NewThreadResponse(BaseModel):

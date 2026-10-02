@@ -4,7 +4,7 @@ from typing import List, Annotated, Literal
 
 from langchain_core.tools import InjectedToolArg, tool
 from langchain_core.runnables import RunnableConfig
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 
 
 @tool

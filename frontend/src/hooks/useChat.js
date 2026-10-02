@@ -4,6 +4,15 @@ import { saveMessageAttachments, withStoredAttachments } from '../lib/attachment
 
 const STATUS_LINE = /^(Thinking\.\.\.|Using .+\.\.\.|Finished using .+\.)$/;
 
+const researchPlaceholder = () => ({
+  type: 'ai',
+  content: '',
+  timestamp: new Date().toISOString(),
+  streaming: true,
+  tool_used: 'deep_research',
+  research: [],
+});
+
 export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = false) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -91,6 +100,17 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
         return isStatus
           ? { ...prev, current: data.content }
           : { ...prev, reasoning: (prev.reasoning || '') + data.content };
+      });
+    } else if (data.message_type === 'research') {
+      // Deep research activity (planning, searches, sources, ...) is kept on
+      // the message so it stays with the conversation.
+      setMessages(prev => {
+        const copy = [...prev];
+        const idx = copy.findIndex(m => m.streaming);
+        if (idx !== -1) {
+          copy[idx] = { ...copy[idx], research: [...(copy[idx].research || []), data.event] };
+        }
+        return copy;
       });
     } else if (data.message_type === 'ai') {
       // The answer has started — the thinking row steps aside.
@@ -259,52 +279,12 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
         return;
       }
 
-      // Deep Research tool: show step-based progress
+      // Deep Research tool: the run's activity streams into the message itself
+      // (shown in the research side panel) and the report streams in as content.
       if (tools.includes('deep_research')) {
-        setStreamingProgress({
-          isStreaming: true,
-          toolName: 'deep_research',
-          steps: [
-            { label: 'Clarifying scope...', status: 'in-progress' },
-            { label: 'Writing research brief...', status: 'pending' },
-            { label: 'Researching...', status: 'pending' },
-            { label: 'Generating report...', status: 'pending' },
-          ],
-        });
-
-        let aiResponse = '';
-
-        const handleMessage = (data) => {
-          if (data.message_type === 'progress') {
-            if (data.node === 'clarify') {
-              updateProgressStep('Clarifying scope...', 'completed');
-              updateProgressStep('Writing research brief...', 'in-progress');
-            } else if (data.node === 'brief') {
-              updateProgressStep('Writing research brief...', 'completed');
-              updateProgressStep('Researching...', 'in-progress');
-            } else if (data.node === 'research') {
-              updateProgressStep('Researching...', 'completed');
-              updateProgressStep('Generating report...', 'in-progress');
-            }
-          } else if (data.message_type === 'ai') {
-            aiResponse += data.content;
-          }
-
-          if (data.done) {
-            if (data.thread_id && onThreadCreated && data.thread_id !== streamThreadId) {
-              onThreadCreated(data.thread_id);
-            }
-            setMessages(prev => [...prev, {
-              type: 'ai',
-              content: aiResponse,
-              timestamp: new Date().toISOString(),
-            }]);
-            setStreamingProgress(null);
-            setLoading(false);
-          }
-        };
-
-        eventSourceRef.current = chatService.streamMessage(streamThreadId, message, tools, handleMessage, handleError, isTempChat);
+        setStreamingProgress({ isStreaming: true, toolName: 'deep_research' });
+        setMessages(prev => [...prev, researchPlaceholder()]);
+        eventSourceRef.current = chatService.streamMessage(streamThreadId, message, tools, handleChatChunk, handleStreamError, isTempChat);
         return;
       }
 
@@ -342,6 +322,12 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
     if (!lastHuman) return;
 
     const tools = lastHuman.tools && lastHuman.tools.length > 0 ? lastHuman.tools : [];
+
+    // Deep research re-runs through the streaming edit flow so its activity
+    // is shown live again.
+    if (tools.includes('deep_research')) {
+      return editMessage(lastHuman.content, messages.lastIndexOf(lastHuman));
+    }
 
     try {
       setLoading(true);
@@ -384,6 +370,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
 
   const editMessage = async (newContent, messageIndex) => {
     if (!threadId || !newContent.trim()) return;
+    lastPromptRef.current = newContent;
 
     // 0-based index of the edited human message among all human turns
     const humanIndex = messages.slice(0, messageIndex + 1).filter(m => m.type === 'human').length - 1;
@@ -393,24 +380,23 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
     try {
       setLoading(true);
       setError(null);
-      setStreamingProgress({
-        isStreaming: true,
-        toolName: 'chat',
-        current: 'Updating...',
-        reasoning: '',
-      });
+      const isResearch = tools.includes('deep_research');
+      setStreamingProgress(
+        isResearch
+          ? { isStreaming: true, toolName: 'deep_research' }
+          : { isStreaming: true, toolName: 'chat', current: 'Updating...', reasoning: '' }
+      );
 
       // Rewrite the edited message, drop everything after it, and add a
       // placeholder bubble that fills live (like regenerate).
       setMessages(prev => {
         const updated = prev.slice(0, messageIndex + 1);
         updated[messageIndex] = { ...updated[messageIndex], content: newContent, streaming: false };
-        updated.push({
-          type: 'ai',
-          content: '',
-          timestamp: new Date().toISOString(),
-          streaming: true,
-        });
+        updated.push(
+          isResearch
+            ? researchPlaceholder()
+            : { type: 'ai', content: '', timestamp: new Date().toISOString(), streaming: true }
+        );
         return updated;
       });
 
@@ -437,8 +423,9 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
     setStreamingProgress(null);
     setMessages(prev => {
       const hadStreaming = prev.some(m => m.streaming);
-      // Keep the partial response, just stop the streaming indicator.
-      const next = prev.map(m => (m.streaming ? { ...m, streaming: false } : m));
+      // Keep the partial response, just stop the streaming indicator. A
+      // stopped run was never saved on the server, so mark it as such.
+      const next = prev.map(m => (m.streaming ? { ...m, streaming: false, unsaved: true } : m));
       // Drop the just-sent human message so the prompt returns to the input.
       if (hadStreaming && next.length && next[next.length - 1]?.type === 'human') {
         return next.slice(0, -1);
@@ -448,8 +435,22 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
     return lastPromptRef.current || '';
   };
 
+  // Replace a deep research report's text (edited in the side panel) and save
+  // it to the thread when the report exists there.
+  const updateReport = async (messageIndex, content) => {
+    const target = messages[messageIndex];
+    if (!target) return;
+    const isSavedReport = (m) => m.type === 'ai' && m.tool_used === 'deep_research' && !m.unsaved;
+    if (threadId && !isTempChat && isSavedReport(target)) {
+      const reportIndex = messages.slice(0, messageIndex).filter(isSavedReport).length;
+      await chatService.updateReport(threadId, reportIndex, content);
+    }
+    setMessages(prev => prev.map((m, i) => (i === messageIndex ? { ...m, content } : m)));
+  };
+
   return {
     messages,
+    updateReport,
     loading,
     error,
     sendMessage,
