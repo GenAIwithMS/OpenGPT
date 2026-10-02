@@ -25,6 +25,9 @@ class Configuration(BaseModel):
     summarization_model: str = Field(default="groq:openai/gpt-oss-120b")
     summarization_model_max_tokens: int = Field(default=8192)
     max_content_length: int = Field(default=50000)
+    # Largest block of gathered material sent in a single model request. Keeps
+    # requests under low tokens-per-minute quotas; raise it on higher API tiers.
+    max_context_chars: int = Field(default=16000)
     research_model: str = Field(default="groq:openai/gpt-oss-120b")
     research_model_max_tokens: int = Field(default=10000)
     compression_model: str = Field(default="groq:openai/gpt-oss-120b")

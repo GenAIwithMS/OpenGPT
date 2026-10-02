@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import MessageList from './components/MessageList';
 import MessageInput from './components/MessageInput';
 import ConfirmationModal from './components/ConfirmationModal';
+import ResearchSidebar from './components/ResearchSidebar';
 import { useThreads } from './hooks/useThreads';
 import { useChat } from './hooks/useChat';
 import { chatService } from './services/api';
@@ -131,6 +132,19 @@ function App() {
     stop,
   } = useChat(currentThreadId, handleThreadCreated, skipLoadRef, isTempChat);
 
+  // Deep research activity panel: index of the message whose run is shown.
+  // It opens by itself when a run starts and can be reopened from the
+  // message's research card.
+  const [researchIndex, setResearchIndex] = useState(null);
+  const researchMessage = researchIndex !== null ? messages[researchIndex] : null;
+  const runningResearchIndex = messages.findIndex(
+    (m) => m.streaming && m.tool_used === 'deep_research'
+  );
+
+  useEffect(() => {
+    if (runningResearchIndex !== -1) setResearchIndex(runningResearchIndex);
+  }, [runningResearchIndex]);
+
   // Centered layout (welcome heading + input in the middle of the viewport)
   // only when the conversation has no messages yet. Driven purely by message
   // count so it resets on new/temp chat and matches a refresh of an existing chat.
@@ -168,6 +182,7 @@ function App() {
     setIsTempChat(false);
     setIsSidebarOpen(false);
     setPendingAttachments([]);
+    setResearchIndex(null);
     navigate('/chat');
   };
 
@@ -180,6 +195,7 @@ function App() {
       const next = !prev;
       setCurrentThreadId(null);
       setIsSidebarOpen(false);
+      setResearchIndex(null);
       // Reflect temp mode in the URL so it survives refresh and is shareable.
       navigate(next ? '/chat?temporary-chat=true' : '/chat');
       return next;
@@ -191,6 +207,7 @@ function App() {
     setCurrentThreadId(threadId);
     setIsSidebarOpen(false);
     setPendingAttachments([]);
+    setResearchIndex(null);
     navigate(`/chat/${threadId}`);
   };
 
@@ -324,7 +341,7 @@ function App() {
       {/* Main Chat Area */}
       <div className="flex-1 flex h-screen relative">
           {/* Chat Section */}
-          <div ref={chatSectionRef} className="flex-1 flex flex-col relative">
+          <div ref={chatSectionRef} className="flex-1 min-w-0 flex flex-col relative">
           {/* Header */}
           <div className="flex-shrink-0 px-4 py-3 bg-chat-bg">
             <div className="flex items-center justify-between">
@@ -369,6 +386,7 @@ function App() {
               streamingProgress={streamingProgress}
               onRegenerate={regenerate}
               onEditMessage={editMessage}
+              onOpenResearch={(index) => setResearchIndex((open) => (open === index ? null : index))}
             />
           </div>
 
@@ -423,6 +441,15 @@ function App() {
             </div>
           )}
         </div>
+
+        {/* Deep research activity panel */}
+        {researchMessage?.research && (
+          <ResearchSidebar
+            events={researchMessage.research}
+            running={!!researchMessage.streaming}
+            onClose={() => setResearchIndex(null)}
+          />
+        )}
       </div>
 
       {/* Delete Confirmation Modal */}

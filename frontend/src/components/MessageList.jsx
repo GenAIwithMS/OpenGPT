@@ -5,6 +5,8 @@ import rehypeRaw from 'rehype-raw';
 import { Loader2, Copy, Check, ThumbsUp, ThumbsDown, RotateCcw, Pencil } from 'lucide-react';
 import AttachmentCard from './AttachmentCard';
 import ThinkingIndicator from './ThinkingIndicator';
+import ResearchCard from './ResearchCard';
+import DownloadMenu from './DownloadMenu';
 import { CodeBlock, CodeBlockCode, CodeBlockGroup, CopyButton } from './ui/code-block';
 
 function nodeToString(node) {
@@ -55,7 +57,7 @@ function UserActions({ content, onEdit }) {
   );
 }
 
-function MessageActions({ content, onRegenerate }) {
+function MessageActions({ content, onRegenerate, downloadable }) {
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState(null); // 'like' | 'dislike'
 
@@ -73,6 +75,7 @@ function MessageActions({ content, onRegenerate }) {
 
   return (
     <div className="mt-2 flex items-center gap-1 justify-end">
+      {downloadable && <DownloadMenu content={content} />}
       <button
         type="button"
         onClick={handleCopy}
@@ -206,7 +209,7 @@ const markdownComponents = {
   br: () => <br />,
 };
 
-const MessageList = ({ messages, loading, streaming, streamingProgress, onRegenerate, onEditMessage }) => {
+const MessageList = ({ messages, loading, streaming, streamingProgress, onRegenerate, onEditMessage, onOpenResearch }) => {
   const messagesEndRef = useRef(null);
   const previousLengthRef = useRef(0);
   const [editIndex, setEditIndex] = useState(null);
@@ -225,6 +228,7 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
 
   const renderMessage = (message, index) => {
     const isUser = message.type === 'human';
+    const isResearch = !isUser && message.tool_used === 'deep_research' && !!message.research;
 
     const commitEdit = () => {
       if (editIndex === null) return;
@@ -286,7 +290,15 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
 
     const bubbleInner = (
       <div className="prose prose-invert max-w-none">
-        {message.streaming && streamingProgress?.isStreaming && !streamingProgress.steps && !streamingProgress.answering && (
+        {isResearch && (
+          <ResearchCard
+            events={message.research}
+            running={!!message.streaming}
+            onOpen={() => onOpenResearch?.(index)}
+          />
+        )}
+
+        {message.streaming && streamingProgress?.toolName === 'chat' && !streamingProgress.answering && (
           <ThinkingIndicator
             label={streamingProgress.current}
             reasoning={streamingProgress.reasoning}
@@ -383,7 +395,11 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
         <div className="max-w-3xl mx-auto flex justify-start">
           <div className="max-w-[80%] px-4 py-3 rounded-lg text-gray-100">
             {bubbleInner}
-            <MessageActions content={message.content} onRegenerate={onRegenerate} />
+            <MessageActions
+              content={message.content}
+              onRegenerate={onRegenerate}
+              downloadable={message.tool_used === 'deep_research' && !message.streaming && !!message.content}
+            />
           </div>
         </div>
       </div>

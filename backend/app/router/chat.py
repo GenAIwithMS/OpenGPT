@@ -158,7 +158,13 @@ async def get_thread_history(thread_id: str):
                 raise NotFoundError("Thread not found")
 
         message_responses = [
-            MessageResponse(content=m["content"], type=m["type"])
+            MessageResponse(
+                content=m["content"],
+                type=m["type"],
+                tools=m.get("tools"),
+                tool_used=m.get("tool_used"),
+                research=m.get("research"),
+            )
             for m in messages
         ]
 

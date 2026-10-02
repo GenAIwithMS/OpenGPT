@@ -60,6 +60,9 @@ class MessageResponse(BaseModel):
 
     content: str = Field(..., description="Message content")
     type: str = Field(..., description="Message type (human, ai, tool)")
+    tools: Optional[List[str]] = Field(None, description="Tools selected for a human message")
+    tool_used: Optional[str] = Field(None, description="Tool that produced an AI message")
+    research: Optional[List[Dict[str, Any]]] = Field(None, description="Deep research activity log")
 
 
 class ThreadHistoryResponse(BaseModel):

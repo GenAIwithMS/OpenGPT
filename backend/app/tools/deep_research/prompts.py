@@ -120,6 +120,8 @@ Please write a comprehensive, well-structured report that:
 
 Format your report using clean markdown.
 
+Cite sources as markdown links, for example [LangGraph releases](https://github.com/langchain-ai/langgraph/releases), using only URLs that appear in the research notes. Do not use bracketed citation markers such as 【1†L1-L4】. End the report with a "Sources" section listing every source you cited as a markdown link.
+
 The report should be thorough and detailed, but also clear and accessible.
 """
 
