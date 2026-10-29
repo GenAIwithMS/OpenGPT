@@ -213,9 +213,11 @@ const numericColumns = (tableNode) => {
   });
 };
 
+// Cells wrap between words so a table normally fits the message column; the
+// wrapper only scrolls (itself, never the page) if whole words cannot fit.
 const MarkdownTable = ({ node, children }) => (
   <TableContext.Provider value={numericColumns(node)}>
-    <div className="my-4 w-full">
+    <div className="thin-scroll my-4 w-full overflow-x-auto">
       <table className="w-full table-auto border-collapse text-[15px]">{children}</table>
     </div>
   </TableContext.Provider>
@@ -239,7 +241,7 @@ const TableCell = ({ as: Tag, style, colIndex, children }) => {
     explicit === 'center' || explicit === 'right' ? explicit : numeric[colIndex] ? 'right' : 'left';
   const base = 'px-3 py-2.5 align-top leading-6 break-words';
   return Tag === 'th' ? (
-    <th style={{ textAlign: align }} className={`${base} font-semibold text-gray-100`}>
+    <th style={{ textAlign: align }} className={`${base} whitespace-nowrap font-semibold text-gray-100`}>
       {children}
     </th>
   ) : (
@@ -407,7 +409,7 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
     }
 
     const bubbleInner = (
-      <div className="prose prose-invert max-w-none">
+      <div className="prose prose-invert max-w-none min-w-0">
         {isResearch && (
           <ResearchCard
             events={message.research}
@@ -523,7 +525,7 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
     return (
       <div key={index} className="py-4 px-4">
         <div className="max-w-3xl mx-auto flex justify-start">
-          <div className="max-w-[80%] px-4 py-3 rounded-lg text-gray-100">
+          <div className="w-full min-w-0 px-4 py-3 rounded-lg text-gray-100">
             {bubbleInner}
             <MessageActions content={message.content} onRegenerate={onRegenerate} />
           </div>
