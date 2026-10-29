@@ -69,6 +69,14 @@ def link_citations(text: str, sources: Dict[int, dict]) -> str:
     if "【" not in text:
         return text
 
+    # Markdown table rows: a chip inside a cell breaks the layout, so markers
+    # there are dropped rather than linked.
+    lines = text.split("\n")
+    for i, line in enumerate(lines):
+        if line.lstrip().startswith("|") and "【" in line:
+            lines[i] = _MARKER_RE.sub("", line)
+    text = "\n".join(lines)
+
     def repl(match):
         src = _resolve(match.group(1), sources)
         start, end = match.span()

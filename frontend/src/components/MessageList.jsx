@@ -171,6 +171,14 @@ const groupCitations = (children) => {
   return out;
 };
 
+// Table cells are too cramped for source chips; any citation that lands in
+// one is dropped so the row stays a clean grid.
+const withoutCitations = (children) => {
+  const items = React.Children.toArray(children);
+  if (!items.some(isCitation)) return children;
+  return items.filter((item) => !isCitation(item));
+};
+
 export const markdownComponents = {
   pre: ({ children }) => <>{children}</>,
   code: ({ node, className, children, ...props }) => {
@@ -233,20 +241,24 @@ export const markdownComponents = {
     </blockquote>
   ),
   table: ({ children }) => (
-    <div className="overflow-x-auto my-3">
-      <table className="min-w-full border-collapse border border-gray-600">
-        {children}
-      </table>
+    <div className="thin-scroll my-4 overflow-x-auto rounded-xl border border-gray-700/80 bg-[#1b1c21]">
+      <table className="w-full border-collapse text-sm">{children}</table>
     </div>
   ),
-  th: ({ children }) => (
-    <th className="border border-gray-600 px-4 py-2 bg-[#2a2b32] font-semibold text-left text-gray-100">
+  thead: ({ children }) => <thead className="bg-[#2a2b32]">{children}</thead>,
+  tbody: ({ children }) => <tbody className="divide-y divide-gray-700/60">{children}</tbody>,
+  tr: ({ children }) => <tr className="transition-colors hover:bg-white/[0.03]">{children}</tr>,
+  th: ({ children, style }) => (
+    <th
+      style={style}
+      className="whitespace-nowrap border-b border-gray-700 px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-300"
+    >
       {children}
     </th>
   ),
-  td: ({ children }) => (
-    <td className="border border-gray-600 px-4 py-2 text-gray-100">
-      {children}
+  td: ({ children, style }) => (
+    <td style={style} className="px-4 py-2.5 align-top leading-6 text-gray-100">
+      {withoutCitations(children)}
     </td>
   ),
   a: MarkdownLink,
