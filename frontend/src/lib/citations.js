@@ -51,3 +51,44 @@ export const withSourceTag = (url) => {
     return url;
   }
 };
+
+// Tables hold data only. Before rendering, every table row is scrubbed of
+// citation markers, markdown links (whole, or broken by a "|" in their title),
+// link remnants and bare URLs. This also covers answers saved before links
+// were kept out of tables on the backend.
+const TABLE_DELIM = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
+
+const scrubCell = (cell) =>
+  cell
+    .replace(/【[^】]*】/g, '')
+    .replace(/\[[^\]]*\]\([^)]*\)/g, '') // complete [text](url "title")
+    .replace(/\[[^\]]*\]\([^)]*$/g, '') // link cut off by a "|" in its title
+    .replace(/^[^"]*"\)/, '') // tail of such a link in the next cell
+    .replace(/<?https?:\/\/[^\s>]+>?/g, '')
+    .replace(/\(\s*(?:see|source|via|ref)?\s*\)/gi, '')
+    .replace(/\s+([,.;:])/g, '$1')
+    .replace(/[ \t]{2,}/g, ' ');
+
+export const cleanTableRows = (markdown) => {
+  if (!markdown || !markdown.includes('|')) return markdown;
+  const lines = markdown.split('\n');
+  let i = 0;
+  while (i < lines.length) {
+    if (TABLE_DELIM.test(lines[i]) && i > 0 && lines[i - 1].includes('|')) {
+      let j = i + 1;
+      while (j < lines.length && lines[j].trim() && lines[j].includes('|')) j += 1;
+      // A "|" inside a link title split a cell in two; once scrubbed, the
+      // extra empty cell is merged back so rows match the header width.
+      const width = lines[i].split('|').length;
+      for (let k = i + 1; k < j; k += 1) {
+        const cells = lines[k].split('|').map(scrubCell);
+        while (cells.length > width && cells[cells.length - 1].trim() === '') cells.pop();
+        lines[k] = cells.length > width ? cells.join('|') : `${cells.join('|')}${cells.length === width ? '' : ' |'}`;
+      }
+      i = j;
+    } else {
+      i += 1;
+    }
+  }
+  return lines.join('\n');
+};

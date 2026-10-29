@@ -9,7 +9,7 @@ import ResearchCard from './ResearchCard';
 import ReportCard from './ReportCard';
 import { CodeBlock, CodeBlockCode, CodeBlockGroup, CopyButton } from './ui/code-block';
 import CitationChip from './CitationChip';
-import { parseCitation, stripCitationMarkers, withSourceTag } from '../lib/citations';
+import { cleanTableRows, parseCitation, stripCitationMarkers, withSourceTag } from '../lib/citations';
 
 function nodeToString(node) {
   if (typeof node === 'string') return node;
@@ -484,7 +484,7 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
             rehypePlugins={[rehypeRaw]}
             components={markdownComponents}
           >
-            {message.streaming ? stripCitationMarkers(message.content) : message.content}
+            {cleanTableRows(message.streaming ? stripCitationMarkers(message.content) : message.content)}
           </ReactMarkdown>
         )}
         {message.streaming && !isResearch && (
