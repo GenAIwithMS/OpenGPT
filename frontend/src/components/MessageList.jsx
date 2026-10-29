@@ -179,6 +179,76 @@ const withoutCitations = (children) => {
   return items.filter((item) => !isCitation(item));
 };
 
+// --- Tables -----------------------------------------------------------------
+// Borderless layout: bold header, thin row dividers, text columns left and
+// numeric columns right. Cells wrap so a table always fits the message width
+// instead of scrolling.
+const TableContext = React.createContext([]);
+
+const NUMERIC_CELL = /^[\s$€£₹+\-−–—(]*\d[\d.,]*\s*(%|[kKmMbB]n?|x)?\)?$/;
+const PLACEHOLDER_CELL = /^([-–—]*|n\/?a|tbd|tba)$/i;
+
+const hastText = (node) =>
+  node.type === 'text' ? node.value : (node.children || []).map(hastText).join('');
+
+// Which columns hold only numbers (or placeholders like "—"), from the table's
+// syntax tree so every cell in the column can agree on its alignment.
+const numericColumns = (tableNode) => {
+  const rows = [];
+  for (const section of tableNode?.children || []) {
+    if (section.tagName !== 'tbody') continue;
+    for (const tr of section.children || []) {
+      if (tr.tagName === 'tr') rows.push(tr.children.filter((c) => c.tagName === 'td'));
+    }
+  }
+  const count = Math.max(0, ...rows.map((r) => r.length));
+  return Array.from({ length: count }, (_, i) => {
+    let numeric = 0;
+    for (const row of rows) {
+      const text = row[i] ? hastText(row[i]).trim() : '';
+      if (NUMERIC_CELL.test(text)) numeric += 1;
+      else if (!PLACEHOLDER_CELL.test(text)) return false;
+    }
+    return numeric > 0;
+  });
+};
+
+const MarkdownTable = ({ node, children }) => (
+  <TableContext.Provider value={numericColumns(node)}>
+    <div className="my-4 w-full">
+      <table className="w-full table-auto border-collapse text-[15px]">{children}</table>
+    </div>
+  </TableContext.Provider>
+);
+
+const TableRow = ({ children }) => {
+  let col = 0;
+  return (
+    <tr className="border-b border-gray-700/60 last:border-b-0">
+      {React.Children.map(children, (child) =>
+        React.isValidElement(child) ? React.cloneElement(child, { colIndex: col++ }) : child
+      )}
+    </tr>
+  );
+};
+
+const TableCell = ({ as: Tag, style, colIndex, children }) => {
+  const numeric = React.useContext(TableContext);
+  const explicit = style?.textAlign;
+  const align =
+    explicit === 'center' || explicit === 'right' ? explicit : numeric[colIndex] ? 'right' : 'left';
+  const base = 'px-3 py-2.5 align-top leading-6 break-words';
+  return Tag === 'th' ? (
+    <th style={{ textAlign: align }} className={`${base} font-semibold text-gray-100`}>
+      {children}
+    </th>
+  ) : (
+    <td style={{ textAlign: align }} className={`${base} text-gray-100`}>
+      {withoutCitations(children)}
+    </td>
+  );
+};
+
 export const markdownComponents = {
   pre: ({ children }) => <>{children}</>,
   code: ({ node, className, children, ...props }) => {
@@ -240,27 +310,12 @@ export const markdownComponents = {
       {children}
     </blockquote>
   ),
-  table: ({ children }) => (
-    <div className="thin-scroll my-4 overflow-x-auto rounded-xl border border-gray-700/80 bg-[#1b1c21]">
-      <table className="w-full border-collapse text-sm">{children}</table>
-    </div>
-  ),
-  thead: ({ children }) => <thead className="bg-[#2a2b32]">{children}</thead>,
-  tbody: ({ children }) => <tbody className="divide-y divide-gray-700/60">{children}</tbody>,
-  tr: ({ children }) => <tr className="transition-colors hover:bg-white/[0.03]">{children}</tr>,
-  th: ({ children, style }) => (
-    <th
-      style={style}
-      className="whitespace-nowrap border-b border-gray-700 px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-300"
-    >
-      {children}
-    </th>
-  ),
-  td: ({ children, style }) => (
-    <td style={style} className="px-4 py-2.5 align-top leading-6 text-gray-100">
-      {withoutCitations(children)}
-    </td>
-  ),
+  table: MarkdownTable,
+  thead: ({ children }) => <thead>{children}</thead>,
+  tbody: ({ children }) => <tbody>{children}</tbody>,
+  tr: TableRow,
+  th: (props) => <TableCell as="th" {...props} />,
+  td: (props) => <TableCell as="td" {...props} />,
   a: MarkdownLink,
   strong: ({ children }) => (
     <strong className="font-semibold text-gray-100">{children}</strong>
