@@ -18,6 +18,9 @@ _SOURCE_RE = re.compile(
 _MARKER_RE = re.compile(r"【([^】]*)】")
 _URL_RE = re.compile(r"https?://[^\s】]+")
 _TITLE_SPLIT_RE = re.compile(r"\s+(?:[|\-–—]|::)\s+")
+# GFM table delimiter row, e.g. "|---|:--:|" or "--- | ---"
+_TABLE_DELIM_RE = re.compile(r"^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$")
+_MD_LINK_RE = re.compile(r"\[([^\]]*)\]\((?:[^()\s]|\([^()]*\))*(?:\s+\"[^\"]*\")?\)")
 
 
 def extract_sources(tool_output: str) -> Dict[int, dict]:
@@ -42,12 +45,41 @@ def site_label(title: str, url: str) -> str:
 
 
 def _link(source: dict) -> str:
-    url = source["url"]
-    label = site_label(source.get("title", ""), url).replace("]", ")")
-    title = (source.get("title") or label).replace('"', "'")
+    # A "|" anywhere in the link would split a markdown table cell, so it is
+    # encoded in the URL and replaced in the label/title.
+    url = source["url"].replace("|", "%7C").replace(" ", "%20")
+    label = site_label(source.get("title", ""), url).replace("]", ")").replace("|", "-")
+    title = (source.get("title") or label).replace('"', "'").replace("|", "-")
     if source.get("date"):
         title = f"{title} ({source['date']})"
     return f"[{label}]({url} \"{title}\")"
+
+
+def _table_rows(lines):
+    """Indexes of lines that belong to a GFM table (header, delimiter, body)."""
+    rows = set()
+    i = 0
+    while i < len(lines):
+        if _TABLE_DELIM_RE.match(lines[i]) and i > 0 and "|" in lines[i - 1]:
+            rows.update({i - 1, i})
+            j = i + 1
+            while j < len(lines) and lines[j].strip() and "|" in lines[j]:
+                rows.add(j)
+                j += 1
+            i = j
+        else:
+            i += 1
+    return rows
+
+
+def strip_table_links(text: str) -> str:
+    """Remove citation markers and reduce markdown links to their text inside
+    tables: a chip or a long URL breaks the cell layout."""
+    lines = text.split("\n")
+    for i in _table_rows(lines):
+        line = _MARKER_RE.sub("", lines[i])
+        lines[i] = _MD_LINK_RE.sub(lambda m: m.group(1), line)
+    return "\n".join(lines)
 
 
 def _resolve(marker: str, sources: Dict[int, dict]) -> Optional[dict]:
@@ -66,16 +98,9 @@ def _resolve(marker: str, sources: Dict[int, dict]) -> Optional[dict]:
 
 def link_citations(text: str, sources: Dict[int, dict]) -> str:
     """Replace citation markers with markdown links; drop ones that can't be resolved."""
+    text = strip_table_links(text)
     if "【" not in text:
         return text
-
-    # Markdown table rows: a chip inside a cell breaks the layout, so markers
-    # there are dropped rather than linked.
-    lines = text.split("\n")
-    for i, line in enumerate(lines):
-        if line.lstrip().startswith("|") and "【" in line:
-            lines[i] = _MARKER_RE.sub("", line)
-    text = "\n".join(lines)
 
     def repl(match):
         src = _resolve(match.group(1), sources)

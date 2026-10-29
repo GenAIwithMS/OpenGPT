@@ -35,8 +35,9 @@ SYSTEM_PROMPT = SystemMessage(
         "provided in this request (Search, Weather, Calculator, Stock_price); "
         "you cannot open URLs or browse pages. When a Search result arrives, answer the "
         "user directly from it, citing sources inline as markdown links like "
-        "[Site name](url); never use 【n†source】 style markers. Do not call Search "
-        "again unless the results did not cover the question."
+        "[Site name](url); never use 【n†source】 style markers, and never put links or "
+        "citations inside a table (cite below it instead). Do not call Search again "
+        "unless the results did not cover the question."
     )
 )
 

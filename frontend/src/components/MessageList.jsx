@@ -171,12 +171,15 @@ const groupCitations = (children) => {
   return out;
 };
 
-// Table cells are too cramped for source chips; any citation that lands in
-// one is dropped so the row stays a clean grid.
+// Table cells are too cramped for links: citation chips are dropped and any
+// other link is reduced to its text so the row stays a clean grid.
+const isLink = (el) => React.isValidElement(el) && el.type === MarkdownLink;
 const withoutCitations = (children) => {
   const items = React.Children.toArray(children);
-  if (!items.some(isCitation)) return children;
-  return items.filter((item) => !isCitation(item));
+  if (!items.some(isLink)) return children;
+  return items
+    .filter((item) => !isCitation(item))
+    .map((item) => (isLink(item) ? nodeToString(item.props.children) : item));
 };
 
 // --- Tables -----------------------------------------------------------------
