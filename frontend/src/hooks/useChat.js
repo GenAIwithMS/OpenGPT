@@ -112,6 +112,14 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
         }
         return copy;
       });
+    } else if (data.message_type === 'ai_replace') {
+      // Final answer with citation markers rewritten as source links
+      setMessages(prev => {
+        const copy = [...prev];
+        const idx = copy.findIndex(m => m.streaming);
+        if (idx !== -1) copy[idx] = { ...copy[idx], content: data.content };
+        return copy;
+      });
     } else if (data.message_type === 'ai') {
       // The answer has started — the thinking row steps aside.
       setStreamingProgress(prev =>

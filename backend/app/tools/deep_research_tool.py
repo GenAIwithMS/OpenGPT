@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import uuid
 
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
@@ -28,7 +29,8 @@ def DeepResearch(query: str) -> str:
     config = {
         "configurable": {
             "allow_clarification": False,
-            "search_api": "duckduckgo",
+            "search_api": "parallel",
+            "search_session_id": f"research-{uuid.uuid4()}",
             "research_model": "groq:" + os.getenv("DEEP_RESEARCH_MODEL", "openai/gpt-oss-120b"),
             "summarization_model": "groq:" + os.getenv("DEEP_RESEARCH_SUMMARIZATION_MODEL", "openai/gpt-oss-120b"),
             "compression_model": "groq:" + os.getenv("DEEP_RESEARCH_COMPRESSION_MODEL", "openai/gpt-oss-120b"),

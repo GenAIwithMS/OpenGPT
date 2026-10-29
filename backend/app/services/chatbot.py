@@ -8,7 +8,7 @@ from langchain_groq import ChatGroq
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.memory import MemorySaver
-from app.tools import Search, Weather, Calculator, Stock_price, DeepResearch
+from app.tools import Search, Weather, Calculator, Stock_price
 from app.services.rag import has_document, retrieve_from_document
 from app.database import DatabaseConfig,MySQLCheckpointSaver,ThreadMetadata
 import os
@@ -22,8 +22,24 @@ model = ChatGroq(
     api_key=api
     )
 
-# Available tools for the chatbot
-all_tools = [Search, Weather, Calculator, Stock_price, DeepResearch]
+# Tools the chat model may call on its own. Deep research is deliberately not
+# among them: it runs for minutes and has its own streaming path, so it only
+# starts when the user picks it from the tools menu (see ChatService).
+all_tools = [Search, Weather, Calculator, Stock_price]
+
+# Without this the model (gpt-oss) tends to invent tools such as "Open_URL"
+# after a search returns links, which the provider rejects.
+SYSTEM_PROMPT = SystemMessage(
+    content=(
+        "You are OpenGPT, a helpful assistant. The only tools available are the ones "
+        "provided in this request (Search, Weather, Calculator, Stock_price); "
+        "you cannot open URLs or browse pages. When a Search result arrives, answer the "
+        "user directly from it, citing sources inline as markdown links like "
+        "[Site name](url); never use 【n†source】 style markers, and never put links or "
+        "citations inside a table (cite below it instead). Do not call Search again "
+        "unless the results did not cover the question."
+    )
+)
 
 
 class Chatstate(TypedDict):
@@ -78,9 +94,18 @@ If the user's question is related to the document, base your answer on this cont
     else:
         print(f"[DEBUG] Skipping document retrieval - thread_id: {thread_id}, has_doc: {has_doc}")
     
+    if not messages or not isinstance(messages[0], SystemMessage):
+        messages = [SYSTEM_PROMPT] + list(messages)
+
+    # Stream for live tokens (picked up by stream_mode="messages"), but store a
+    # single merged message: ``add_messages`` replaces a message that shares an
+    # id, so yielding raw chunks would leave only the last (empty) chunk in the
+    # state and drop the tool calls before the tool node ever ran.
     model_with_tools = model.bind_tools(all_tools)
+    response = None
     for chunk in model_with_tools.stream(messages):
-        yield {"messages": [chunk]}
+        response = chunk if response is None else response + chunk
+    return {"messages": [response]} if response is not None else {}
 
 
 # Create tool node

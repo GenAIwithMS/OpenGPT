@@ -8,6 +8,8 @@ import ThinkingIndicator from './ThinkingIndicator';
 import ResearchCard from './ResearchCard';
 import ReportCard from './ReportCard';
 import { CodeBlock, CodeBlockCode, CodeBlockGroup, CopyButton } from './ui/code-block';
+import CitationChip from './CitationChip';
+import { cleanTableRows, parseCitation, stripCitationMarkers, withSourceTag } from '../lib/citations';
 
 function nodeToString(node) {
   if (typeof node === 'string') return node;
@@ -116,6 +118,140 @@ function MessageActions({ content, onRegenerate }) {
   );
 }
 
+// Links written by the backend's citation pass carry a title attribute
+// ("Page title (date)"); ordinary markdown links the model writes do not.
+const isCitation = (el) => React.isValidElement(el) && el.type === MarkdownLink && !!el.props.title;
+
+const MarkdownLink = ({ href, title, children }) => {
+  if (title) {
+    return <CitationChip sources={[parseCitation({ href, title, label: nodeToString(children) })]} />;
+  }
+  return (
+    <a
+      href={withSourceTag(href)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-blue-400 hover:text-blue-300 underline break-words"
+    >
+      {children}
+    </a>
+  );
+};
+
+// Adjacent citation links (only whitespace between them) collapse into one
+// chip that reads "Site +N", like the sources pill in ChatGPT.
+const groupCitations = (children) => {
+  const items = React.Children.toArray(children);
+  if (!items.some(isCitation)) return children;
+  const out = [];
+  let run = [];
+  const flush = () => {
+    if (run.length === 0) return;
+    out.push(
+      <CitationChip
+        key={`cite-${out.length}`}
+        sources={run.map((el) =>
+          parseCitation({ href: el.props.href, title: el.props.title, label: nodeToString(el.props.children) })
+        )}
+      />
+    );
+    run = [];
+  };
+  items.forEach((item, i) => {
+    if (isCitation(item)) {
+      run.push(item);
+      return;
+    }
+    const next = items[i + 1];
+    if (run.length && typeof item === 'string' && item.trim() === '' && isCitation(next)) return;
+    flush();
+    out.push(item);
+  });
+  flush();
+  return out;
+};
+
+// Tables hold data, not sources: every link (citation chip or plain) that
+// lands in a cell is removed outright.
+const isLink = (el) => React.isValidElement(el) && el.type === MarkdownLink;
+const withoutCitations = (children) => {
+  const items = React.Children.toArray(children);
+  if (!items.some(isLink)) return children;
+  return items.filter((item) => !isLink(item));
+};
+
+// --- Tables -----------------------------------------------------------------
+// Borderless layout: bold header, thin row dividers, text columns left and
+// numeric columns right. Cells wrap so a table always fits the message width
+// instead of scrolling.
+const TableContext = React.createContext([]);
+
+const NUMERIC_CELL = /^[\s$€£₹+\-−–—(]*\d[\d.,]*\s*(%|[kKmMbB]n?|x)?\)?$/;
+const PLACEHOLDER_CELL = /^([-–—]*|n\/?a|tbd|tba)$/i;
+
+const hastText = (node) =>
+  node.type === 'text' ? node.value : (node.children || []).map(hastText).join('');
+
+// Which columns hold only numbers (or placeholders like "—"), from the table's
+// syntax tree so every cell in the column can agree on its alignment.
+const numericColumns = (tableNode) => {
+  const rows = [];
+  for (const section of tableNode?.children || []) {
+    if (section.tagName !== 'tbody') continue;
+    for (const tr of section.children || []) {
+      if (tr.tagName === 'tr') rows.push(tr.children.filter((c) => c.tagName === 'td'));
+    }
+  }
+  const count = Math.max(0, ...rows.map((r) => r.length));
+  return Array.from({ length: count }, (_, i) => {
+    let numeric = 0;
+    for (const row of rows) {
+      const text = row[i] ? hastText(row[i]).trim() : '';
+      if (NUMERIC_CELL.test(text)) numeric += 1;
+      else if (!PLACEHOLDER_CELL.test(text)) return false;
+    }
+    return numeric > 0;
+  });
+};
+
+// Cells wrap between words so a table normally fits the message column; the
+// wrapper only scrolls (itself, never the page) if whole words cannot fit.
+const MarkdownTable = ({ node, children }) => (
+  <TableContext.Provider value={numericColumns(node)}>
+    <div className="thin-scroll my-4 w-full overflow-x-auto">
+      <table className="w-full table-auto border-collapse text-[15px]">{children}</table>
+    </div>
+  </TableContext.Provider>
+);
+
+const TableRow = ({ children }) => {
+  let col = 0;
+  return (
+    <tr className="border-b border-gray-700/60 last:border-b-0">
+      {React.Children.map(children, (child) =>
+        React.isValidElement(child) ? React.cloneElement(child, { colIndex: col++ }) : child
+      )}
+    </tr>
+  );
+};
+
+const TableCell = ({ as: Tag, style, colIndex, children }) => {
+  const numeric = React.useContext(TableContext);
+  const explicit = style?.textAlign;
+  const align =
+    explicit === 'center' || explicit === 'right' ? explicit : numeric[colIndex] ? 'right' : 'left';
+  const base = 'px-3 py-2.5 align-top leading-6 break-words';
+  return Tag === 'th' ? (
+    <th style={{ textAlign: align }} className={`${base} whitespace-nowrap font-semibold text-gray-100`}>
+      {children}
+    </th>
+  ) : (
+    <td style={{ textAlign: align }} className={`${base} text-gray-100`}>
+      {withoutCitations(children)}
+    </td>
+  );
+};
+
 export const markdownComponents = {
   pre: ({ children }) => <>{children}</>,
   code: ({ node, className, children, ...props }) => {
@@ -146,7 +282,9 @@ export const markdownComponents = {
     );
   },
   p: ({ children }) => (
-    <p className="mb-3 last:mb-0 leading-7 text-gray-100 whitespace-pre-wrap break-words">{children}</p>
+    <p className="mb-3 last:mb-0 leading-7 text-gray-100 whitespace-pre-wrap break-words">
+      {groupCitations(children)}
+    </p>
   ),
   ul: ({ children }) => (
     <ul className="list-disc ml-6 mb-3 space-y-1 text-gray-100">
@@ -159,7 +297,7 @@ export const markdownComponents = {
     </ol>
   ),
   li: ({ children }) => (
-    <li className="leading-7 text-gray-100">{children}</li>
+    <li className="leading-7 text-gray-100">{groupCitations(children)}</li>
   ),
   h1: ({ children }) => (
     <h1 className="text-2xl font-bold mb-3 mt-4 text-gray-100">{children}</h1>
@@ -175,33 +313,13 @@ export const markdownComponents = {
       {children}
     </blockquote>
   ),
-  table: ({ children }) => (
-    <div className="overflow-x-auto my-3">
-      <table className="min-w-full border-collapse border border-gray-600">
-        {children}
-      </table>
-    </div>
-  ),
-  th: ({ children }) => (
-    <th className="border border-gray-600 px-4 py-2 bg-[#2a2b32] font-semibold text-left text-gray-100">
-      {children}
-    </th>
-  ),
-  td: ({ children }) => (
-    <td className="border border-gray-600 px-4 py-2 text-gray-100">
-      {children}
-    </td>
-  ),
-  a: ({ href, children }) => (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-blue-400 hover:text-blue-300 underline break-words"
-    >
-      {children}
-    </a>
-  ),
+  table: MarkdownTable,
+  thead: ({ children }) => <thead>{children}</thead>,
+  tbody: ({ children }) => <tbody>{children}</tbody>,
+  tr: TableRow,
+  th: (props) => <TableCell as="th" {...props} />,
+  td: (props) => <TableCell as="td" {...props} />,
+  a: MarkdownLink,
   strong: ({ children }) => (
     <strong className="font-semibold text-gray-100">{children}</strong>
   ),
@@ -292,7 +410,7 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
     }
 
     const bubbleInner = (
-      <div className="prose prose-invert max-w-none">
+      <div className="prose prose-invert max-w-none min-w-0">
         {isResearch && (
           <ResearchCard
             events={message.research}
@@ -366,7 +484,7 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
             rehypePlugins={[rehypeRaw]}
             components={markdownComponents}
           >
-            {message.content}
+            {cleanTableRows(message.streaming ? stripCitationMarkers(message.content) : message.content)}
           </ReactMarkdown>
         )}
         {message.streaming && !isResearch && (
@@ -408,7 +526,7 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
     return (
       <div key={index} className="py-4 px-4">
         <div className="max-w-3xl mx-auto flex justify-start">
-          <div className="max-w-[80%] px-4 py-3 rounded-lg text-gray-100">
+          <div className="w-full min-w-0 px-4 py-3 rounded-lg text-gray-100">
             {bubbleInner}
             <MessageActions content={message.content} onRegenerate={onRegenerate} />
           </div>
