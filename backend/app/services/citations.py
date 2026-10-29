@@ -72,13 +72,22 @@ def _table_rows(lines):
     return rows
 
 
+_BARE_URL_RE = re.compile(r"<?https?://[^\s|>]+>?")
+
+
 def strip_table_links(text: str) -> str:
-    """Remove citation markers and reduce markdown links to their text inside
-    tables: a chip or a long URL breaks the cell layout."""
+    """Remove citation markers, markdown links and bare URLs from table rows
+    entirely: tables hold the data, sources are cited below them."""
     lines = text.split("\n")
     for i in _table_rows(lines):
         line = _MARKER_RE.sub("", lines[i])
-        lines[i] = _MD_LINK_RE.sub(lambda m: m.group(1), line)
+        line = _MD_LINK_RE.sub("", line)
+        line = _BARE_URL_RE.sub("", line)
+        # Tidy what the removal leaves behind: "(see )", doubled spaces, " ,"
+        line = re.sub(r"\(\s*(?:see|source|via|ref)?\s*\)", "", line, flags=re.I)
+        line = re.sub(r"[ \t]{2,}", " ", line)
+        line = re.sub(r"\s+([,.;:])", r"\1", line)
+        lines[i] = re.sub(r"\s+\|", " |", line)
     return "\n".join(lines)
 
 

@@ -171,15 +171,13 @@ const groupCitations = (children) => {
   return out;
 };
 
-// Table cells are too cramped for links: citation chips are dropped and any
-// other link is reduced to its text so the row stays a clean grid.
+// Tables hold data, not sources: every link (citation chip or plain) that
+// lands in a cell is removed outright.
 const isLink = (el) => React.isValidElement(el) && el.type === MarkdownLink;
 const withoutCitations = (children) => {
   const items = React.Children.toArray(children);
   if (!items.some(isLink)) return children;
-  return items
-    .filter((item) => !isCitation(item))
-    .map((item) => (isLink(item) ? nodeToString(item.props.children) : item));
+  return items.filter((item) => !isLink(item));
 };
 
 // --- Tables -----------------------------------------------------------------
