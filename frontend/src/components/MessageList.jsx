@@ -9,7 +9,7 @@ import ResearchCard from './ResearchCard';
 import ReportCard from './ReportCard';
 import { CodeBlock, CodeBlockCode, CodeBlockGroup, CopyButton } from './ui/code-block';
 import CitationChip from './CitationChip';
-import { parseCitation, stripCitationMarkers } from '../lib/citations';
+import { parseCitation, stripCitationMarkers, withSourceTag } from '../lib/citations';
 
 function nodeToString(node) {
   if (typeof node === 'string') return node;
@@ -128,7 +128,7 @@ const MarkdownLink = ({ href, title, children }) => {
   }
   return (
     <a
-      href={href}
+      href={withSourceTag(href)}
       target="_blank"
       rel="noopener noreferrer"
       className="text-blue-400 hover:text-blue-300 underline break-words"

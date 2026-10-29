@@ -35,3 +35,19 @@ export const formatCitationDate = (iso) => {
 // While an answer streams, the model's raw 【n†source】 markers (and a marker
 // cut off mid-stream) are hidden; the backend replaces them with links at the end.
 export const stripCitationMarkers = (text) => text.replace(/【[^】]*(】|$)/g, '');
+
+// Links opened from an answer carry utm_source=opengpt (as ChatGPT does with
+// utm_source=chatgpt.com) so site owners can see where the visit came from.
+// The stored message text keeps the clean URL; the tag is added at render time.
+export const SOURCE_TAG = 'opengpt';
+
+export const withSourceTag = (url) => {
+  try {
+    const u = new URL(url);
+    if (!/^https?:$/.test(u.protocol)) return url;
+    u.searchParams.set('utm_source', SOURCE_TAG);
+    return u.toString();
+  } catch {
+    return url;
+  }
+};

@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { faviconUrl, formatCitationDate, hostOf } from '../lib/citations';
+import { faviconUrl, formatCitationDate, hostOf, withSourceTag } from '../lib/citations';
 
 const Favicon = ({ url, size = 14 }) => {
   const [failed, setFailed] = useState(false);
@@ -46,7 +46,7 @@ const CitationChip = ({ sources }) => {
       onMouseLeave={hide}
     >
       <a
-        href={first.url}
+        href={withSourceTag(first.url)}
         target="_blank"
         rel="noopener noreferrer"
         className="inline-flex max-w-[150px] items-center gap-1 rounded-full bg-[#34353d] px-1.5 py-[1px] text-[11px] leading-4 text-gray-300 no-underline transition-colors hover:bg-[#42434c] hover:text-gray-100"
@@ -67,7 +67,7 @@ const CitationChip = ({ sources }) => {
           {sources.map((s, i) => (
             <a
               key={`${s.url}-${i}`}
-              href={s.url}
+              href={withSourceTag(s.url)}
               target="_blank"
               rel="noopener noreferrer"
               className={`block rounded-xl px-3 py-2.5 no-underline transition-colors hover:bg-[#2a2b32] ${
