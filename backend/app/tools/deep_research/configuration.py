@@ -13,13 +13,14 @@ class SearchAPI(Enum):
     OPENAI = "openai"
     TAVILY = "tavily"
     DUCKDUCKGO = "duckduckgo"
+    PARALLEL = "parallel"
     NONE = "none"
 
 class Configuration(BaseModel):
     max_structured_output_retries: int = Field(default=3)
     allow_clarification: bool = Field(default=True)
     max_concurrent_research_units: int = Field(default=5)
-    search_api: SearchAPI = Field(default=SearchAPI.DUCKDUCKGO)
+    search_api: SearchAPI = Field(default=SearchAPI.PARALLEL)
     max_researcher_iterations: int = Field(default=6)
     max_react_tool_calls: int = Field(default=10)
     summarization_model: str = Field(default="groq:openai/gpt-oss-120b")

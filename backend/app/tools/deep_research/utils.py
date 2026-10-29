@@ -330,6 +330,19 @@ async def get_search_tool(search_api: SearchAPI):
         }
         return [search_tool]
 
+    elif search_api == SearchAPI.PARALLEL:
+        from app.tools.parallel_search import parallel_configured
+        if not parallel_configured():
+            logging.warning("PARALLEL_API_KEY is not set; deep research falls back to DuckDuckGo search")
+            return await get_search_tool(SearchAPI.DUCKDUCKGO)
+        from .parallel_search import web_search
+        web_search.metadata = {
+            **(web_search.metadata or {}),
+            "type": "search",
+            "name": "web_search"
+        }
+        return [web_search]
+
     elif search_api == SearchAPI.DUCKDUCKGO:
         from .duckduckgo_search import duckduckgo_search_tool
         search_tool = duckduckgo_search_tool
