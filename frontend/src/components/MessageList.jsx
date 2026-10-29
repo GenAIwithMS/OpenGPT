@@ -8,6 +8,8 @@ import ThinkingIndicator from './ThinkingIndicator';
 import ResearchCard from './ResearchCard';
 import ReportCard from './ReportCard';
 import { CodeBlock, CodeBlockCode, CodeBlockGroup, CopyButton } from './ui/code-block';
+import CitationChip from './CitationChip';
+import { parseCitation, stripCitationMarkers } from '../lib/citations';
 
 function nodeToString(node) {
   if (typeof node === 'string') return node;
@@ -116,6 +118,59 @@ function MessageActions({ content, onRegenerate }) {
   );
 }
 
+// Links written by the backend's citation pass carry a title attribute
+// ("Page title (date)"); ordinary markdown links the model writes do not.
+const isCitation = (el) => React.isValidElement(el) && el.type === MarkdownLink && !!el.props.title;
+
+const MarkdownLink = ({ href, title, children }) => {
+  if (title) {
+    return <CitationChip sources={[parseCitation({ href, title, label: nodeToString(children) })]} />;
+  }
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-blue-400 hover:text-blue-300 underline break-words"
+    >
+      {children}
+    </a>
+  );
+};
+
+// Adjacent citation links (only whitespace between them) collapse into one
+// chip that reads "Site +N", like the sources pill in ChatGPT.
+const groupCitations = (children) => {
+  const items = React.Children.toArray(children);
+  if (!items.some(isCitation)) return children;
+  const out = [];
+  let run = [];
+  const flush = () => {
+    if (run.length === 0) return;
+    out.push(
+      <CitationChip
+        key={`cite-${out.length}`}
+        sources={run.map((el) =>
+          parseCitation({ href: el.props.href, title: el.props.title, label: nodeToString(el.props.children) })
+        )}
+      />
+    );
+    run = [];
+  };
+  items.forEach((item, i) => {
+    if (isCitation(item)) {
+      run.push(item);
+      return;
+    }
+    const next = items[i + 1];
+    if (run.length && typeof item === 'string' && item.trim() === '' && isCitation(next)) return;
+    flush();
+    out.push(item);
+  });
+  flush();
+  return out;
+};
+
 export const markdownComponents = {
   pre: ({ children }) => <>{children}</>,
   code: ({ node, className, children, ...props }) => {
@@ -146,7 +201,9 @@ export const markdownComponents = {
     );
   },
   p: ({ children }) => (
-    <p className="mb-3 last:mb-0 leading-7 text-gray-100 whitespace-pre-wrap break-words">{children}</p>
+    <p className="mb-3 last:mb-0 leading-7 text-gray-100 whitespace-pre-wrap break-words">
+      {groupCitations(children)}
+    </p>
   ),
   ul: ({ children }) => (
     <ul className="list-disc ml-6 mb-3 space-y-1 text-gray-100">
@@ -159,7 +216,7 @@ export const markdownComponents = {
     </ol>
   ),
   li: ({ children }) => (
-    <li className="leading-7 text-gray-100">{children}</li>
+    <li className="leading-7 text-gray-100">{groupCitations(children)}</li>
   ),
   h1: ({ children }) => (
     <h1 className="text-2xl font-bold mb-3 mt-4 text-gray-100">{children}</h1>
@@ -192,16 +249,7 @@ export const markdownComponents = {
       {children}
     </td>
   ),
-  a: ({ href, children }) => (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-blue-400 hover:text-blue-300 underline break-words"
-    >
-      {children}
-    </a>
-  ),
+  a: MarkdownLink,
   strong: ({ children }) => (
     <strong className="font-semibold text-gray-100">{children}</strong>
   ),
@@ -366,7 +414,7 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
             rehypePlugins={[rehypeRaw]}
             components={markdownComponents}
           >
-            {message.content}
+            {message.streaming ? stripCitationMarkers(message.content) : message.content}
           </ReactMarkdown>
         )}
         {message.streaming && !isResearch && (

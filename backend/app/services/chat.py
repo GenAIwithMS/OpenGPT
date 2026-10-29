@@ -1,4 +1,5 @@
 import os
+import uuid
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, RemoveMessage
@@ -13,6 +14,7 @@ from app.services.chatbot import (
 )
 from app.services.thread import generate_thread_id, generate_id_name
 from app.services.rag import has_document
+from app.services.citations import extract_sources, link_citations
 
 # How much of the earlier conversation a deep research run receives as context
 DEEP_RESEARCH_HISTORY_MESSAGES = 6
@@ -336,6 +338,9 @@ class ChatService:
         # reasoning in the thinking bar so the saved response stays clean.
         answer_parts = []
         reasoning_parts = []
+        # Search results the model saw, by source number, for resolving its
+        # ``【n†source】`` citation markers once the answer is complete.
+        sources = {}
 
         for message_chunk, metadata in graph.stream(
             {
@@ -349,6 +354,8 @@ class ChatService:
             # Tool produced a result -> live "finished" signal
             if isinstance(message_chunk, ToolMessage):
                 name = getattr(message_chunk, "name", None) or "tool"
+                if isinstance(message_chunk.content, str):
+                    sources.update(extract_sources(message_chunk.content))
                 yield {
                     "content": f"Finished using {name}.",
                     "message_type": "thinking",
@@ -385,9 +392,16 @@ class ChatService:
         # with the real content. The answer lives in ``content``; only fall back
         # to reasoning when the model emitted no final answer. Temporary chats
         # are never persisted — they live only in the in-memory graph.
+        # Citation markers are rewritten as links in one pass at the end; the
+        # client swaps its streamed text for this final version.
+        answer = "".join(answer_parts)
+        linked = link_citations(answer, sources)
+        if linked != answer:
+            yield {"content": linked, "message_type": "ai_replace"}
+
         if temporary:
             return
-        persist_text = "".join(answer_parts).strip() or "".join(reasoning_parts).strip()
+        persist_text = linked.strip() or "".join(reasoning_parts).strip()
         if persist_text:
             try:
                 current = chatbot.get_state(config=config)
@@ -438,6 +452,8 @@ class ChatService:
                 "allow_clarification": False,
                 "max_researcher_iterations": int(os.getenv("DEEP_RESEARCH_MAX_ITERATIONS", "3")),
                 "max_react_tool_calls": int(os.getenv("DEEP_RESEARCH_MAX_TOOL_CALLS", "6")),
+                # Links all web searches of this run (Parallel session)
+                "search_session_id": f"research-{uuid.uuid4()}",
             }
         }
 
