@@ -311,33 +311,6 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 A big thank you to everyone who has helped build OpenGPT! 💙
 
-<table>
-  <tr>
-    <td align="center">
-      <a href="https://github.com/GenAIwithMS">
-        <img src="https://github.com/GenAIwithMS.png" width="100" alt="GenAIwithMS"/><br/>
-        <sub><b>Muhammad Siddiq</b></sub>
-      </a><br/>
-      <sub>Creator &amp; Maintainer</sub>
-    </td>
-    <td align="center">
-      <a href="https://github.com/Dextheking1">
-        <img src="https://github.com/Dextheking1.png" width="100" alt="Dextheking1"/><br/>
-        <sub><b>Dextheking1</b></sub>
-      </a><br/>
-      <sub>Contributor</sub>
-    </td>
-    <td align="center">
-      <a href="https://github.com/apps/langsmith-fleet">
-        <img src="https://avatars.githubusercontent.com/in/2251985?v=4" width="100" alt="langsmith-fleet[bot]"/><br/>
-        <sub><b>langsmith-fleet[bot]</b></sub>
-      </a><br/>
-      <sub>Automation</sub>
-    </td>
-  </tr>
-</table>
-
-All contributors (updates automatically):
 
 <a href="https://github.com/GenAIwithMS/OpenGPT/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=GenAIwithMS/OpenGPT" alt="Contributors"/>
