@@ -326,3 +326,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Groq for fast LLM inference
 - FastAPI for the modern Python web framework
 - React and Vite for the frontend tooling
+
+## Related Resources
+
+- [Equibles](https://equibles.com): stock market data API
