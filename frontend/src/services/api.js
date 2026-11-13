@@ -78,6 +78,16 @@ export const chatService = {
     return eventSource;
   },
 
+  // Tell the backend to forget a temporary chat's memory. `keepalive` lets the
+  // request finish even while the tab is closing.
+  endTempSession: (tempSessionId) => {
+    if (!tempSessionId) return;
+    fetch(`${API_BASE_URL}/chat/temp/${encodeURIComponent(tempSessionId)}/end`, {
+      method: 'POST',
+      keepalive: true,
+    }).catch(() => {});
+  },
+
   // Edit a previously sent user message and stream the regenerated response.
   // Uses POST (because editing mutates state) with a manual SSE read.
   editStream: (threadId, message, index, tools = [], onMessage, onError) => {

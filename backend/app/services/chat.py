@@ -535,6 +535,7 @@ class ChatService:
                     blog_state = {
                         "topic": message,
                         "as_of": date.today().isoformat(),
+                        "persist": not temporary,
                     }
 
                     for event in blog_app.stream(blog_state, stream_mode="updates"):

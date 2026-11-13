@@ -24,7 +24,9 @@ from app.schema.models import (
 from app.services.chat import ChatService
 from app.services.rag import ingest_document, retrieve_from_document, has_document, get_document_info, SUPPORTED_EXTENSIONS
 from app.exceptions import NotFoundError, ValidationError, AppError
+from app.services.chatbot import touch_temp_session, end_temp_session
 from langchain_groq import ChatGroq
+from langsmith import tracing_context
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -45,6 +47,22 @@ def _valid_thread_id(thread_id: Optional[str]) -> Optional[str]:
         return str(uuid.UUID(thread_id))
     except (ValueError, AttributeError, TypeError):
         raise ValidationError("Invalid thread_id: expected a UUID")
+
+
+def _untraced(stream):
+    """Iterate a generator with LangSmith tracing off.
+
+    Each step runs under its own tracing_context because StreamingResponse may
+    pull every chunk in a different worker thread.
+    """
+    iterator = iter(stream)
+    while True:
+        with tracing_context(enabled=False):
+            try:
+                item = next(iterator)
+            except StopIteration:
+                return
+        yield item
 
 
 def _require_thread_id(thread_id: Optional[str]) -> str:
@@ -131,10 +149,15 @@ def chat_stream(
             except ValueError:
                 raise ValidationError("Invalid session_id: expected a UUID")
             thread_id = f"temp-{session}"
+            touch_temp_session(thread_id)
 
             def generate_stream():
                 try:
-                    for chunk in ChatService.stream_message(message, thread_id, tools_list, temporary=True):
+                    # Temporary chats are never sent to LangSmith tracing.
+                    chunks = _untraced(
+                        ChatService.stream_message(message, thread_id, tools_list, temporary=True)
+                    )
+                    for chunk in chunks:
                         yield f"data: {json.dumps(chunk)}\n\n"
 
                     yield f"data: {json.dumps({'done': True})}\n\n"
@@ -170,6 +193,17 @@ def chat_stream(
         raise
     except Exception as e:
         raise AppError(str(e)) from e
+
+
+@chat_router.post("/chat/temp/{session_id}/end")
+def end_temporary_chat(session_id: str):
+    """Forget a temporary chat's in-memory history once the client leaves it."""
+    try:
+        session = str(uuid.UUID(session_id))
+    except ValueError:
+        raise ValidationError("Invalid session_id: expected a UUID")
+    end_temp_session(f"temp-{session}")
+    return {"status": "success"}
 
 
 @chat_router.get("/threads", response_model=ThreadListResponse)

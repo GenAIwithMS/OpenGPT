@@ -1,3 +1,6 @@
+import threading
+import time
+from collections import OrderedDict
 from dotenv import load_dotenv
 from langsmith import traceable
 from typing import TypedDict, Annotated
@@ -130,6 +133,38 @@ chatbot = graph.compile(checkpointer=check_pointer)
 # on refresh / new chat / backend restart.
 memory_checkpointer = MemorySaver()
 chatbot_memory = graph.compile(checkpointer=memory_checkpointer)
+
+# Temporary sessions held in memory, oldest first: {thread_id: last_used}.
+# Sessions are removed when the client ends them, after an hour idle, or when
+# there are too many, so memory doesn't grow until the next restart.
+_TEMP_SESSION_TTL_SECONDS = 60 * 60
+_MAX_TEMP_SESSIONS = 200
+_temp_sessions: "OrderedDict[str, float]" = OrderedDict()
+_temp_sessions_lock = threading.Lock()
+
+
+def _forget_temp_session(thread_id: str) -> None:
+    _temp_sessions.pop(thread_id, None)
+    memory_checkpointer.delete_thread(thread_id)
+
+
+def touch_temp_session(thread_id: str) -> None:
+    """Mark a temporary session as used and evict stale ones."""
+    now = time.monotonic()
+    with _temp_sessions_lock:
+        _temp_sessions[thread_id] = now
+        _temp_sessions.move_to_end(thread_id)
+        for tid, last_used in list(_temp_sessions.items()):
+            expired = now - last_used > _TEMP_SESSION_TTL_SECONDS
+            over_cap = len(_temp_sessions) > _MAX_TEMP_SESSIONS
+            if tid != thread_id and (expired or over_cap):
+                _forget_temp_session(tid)
+
+
+def end_temp_session(thread_id: str) -> None:
+    """Delete a temporary session's memory as soon as the client leaves it."""
+    with _temp_sessions_lock:
+        _forget_temp_session(thread_id)
 
 # Database session factory
 Session = DatabaseConfig.get_session_factory()

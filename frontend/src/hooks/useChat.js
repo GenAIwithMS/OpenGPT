@@ -29,8 +29,36 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
   const eventSourceRef = useRef(null);
   const lastPromptRef = useRef('');
   const tempSessionRef = useRef(newTempSessionId());
+  // True once the current temporary session has sent a message to the backend.
+  const tempUsedRef = useRef(false);
+
+  // Free the current temporary chat's server memory and start a fresh session.
+  const endTempSession = () => {
+    if (tempUsedRef.current) {
+      chatService.endTempSession(tempSessionRef.current);
+      tempUsedRef.current = false;
+    }
+    tempSessionRef.current = newTempSessionId();
+  };
+
+  const claimTempSession = () => {
+    tempUsedRef.current = true;
+    return tempSessionRef.current;
+  };
+
+  // Closing or reloading the tab also ends the temporary chat.
+  useEffect(() => {
+    const onUnload = () => {
+      if (tempUsedRef.current) chatService.endTempSession(tempSessionRef.current);
+    };
+    window.addEventListener('pagehide', onUnload);
+    return () => window.removeEventListener('pagehide', onUnload);
+  }, []);
 
   useEffect(() => {
+    // Any switch (new chat, another thread, leaving temporary mode) ends the
+    // previous temporary chat, so a new one never sees its memory.
+    endTempSession();
     if (threadId) {
       // When a brand-new thread was just created by streaming the first
       // message, the UI already holds the messages — skip the backend reload
@@ -42,8 +70,6 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
       loadMessages();
     } else {
       setMessages([]);
-      // Fresh chat: a new temporary chat must not see the previous one's memory.
-      tempSessionRef.current = newTempSessionId();
     }
   }, [threadId, isTempChat]);
 
@@ -294,7 +320,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
           }
         };
 
-        eventSourceRef.current = chatService.streamMessage(streamThreadId, message, tools, handleMessage, handleError, isTempChat ? tempSessionRef.current : null);
+        eventSourceRef.current = chatService.streamMessage(streamThreadId, message, tools, handleMessage, handleError, isTempChat ? claimTempSession() : null);
         return;
       }
 
@@ -303,7 +329,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
       if (tools.includes('deep_research')) {
         setStreamingProgress({ isStreaming: true, toolName: 'deep_research' });
         setMessages(prev => [...prev, researchPlaceholder()]);
-        eventSourceRef.current = chatService.streamMessage(streamThreadId, message, tools, handleChatChunk, handleStreamError, isTempChat ? tempSessionRef.current : null);
+        eventSourceRef.current = chatService.streamMessage(streamThreadId, message, tools, handleChatChunk, handleStreamError, isTempChat ? claimTempSession() : null);
         return;
       }
 
@@ -325,7 +351,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
         },
       ]);
 
-      eventSourceRef.current = chatService.streamMessage(streamThreadId, message, tools, handleChatChunk, handleStreamError, isTempChat ? tempSessionRef.current : null);
+      eventSourceRef.current = chatService.streamMessage(streamThreadId, message, tools, handleChatChunk, handleStreamError, isTempChat ? claimTempSession() : null);
     } catch (err) {
       setError(err.message);
       console.error('Error sending message:', err);
