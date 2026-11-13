@@ -51,6 +51,10 @@ from .utils import (
     think_tool,
 )
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 ################################################################################
 # Helper
@@ -388,8 +392,18 @@ def supervisor_tools_node(state: SupervisorState, config: RunnableConfig):
 
     tool_messages = []
     notes = []
+    # Each ConductResearch runs a whole researcher sub-graph (many paid model
+    # and search calls), so cap how many one supervisor step may start.
+    max_units = Configuration.from_runnable_config(config).max_concurrent_research_units
+    started = 0
     for tc in last_message.tool_calls:
-        if tc["name"] == "ConductResearch":
+        if tc["name"] == "ConductResearch" and started >= max_units:
+            tool_messages.append(ToolMessage(
+                content=f"Skipped: at most {max_units} research topics can run per step.",
+                tool_call_id=tc["id"],
+            ))
+        elif tc["name"] == "ConductResearch":
+            started += 1
             research_topic = tc["args"].get("research_topic", "Research topic not specified.")
             emit("delegate", text=research_topic)
             try:
@@ -401,7 +415,8 @@ def supervisor_tools_node(state: SupervisorState, config: RunnableConfig):
                 })
                 findings = result.get("compressed_research") or "No findings were produced for this topic."
             except Exception as e:
-                findings = f"Research on this topic failed: {e}"
+                logger.warning("Tool call failed: %s", e, exc_info=e)
+                findings = f"Research on this topic failed ({type(e).__name__})."
                 emit("error", text=findings)
             notes.append(f"## Research topic\n{research_topic}\n\n## Findings\n{findings}")
             # The supervisor only needs the gist to plan its next step
@@ -474,9 +489,10 @@ def researcher_tools_node(state: ResearcherState, config: RunnableConfig):
             tool_messages.append(ToolMessage(content=result, tool_call_id=tool_call_id))
             raw_notes.append(result)
         except Exception as e:
-            emit("error", text=f"{tool_name} failed: {e}")
+            logger.warning("Tool call failed: %s", e, exc_info=e)
+            emit("error", text=f"{tool_name} failed ({type(e).__name__}).")
             tool_messages.append(
-                ToolMessage(content=f"Tool execution error: {str(e)}", tool_call_id=tool_call_id)
+                ToolMessage(content=f"Tool execution error ({type(e).__name__}).", tool_call_id=tool_call_id)
             )
 
     return {

@@ -8,6 +8,10 @@ from langchain_core.tools import tool
 from app.tools.parallel_search import search_async
 from .configuration import Configuration
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 @tool(parse_docstring=True)
 async def web_search(queries: List[str], objective: str, config: RunnableConfig) -> str:
@@ -32,4 +36,5 @@ async def web_search(queries: List[str], objective: str, config: RunnableConfig)
             client_model=research_model.split(":", 1)[-1],
         )
     except Exception as e:
-        return f"Web search failed: {e}"
+        logger.warning("Tool call failed: %s", e, exc_info=e)
+        return f"Web search failed ({type(e).__name__})."

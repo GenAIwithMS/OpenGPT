@@ -39,7 +39,9 @@ const postStream = (path, body, onMessage, onError) => {
         let detail = `Request failed (${response.status})`;
         try {
           const err = await response.json();
-          detail = err?.error?.message || err?.detail || detail;
+          // App errors: {error: {message}}. Request validation: {detail: [{msg}]}.
+          const validation = Array.isArray(err?.detail) ? err.detail[0]?.msg : err?.detail;
+          detail = err?.error?.message || validation || detail;
         } catch { /* not JSON */ }
         fail(new Error(detail));
         return;

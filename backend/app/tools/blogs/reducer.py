@@ -156,7 +156,7 @@ def generate_and_place_images(state: TypedDict) -> dict:
                     f"> **[IMAGE GENERATION FAILED]** {spec.get('caption','')}\n>\n"
                     f"> **Alt:** {spec.get('alt','')}\n>\n"
                     f"> **Prompt:** {spec.get('prompt','')}\n>\n"
-                    f"> **Error:** {e}\n"
+                    f"> **Error:** {type(e).__name__}\n"
                 )
                 md = md.replace(placeholder, prompt_block)
                 continue

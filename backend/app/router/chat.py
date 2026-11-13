@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Form
+from fastapi import APIRouter, Depends, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from typing import Optional
 import json
@@ -25,6 +25,8 @@ from app.schema.models import (
 from app.services.chat import ChatService
 from app.services.rag import ingest_document, retrieve_from_document, has_document, get_document_info, SUPPORTED_EXTENSIONS
 from app.exceptions import NotFoundError, ValidationError, AppError
+from app.error_handlers import log_error, public_error
+from app.rate_limit import rate_limit
 from app.services.chatbot import touch_temp_session, end_temp_session, get_thread_title_from_db
 from langchain_groq import ChatGroq
 from langsmith import tracing_context
@@ -33,6 +35,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 chat_router = APIRouter()
+
+# Routes that call paid LLM / search APIs are rate limited per client.
+LIMITED = [Depends(rate_limit)]
+
+MAX_UPLOAD_BYTES = int(float(os.getenv("MAX_UPLOAD_MB", "20")) * 1024 * 1024)
 
 
 def _valid_thread_id(thread_id: Optional[str]) -> Optional[str]:
@@ -48,6 +55,17 @@ def _valid_thread_id(thread_id: Optional[str]) -> Optional[str]:
         return str(uuid.UUID(thread_id))
     except (ValueError, AttributeError, TypeError):
         raise ValidationError("Invalid thread_id: expected a UUID")
+
+
+def _internal_error(exc: Exception) -> AppError:
+    """Turn an unexpected exception into a generic 500 without internal details."""
+    ref = log_error("Request failed", exc)
+    return AppError(public_error(ref), details={"ref": ref})
+
+
+def _stream_error(exc: Exception) -> str:
+    """Generic error text for a stream; the details only go to the server log."""
+    return public_error(log_error("Stream failed", exc))
 
 
 def _untraced(stream):
@@ -73,7 +91,7 @@ def _require_thread_id(thread_id: Optional[str]) -> str:
     return valid
 
 
-@chat_router.post("/chat", response_model=ChatResponse)
+@chat_router.post("/chat", response_model=ChatResponse, dependencies=LIMITED)
 def chat(request: ChatRequest):
     try:
         thread_id = _valid_thread_id(request.thread_id)
@@ -89,10 +107,10 @@ def chat(request: ChatRequest):
     except AppError:
         raise
     except Exception as e:
-        raise AppError(str(e)) from e
+        raise _internal_error(e) from e
 
 
-@chat_router.post("/chat/regenerate", response_model=ChatResponse)
+@chat_router.post("/chat/regenerate", response_model=ChatResponse, dependencies=LIMITED)
 def regenerate(request: RegenerateRequest):
     try:
         thread_id = _require_thread_id(request.thread_id)
@@ -101,10 +119,10 @@ def regenerate(request: RegenerateRequest):
     except AppError:
         raise
     except Exception as e:
-        raise AppError(str(e)) from e
+        raise _internal_error(e) from e
 
 
-@chat_router.post("/chat/edit", response_model=ChatResponse)
+@chat_router.post("/chat/edit", dependencies=LIMITED)
 def edit_message(request: EditMessageRequest):
     try:
         thread_id = _require_thread_id(request.thread_id)
@@ -118,7 +136,7 @@ def edit_message(request: EditMessageRequest):
 
                 yield f"data: {json.dumps({'thread_id': thread_id, 'done': True})}\n\n"
             except Exception as e:
-                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                yield f"data: {json.dumps({'error': _stream_error(e)})}\n\n"
 
         return StreamingResponse(
             generate_stream(),
@@ -127,12 +145,12 @@ def edit_message(request: EditMessageRequest):
     except AppError:
         raise
     except Exception as e:
-        raise AppError(str(e)) from e
+        raise _internal_error(e) from e
 
 
 # POST, so the prompt travels in the request body instead of the URL, where it
 # would end up in access logs and browser history.
-@chat_router.post("/chat/stream")
+@chat_router.post("/chat/stream", dependencies=LIMITED)
 def chat_stream(request: ChatStreamRequest):
     message = request.message
     thread_id = request.thread_id
@@ -163,7 +181,7 @@ def chat_stream(request: ChatStreamRequest):
 
                     yield f"data: {json.dumps({'done': True})}\n\n"
                 except Exception as e:
-                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                    yield f"data: {json.dumps({'error': _stream_error(e)})}\n\n"
 
             return StreamingResponse(
                 generate_stream(),
@@ -183,7 +201,7 @@ def chat_stream(request: ChatStreamRequest):
 
                 yield f"data: {json.dumps({'thread_id': thread_id, 'done': True})}\n\n"
             except Exception as e:
-                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                yield f"data: {json.dumps({'error': _stream_error(e)})}\n\n"
 
         return StreamingResponse(
             generate_stream(),
@@ -193,7 +211,7 @@ def chat_stream(request: ChatStreamRequest):
     except AppError:
         raise
     except Exception as e:
-        raise AppError(str(e)) from e
+        raise _internal_error(e) from e
 
 
 @chat_router.post("/chat/temp/{session_id}/end")
@@ -222,7 +240,7 @@ def get_threads():
     except AppError:
         raise
     except Exception as e:
-        raise AppError(str(e)) from e
+        raise _internal_error(e) from e
 
 
 @chat_router.get("/threads/{thread_id}", response_model=ThreadHistoryResponse)
@@ -257,7 +275,7 @@ def get_thread_history(thread_id: str):
     except AppError:
         raise
     except Exception as e:
-        raise AppError(str(e)) from e
+        raise _internal_error(e) from e
 
 
 @chat_router.post("/threads/new", response_model=NewThreadResponse)
@@ -269,7 +287,7 @@ def create_new_thread():
     except AppError:
         raise
     except Exception as e:
-        raise AppError(str(e)) from e
+        raise _internal_error(e) from e
 
 
 @chat_router.put("/threads/{thread_id}/title")
@@ -286,7 +304,7 @@ def update_thread_title(thread_id: str, request: UpdateTitleRequest):
     except AppError:
         raise
     except Exception as e:
-        raise AppError(str(e)) from e
+        raise _internal_error(e) from e
 
 
 @chat_router.put("/threads/{thread_id}/reports/{report_index}")
@@ -297,7 +315,7 @@ def update_research_report(thread_id: str, report_index: int, request: UpdateRep
     return {"status": "success", "thread_id": thread_id, "report_index": report_index}
 
 
-@chat_router.post("/upload-pdf", response_model=PDFUploadResponse)
+@chat_router.post("/upload-pdf", response_model=PDFUploadResponse, dependencies=LIMITED)
 def upload_pdf(
     file: UploadFile = File(...),
     thread_id: Optional[str] = Form(None)
@@ -314,7 +332,13 @@ def upload_pdf(
         if thread_id and get_thread_title_from_db(thread_id) is None:
             raise NotFoundError("Thread not found")
 
-        file_bytes = file.file.read()
+        # Read at most one byte past the limit, so a huge upload is rejected
+        # without loading all of it into memory.
+        file_bytes = file.file.read(MAX_UPLOAD_BYTES + 1)
+        if len(file_bytes) > MAX_UPLOAD_BYTES:
+            raise ValidationError(
+                f"File is too large. The limit is {MAX_UPLOAD_BYTES // (1024 * 1024)} MB."
+            )
 
         if not file_bytes:
             raise ValidationError("Empty file uploaded")
@@ -336,7 +360,7 @@ def upload_pdf(
     except AppError:
         raise
     except Exception as e:
-        raise AppError(str(e)) from e
+        raise _internal_error(e) from e
 
 
 @chat_router.delete("/threads/{thread_id}")
@@ -357,10 +381,10 @@ def delete_thread(thread_id: str):
     except AppError:
         raise
     except Exception as e:
-        raise AppError(str(e)) from e
+        raise _internal_error(e) from e
 
 
-@chat_router.post("/query-document", response_model=DocumentQueryResponse)
+@chat_router.post("/query-document", response_model=DocumentQueryResponse, dependencies=LIMITED)
 def query_document(request: DocumentQueryRequest):
     try:
         thread_id = _require_thread_id(request.thread_id)
@@ -402,7 +426,7 @@ Answer:"""
     except AppError:
         raise
     except Exception as e:
-        raise AppError(str(e)) from e
+        raise _internal_error(e) from e
 
 
 @chat_router.get("/threads/{thread_id}/document", response_model=DocumentInfoResponse)
@@ -429,4 +453,4 @@ def get_thread_document_info(thread_id: str):
     except AppError:
         raise
     except Exception as e:
-        raise AppError(str(e)) from e
+        raise _internal_error(e) from e
