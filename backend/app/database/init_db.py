@@ -35,6 +35,20 @@ def _upgrade_blob_columns():
                 logger.info(f"Upgraded {table}.{column} to LONGBLOB")
 
 
+def _drop_checkpoint_writes_foreign_key():
+    """Older databases have a foreign key from checkpoint_writes to checkpoints."""
+    with DatabaseConfig.get_engine().begin() as conn:
+        names = conn.execute(
+            text(
+                "SELECT CONSTRAINT_NAME FROM information_schema.REFERENTIAL_CONSTRAINTS "
+                "WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'checkpoint_writes'"
+            )
+        ).scalars().all()
+        for name in names:
+            conn.execute(text(f"ALTER TABLE `checkpoint_writes` DROP FOREIGN KEY `{name}`"))
+            logger.info("Dropped foreign key %s from checkpoint_writes", name)
+
+
 def _warn_about_pickled_checkpoints():
     """Old checkpoints were pickled; the app refuses to load those."""
     with DatabaseConfig.get_engine().connect() as conn:
@@ -65,6 +79,7 @@ def init_database():
         # Create tables
         Base.metadata.create_all(DatabaseConfig.get_engine())
         _upgrade_blob_columns()
+        _drop_checkpoint_writes_foreign_key()
         _warn_about_pickled_checkpoints()
 
         return True
