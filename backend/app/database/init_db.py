@@ -1,7 +1,10 @@
 """Database Initialization Script"""
+import logging
 from sqlalchemy import create_engine, text
 from app.database import DatabaseConfig
 from app.database.models import Base
+
+logger = logging.getLogger(__name__)
 
 
 # (table, column, NOT NULL?) for columns that must be LONGBLOB. create_all()
@@ -28,7 +31,7 @@ def _upgrade_blob_columns():
             if data_type and data_type.lower() != "longblob":
                 null_sql = "NOT NULL" if not_null else "NULL"
                 conn.execute(text(f"ALTER TABLE `{table}` MODIFY `{column}` LONGBLOB {null_sql}"))
-                print(f"Upgraded {table}.{column} to LONGBLOB")
+                logger.info(f"Upgraded {table}.{column} to LONGBLOB")
 
 
 def init_database():
@@ -49,7 +52,7 @@ def init_database():
 
         return True
     except Exception as e:
-        print(f"Database initialization error: {e}")
+        logger.error(f"Database initialization error: {e}")
         return False
 
 

@@ -2,12 +2,81 @@ import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8000/api';
 
+// Optional API token (VITE_API_TOKEN in frontend/.env.local). It must match
+// API_TOKEN in backend/.env when the backend requires one.
+const API_TOKEN = import.meta.env.VITE_API_TOKEN;
+const authHeaders = () => (API_TOKEN ? { Authorization: `Bearer ${API_TOKEN}` } : {});
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
+    ...authHeaders(),
   },
 });
+
+// POST a JSON body and read the Server-Sent Events reply. Returns an object
+// with close(), which aborts the request (used by the Stop button).
+// A stream that ends without a `done` or `error` event is reported as an error.
+const postStream = (path, body, onMessage, onError) => {
+  const controller = new AbortController();
+  let finished = false;
+  const fail = (err) => {
+    if (finished || controller.signal.aborted) return;
+    finished = true;
+    console.error('Stream error:', err);
+    if (onError) onError(err);
+  };
+
+  fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body),
+    signal: controller.signal,
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        let detail = `Request failed (${response.status})`;
+        try {
+          const err = await response.json();
+          detail = err?.error?.message || err?.detail || detail;
+        } catch { /* not JSON */ }
+        fail(new Error(detail));
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() || '';
+        for (const part of parts) {
+          const trimmed = part.trim();
+          if (!trimmed.startsWith('data:')) continue;
+          const data = trimmed.slice(5).trim();
+          if (data === '[DONE]') continue;
+          let parsed;
+          try {
+            parsed = JSON.parse(data);
+          } catch (error) {
+            console.error('Error parsing message:', error);
+            continue;
+          }
+          if (parsed.done || parsed.error) finished = true;
+          onMessage(parsed);
+        }
+      }
+      if (!finished) fail(new Error('The connection closed before the reply finished.'));
+    })
+    .catch(fail);
+
+  return { close: () => controller.abort() };
+};
 
 export const chatService = {
   // Send a message to the chatbot
@@ -29,54 +98,25 @@ export const chatService = {
     return response.data;
   },
 
-  // Stream messages (using EventSource for SSE)
+  // Stream a chat reply. The message goes in a POST body, not the URL, so it
+  // never lands in server logs or browser history.
   // `tempSessionId` is set only for temporary chats: it marks the chat as
   // session-only and keeps each temporary chat's memory separate.
-  streamMessage: (threadId, message, tools = [], onMessage, onError, tempSessionId = null) => {
-    const params = new URLSearchParams();
-    params.set('message', message);
-    // Omit thread_id for a brand-new ("New Chat") conversation so the backend
-    // creates the thread and returns its id in the final `done` event.
-    if (threadId) params.set('thread_id', threadId);
-    if (tools.length > 0) params.set('tools', tools.join(','));
-    if (tempSessionId) {
-      params.set('temporary', 'true');
-      params.set('session_id', tempSessionId);
-    }
-    const eventSource = new EventSource(
-      `${API_BASE_URL}/chat/stream?${params.toString()}`
-    );
-
-    eventSource.onmessage = (event) => {
-      if (event.data === '[DONE]') {
-        eventSource.close();
-        return;
-      }
-      try {
-        const data = JSON.parse(event.data);
-        // Close on terminal events so the browser doesn't surface a false
-        // "connection closed" error when the backend ends the stream.
-        if (data.done || data.error) {
-          eventSource.close();
-        }
-        onMessage(data);
-      } catch (error) {
-        console.error('Error parsing message:', error);
-      }
-    };
-
-    eventSource.onerror = (error) => {
-      // EventSource fires "error" on a normal connection close too. Only surface
-      // it as a real error if the connection is still open/connecting.
-      if (eventSource.readyState !== EventSource.CLOSED) {
-        console.error('EventSource error:', error);
-        eventSource.close();
-        if (onError) onError(error);
-      }
-    };
-
-    return eventSource;
-  },
+  streamMessage: (threadId, message, tools = [], onMessage, onError, tempSessionId = null) =>
+    postStream(
+      '/chat/stream',
+      {
+        message,
+        // Omit thread_id for a brand-new chat; the backend creates the thread
+        // and returns its id in the final `done` event.
+        thread_id: threadId || undefined,
+        tools: tools.length > 0 ? tools : undefined,
+        temporary: Boolean(tempSessionId),
+        session_id: tempSessionId || undefined,
+      },
+      onMessage,
+      onError,
+    ),
 
   // Tell the backend to forget a temporary chat's memory. `keepalive` lets the
   // request finish even while the tab is closing.
@@ -85,65 +125,23 @@ export const chatService = {
     fetch(`${API_BASE_URL}/chat/temp/${encodeURIComponent(tempSessionId)}/end`, {
       method: 'POST',
       keepalive: true,
+      headers: authHeaders(),
     }).catch(() => {});
   },
 
   // Edit a previously sent user message and stream the regenerated response.
-  // Uses POST (because editing mutates state) with a manual SSE read.
-  editStream: (threadId, message, index, tools = [], onMessage, onError) => {
-    const body = {
-      thread_id: threadId,
-      message: message,
-      index: index,
-      tools: tools.length > 0 ? tools : undefined,
-    };
-
-    fetch(`${API_BASE_URL}/chat/edit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-      .then((response) => {
-        if (!response.ok) {
-          if (onError) onError(new Error(`Edit failed (${response.status})`));
-          return;
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        const read = () => {
-          reader.read().then(({ done, value }) => {
-            if (done) return;
-            buffer += decoder.decode(value, { stream: true });
-            const parts = buffer.split('\n\n');
-            buffer = parts.pop() || '';
-            for (const part of parts) {
-              const trimmed = part.trim();
-              if (!trimmed.startsWith('data:')) continue;
-              const data = trimmed.slice(5).trim();
-              if (data === '[DONE]') continue;
-              try {
-                onMessage(JSON.parse(data));
-              } catch (error) {
-                console.error('Error parsing message:', error);
-              }
-            }
-            read();
-          }).catch((err) => {
-            console.error('Edit stream error:', err);
-            if (onError) onError(err);
-          });
-        };
-
-        read();
-      })
-      .catch((err) => {
-        console.error('Edit fetch error:', err);
-        if (onError) onError(err);
-      });
-  },
+  editStream: (threadId, message, index, tools = [], onMessage, onError) =>
+    postStream(
+      '/chat/edit',
+      {
+        thread_id: threadId,
+        message,
+        index,
+        tools: tools.length > 0 ? tools : undefined,
+      },
+      onMessage,
+      onError,
+    ),
 
   // Get all threads
   getThreads: async () => {

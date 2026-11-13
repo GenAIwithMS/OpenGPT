@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Form, Query
+from fastapi import APIRouter, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from typing import Optional
 import json
@@ -6,6 +6,7 @@ import os
 import uuid
 from app.schema.models import (
     ChatRequest,
+    ChatStreamRequest,
     RegenerateRequest,
     EditMessageRequest,
     ChatResponse,
@@ -24,7 +25,7 @@ from app.schema.models import (
 from app.services.chat import ChatService
 from app.services.rag import ingest_document, retrieve_from_document, has_document, get_document_info, SUPPORTED_EXTENSIONS
 from app.exceptions import NotFoundError, ValidationError, AppError
-from app.services.chatbot import touch_temp_session, end_temp_session
+from app.services.chatbot import touch_temp_session, end_temp_session, get_thread_title_from_db
 from langchain_groq import ChatGroq
 from langsmith import tracing_context
 from dotenv import load_dotenv
@@ -129,16 +130,16 @@ def edit_message(request: EditMessageRequest):
         raise AppError(str(e)) from e
 
 
-@chat_router.get("/chat/stream")
-def chat_stream(
-    message: str = Query(..., description="User message"),
-    thread_id: Optional[str] = Query(None, description="Thread ID"),
-    tools: Optional[str] = Query(None, description="Comma-separated list of tools"),
-    temporary: bool = Query(False, description="If true, chat is session-only (never persisted)"),
-    session_id: Optional[str] = Query(None, description="Client-generated UUID for one temporary chat session")
-):
+# POST, so the prompt travels in the request body instead of the URL, where it
+# would end up in access logs and browser history.
+@chat_router.post("/chat/stream")
+def chat_stream(request: ChatStreamRequest):
+    message = request.message
+    thread_id = request.thread_id
+    session_id = request.session_id
+    temporary = request.temporary
     try:
-        tools_list = tools.split(',') if tools else None
+        tools_list = request.tools or None
 
         if temporary:
             # Each temporary chat gets its own in-memory thread, so separate
@@ -309,6 +310,9 @@ def upload_pdf(
             )
 
         thread_id = _valid_thread_id(thread_id)
+        # Documents can only be attached to threads this server created.
+        if thread_id and get_thread_title_from_db(thread_id) is None:
+            raise NotFoundError("Thread not found")
 
         file_bytes = file.file.read()
 

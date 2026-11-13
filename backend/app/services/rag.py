@@ -1,3 +1,4 @@
+import logging
 import json
 import uuid
 import os
@@ -8,6 +9,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langsmith import traceable
 
+logger = logging.getLogger(__name__)
+
 # Document types supported for upload (RAG context).
 SUPPORTED_EXTENSIONS = (".pdf", ".md", ".txt")
 
@@ -15,7 +18,7 @@ SUPPORTED_EXTENSIONS = (".pdf", ".md", ".txt")
 try:
     _DEFAULT_EMBEDDINGS = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 except Exception as e:
-    print(f"⚠ HuggingFaceEmbeddings initialization failed: {e}")
+    logger.warning(f"⚠ HuggingFaceEmbeddings initialization failed: {e}")
     _DEFAULT_EMBEDDINGS = None
 
 
@@ -57,7 +60,7 @@ def _read_metadata(thread_id: str) -> Optional[dict]:
         with open(meta_path, "r", encoding="utf-8") as handle:
             return json.load(handle)
     except Exception as exc:
-        print(f"[DEBUG RAG] Failed to read metadata for thread {thread_id}: {exc}")
+        logger.warning(f"Failed to read metadata for thread {thread_id}: {exc}")
         return None
 
 
@@ -103,7 +106,7 @@ def _get_retriever(thread_id: Optional[str]):
         ext = metadata.get("ext") or _ext_for(file_path or "")
         if file_path and os.path.exists(file_path):
             if _DEFAULT_EMBEDDINGS is None:
-                print("[DEBUG RAG] Embeddings not available to rebuild retriever")
+                logger.warning("Embeddings not available to rebuild retriever")
                 return None
             try:
                 retriever, docs_count, chunks_count = _build_retriever_from_file(file_path, _DEFAULT_EMBEDDINGS, ext)
@@ -116,12 +119,12 @@ def _get_retriever(thread_id: Optional[str]):
                 _write_metadata(thread_key, metadata)
                 return retriever
             except Exception as exc:
-                print(f"[DEBUG RAG] Failed to rebuild retriever for thread {thread_key}: {exc}")
+                logger.warning(f"Failed to rebuild retriever for thread {thread_key}: {exc}")
                 return None
 
-    print(f"[DEBUG RAG] Retriever not found for thread {thread_id}")
-    print(f"[DEBUG RAG] Available threads: {list(_THREAD_RETRIEVERS.keys())}")
-    print(f"[DEBUG RAG] Metadata threads: {list(_THREAD_METADATA.keys())}")
+    logger.debug(f"Retriever not found for thread {thread_id}")
+    logger.debug(f"Available threads: {list(_THREAD_RETRIEVERS.keys())}")
+    logger.debug(f"Metadata threads: {list(_THREAD_METADATA.keys())}")
     return None
 
 
@@ -178,7 +181,7 @@ def retrieve_from_document(query: str, thread_id: str) -> dict:
     Retrieve relevant information from the uploaded PDF for this chat thread.
     Returns context and metadata from the document.
     """
-    print(f"[DEBUG RAG] Attempting to retrieve for thread: {thread_id}")
+    logger.debug(f"Attempting to retrieve for thread: {thread_id}")
     retriever = _get_retriever(thread_id)
     if retriever is None:
         # Check if we have metadata but lost the retriever (server restart)
@@ -194,11 +197,11 @@ def retrieve_from_document(query: str, thread_id: str) -> dict:
 
     # Use the retriever API to fetch relevant documents
     try:
-        print(f"[DEBUG RAG] Calling retriever.invoke with query: {query[:50]}...")
+        logger.debug(f"Calling retriever.invoke with query: {query[:50]}...")
         results = retriever.invoke(query)
-        print(f"[DEBUG RAG] Successfully retrieved {len(results)} documents")
+        logger.debug(f"Successfully retrieved {len(results)} documents")
     except Exception as e:
-        print(f"[DEBUG RAG] Exception during retrieval: {type(e).__name__}: {e}")
+        logger.warning(f"Exception during retrieval: {type(e).__name__}: {e}")
         return {"error": f"Retrieval failed: {e}", "query": query}
 
     context = [doc.page_content for doc in results]
@@ -218,7 +221,7 @@ def has_document(thread_id: str) -> bool:
     has_retriever = thread_key in _THREAD_RETRIEVERS
     metadata = _THREAD_METADATA.get(thread_key) or _read_metadata(thread_key)
     has_file = bool(metadata and metadata.get("file_path") and os.path.exists(metadata["file_path"]))
-    print(f"[DEBUG RAG] has_document check - thread: {thread_id}, retriever: {has_retriever}, metadata: {bool(metadata)}, file: {has_file}")
+    logger.debug(f"has_document check - thread: {thread_id}, retriever: {has_retriever}, metadata: {bool(metadata)}, file: {has_file}")
     # Return True if retriever exists or stored file exists to allow rehydration
     return has_retriever or has_file
 

@@ -1,3 +1,4 @@
+import uuid
 import os
 import re
 from pathlib import Path
@@ -138,7 +139,10 @@ def generate_and_place_images(state: TypedDict) -> dict:
 
     for spec in image_specs:
         placeholder = spec["placeholder"]
-        filename = spec["filename"]
+        # Never use the model's filename: it could point outside images/
+        # (e.g. "../x" or "/tmp/x"). A random name also avoids reusing another
+        # blog's image.
+        filename = f"{uuid.uuid4().hex}.png"
         out_path = images_dir / filename
 
         # generate only if needed

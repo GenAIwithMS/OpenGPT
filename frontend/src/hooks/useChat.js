@@ -445,7 +445,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
         return updated;
       });
 
-      chatService.editStream(threadId, newContent, humanIndex, tools, handleChatChunk, handleStreamError);
+      eventSourceRef.current = chatService.editStream(threadId, newContent, humanIndex, tools, handleChatChunk, handleStreamError);
     } catch (err) {
       setError(err.message);
       console.error('Error editing message:', err);

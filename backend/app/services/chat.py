@@ -1,3 +1,4 @@
+import logging
 import os
 import uuid
 from typing import Optional, List, Dict, Any
@@ -15,6 +16,8 @@ from app.services.chatbot import (
 from app.services.thread import generate_thread_id, generate_id_name
 from app.services.rag import has_document
 from app.services.citations import extract_sources, link_citations
+
+logger = logging.getLogger(__name__)
 
 # How much of the earlier conversation a deep research run receives as context
 DEEP_RESEARCH_HISTORY_MESSAGES = 6
@@ -46,7 +49,7 @@ class ChatService:
                 save_thread_title(thread_id, title)
                 return title
             except Exception as e:
-                print(f"Error generating title: {e}")
+                logger.warning(f"Error generating title: {e}")
                 return str(thread_id)[:8] + "..."
         
         return str(thread_id)[:8] + "..."
@@ -98,7 +101,7 @@ class ChatService:
             
             return formatted_messages
         except Exception as e:
-            print(f"Error loading conversation: {e}")
+            logger.warning(f"Error loading conversation: {e}")
             return []
     
     @staticmethod
@@ -131,7 +134,7 @@ class ChatService:
                     }
                 except Exception as blog_error:
                     error_msg = str(blog_error)
-                    print(f"Error using blog tool: {error_msg}")
+                    logger.warning(f"Error using blog tool: {error_msg}")
                     
                     # Provide user-friendly error messages
                     if "name resolution failed" in error_msg or "503" in error_msg:
@@ -171,7 +174,7 @@ class ChatService:
                     }
                 except Exception as deep_error:
                     error_msg = str(deep_error)
-                    print(f"Error using deep research tool: {error_msg}")
+                    logger.warning(f"Error using deep research tool: {error_msg}")
                     return {
                         "response": f"⚠️ **Deep Research Failed**\n\nAn error occurred:\n```\n{error_msg}\n```",
                         "thread_id": thread_id,
@@ -213,7 +216,7 @@ class ChatService:
                 "has_tool_calls": has_tool_calls
             }
         except Exception as e:
-            print(f"Error sending message: {e}")
+            logger.warning(f"Error sending message: {e}")
             raise Exception(f"Failed to send message: {str(e)}")
 
     @staticmethod
@@ -310,7 +313,7 @@ class ChatService:
                 "has_tool_calls": has_tool_calls,
             }
         except Exception as e:
-            print(f"Error regenerating message: {e}")
+            logger.warning(f"Error regenerating message: {e}")
             raise Exception(f"Failed to regenerate message: {str(e)}")
 
     @staticmethod
@@ -414,7 +417,7 @@ class ChatService:
                     config, {"messages": [AIMessage(content=persist_text)]}
                 )
             except Exception as e:
-                print(f"Error persisting final assistant message: {e}")
+                logger.warning(f"Error persisting final assistant message: {e}")
 
     @staticmethod
     def _stream_deep_research(graph, config, message: str, human_in_state: bool = False):
@@ -484,7 +487,7 @@ class ChatService:
         except Exception as deep_error:
             failed = True
             error_msg = str(deep_error)
-            print(f"Error streaming deep research: {error_msg}")
+            logger.warning(f"Error streaming deep research: {error_msg}")
             event = {"id": len(activity), "kind": "error", "text": error_msg}
             activity.append(event)
             yield {"message_type": "research", "event": event}
@@ -513,7 +516,7 @@ class ChatService:
                 ))
                 graph.update_state(config, {"messages": turn}, as_node="chat_node")
             except Exception as e:
-                print(f"Error saving deep research turn: {e}")
+                logger.warning(f"Error saving deep research turn: {e}")
 
     @staticmethod
     def stream_message(message: str, thread_id: str, tools: Optional[List[str]] = None, temporary: bool = False):
@@ -582,7 +585,7 @@ class ChatService:
                     return
                 except Exception as blog_error:
                     error_msg = str(blog_error)
-                    print(f"Error streaming blog tool: {error_msg}")
+                    logger.warning(f"Error streaming blog tool: {error_msg}")
 
                     # Provide user-friendly error messages
                     if "name resolution failed" in error_msg or "503" in error_msg:
@@ -611,7 +614,7 @@ class ChatService:
             # Stream tokens from the chatbot graph (live thinking + AI output)
             yield from ChatService._stream_chatbot(graph, config, doc_exists, message, temporary)
         except Exception as e:
-            print(f"Error streaming message: {e}")
+            logger.warning(f"Error streaming message: {e}")
             raise Exception(f"Failed to stream message: {str(e)}")
     
     @staticmethod
@@ -704,7 +707,7 @@ class ChatService:
                     return
                 except Exception as blog_error:
                     error_msg = str(blog_error)
-                    print(f"Error editing blog tool: {error_msg}")
+                    logger.warning(f"Error editing blog tool: {error_msg}")
                     if "name resolution failed" in error_msg or "503" in error_msg:
                         yield {
                             "content": "⚠️ **Blog Generation Failed**\n\nThe blog generation service is currently unavailable (network connection issue). This could be due to:\n- External API service is down\n- Network connectivity issues\n- DNS resolution problems\n\nPlease try again later or use the regular chat without the blog tool.",
@@ -728,7 +731,7 @@ class ChatService:
             yield from ChatService._stream_chatbot(chatbot, config, doc_exists, None)
             touch_thread(thread_id)
         except Exception as e:
-            print(f"Error editing message: {e}")
+            logger.warning(f"Error editing message: {e}")
             raise Exception(f"Failed to edit message: {str(e)}")
 
     @staticmethod
@@ -765,7 +768,7 @@ class ChatService:
             save_thread_title(thread_id, title)
             return True
         except Exception as e:
-            print(f"Error updating title: {e}")
+            logger.warning(f"Error updating title: {e}")
             return False
     
     @staticmethod
@@ -803,12 +806,12 @@ class ChatService:
                 doc_path = meta.get("file_path")
                 if doc_path and os.path.exists(doc_path):
                     os.remove(doc_path)
-                    print(f"Deleted document file: {doc_path}")
+                    logger.info(f"Deleted document file: {doc_path}")
                 if os.path.exists(meta_path):
                     os.remove(meta_path)
-                    print(f"Deleted metadata file: {meta_path}")
+                    logger.info(f"Deleted metadata file: {meta_path}")
             except Exception as e:
-                print(f"Warning: Failed to delete storage files for thread {thread_id}: {e}")
+                logger.warning(f"Warning: Failed to delete storage files for thread {thread_id}: {e}")
                 # Don't fail the whole operation if file cleanup fails
             
             # Clear any in-memory caches
@@ -819,14 +822,14 @@ class ChatService:
                 if thread_id in _THREAD_METADATA:
                     del _THREAD_METADATA[thread_id]
             except Exception as e:
-                print(f"Warning: Failed to clear thread cache for {thread_id}: {e}")
+                logger.warning(f"Warning: Failed to clear thread cache for {thread_id}: {e}")
             
-            print(f"Successfully deleted thread: {thread_id}")
+            logger.info(f"Successfully deleted thread: {thread_id}")
             return True
             
         except Exception as e:
             session.rollback()
-            print(f"Error deleting thread {thread_id}: {e}")
+            logger.warning(f"Error deleting thread {thread_id}: {e}")
             return False
         finally:
             session.close()
