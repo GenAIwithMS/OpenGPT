@@ -213,14 +213,12 @@ Session = DatabaseConfig.get_session_factory()
 
 def retrieve_all_threads():
     """Retrieve all thread IDs from the checkpointer"""
-    all_threads = set()
     try:
-        for checkpoint_tuple in check_pointer.list(None):
-            # checkpoint_tuple is a CheckpointTuple with .config attribute
-            all_threads.add(checkpoint_tuple.config["configurable"]["thread_id"])
+        # Reads only thread ids, instead of loading every checkpoint.
+        return check_pointer.list_thread_ids()
     except Exception as e:
         logger.warning(f"Error retrieving threads: {e}")
-    return list(all_threads)
+        return []
 
 
 def save_thread_title(thread_id: str, title: str):

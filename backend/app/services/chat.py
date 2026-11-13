@@ -391,13 +391,12 @@ class ChatService:
             try:
                 current = chatbot.get_state(config=config)
                 msgs = list(current.values.get("messages", []))
+                ops = []
                 if msgs and isinstance(msgs[-1], AIMessage):
-                    chatbot.update_state(
-                        config, {"messages": [RemoveMessage(id=msgs[-1].id)]}
-                    )
-                chatbot.update_state(
-                    config, {"messages": [AIMessage(content=persist_text)]}
-                )
+                    ops.append(RemoveMessage(id=msgs[-1].id))
+                ops.append(AIMessage(content=persist_text))
+                # One update (one checkpoint) instead of a remove plus an add.
+                chatbot.update_state(config, {"messages": ops})
             except Exception as e:
                 logger.warning(f"Error persisting final assistant message: {e}")
 
@@ -804,7 +803,8 @@ class ChatService:
     @staticmethod
     def delete_thread(thread_id: str) -> bool:
         """Delete a thread and all its associated data"""
-        from app.database import DatabaseConfig, ThreadMetadata, DocumentMetadata, Checkpoint, CheckpointWrite
+        from app.database import DatabaseConfig, ThreadMetadata, DocumentMetadata
+        from app.services.chatbot import check_pointer
         from app.services.rag import _thread_paths
         import os
         
@@ -813,8 +813,7 @@ class ChatService:
             # Delete from database tables (cascade will handle related records)
             
             # Delete checkpoints and checkpoint writes
-            session.query(CheckpointWrite).filter_by(thread_id=thread_id).delete()
-            session.query(Checkpoint).filter_by(thread_id=thread_id).delete()
+            check_pointer.delete_thread(thread_id)
             
             # Delete document metadata (this should cascade from thread_metadata but let's be explicit)
             session.query(DocumentMetadata).filter_by(thread_id=thread_id).delete()

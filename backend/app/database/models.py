@@ -79,11 +79,6 @@ class CheckpointWrite(Base):
     channel = Column(String(128), nullable=False)
     type = Column(String(128), nullable=True)
     value = Column(BigBinary, nullable=True)
-    
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ["thread_id", "checkpoint_ns", "checkpoint_id"],
-            ["checkpoints.thread_id", "checkpoints.checkpoint_ns", "checkpoints.checkpoint_id"],
-            ondelete="CASCADE"
-        ),
-    )
+    # No foreign key to checkpoints (like LangGraph's own savers): the saver
+    # deletes writes together with their checkpoint, and a foreign key would
+    # force it to invent placeholder checkpoints.
