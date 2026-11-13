@@ -22,7 +22,7 @@ def configure_langsmith() -> dict[str, str | bool]:
     load_dotenv(repo_root / ".env")
     load_dotenv(repo_root / ".env.local", override=False)
 
-    tracing_flag = os.getenv("LANGSMITH_TRACING", os.getenv("LANGCHAIN_TRACING_V2", "true"))
+    tracing_flag = os.getenv("LANGSMITH_TRACING", os.getenv("LANGCHAIN_TRACING_V2", "false"))
     tracing_enabled = str(tracing_flag).strip().lower() in {"1", "true", "yes", "on"}
     project = os.getenv("LANGSMITH_PROJECT") or os.getenv("LANGCHAIN_PROJECT") or "OpenGPT"
     endpoint = os.getenv("LANGSMITH_ENDPOINT") or os.getenv(

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
 import { Loader2, Copy, Check, ThumbsUp, ThumbsDown, RotateCcw, Pencil } from 'lucide-react';
 import AttachmentCard from './AttachmentCard';
 import ThinkingIndicator from './ThinkingIndicator';
@@ -481,7 +482,7 @@ const MessageList = ({ messages, loading, streaming, streamingProgress, onRegene
         {!asReportCard && (
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeRaw]}
+            rehypePlugins={[rehypeRaw, rehypeSanitize]}
             components={markdownComponents}
           >
             {cleanTableRows(message.streaming ? stripCitationMarkers(message.content) : message.content)}

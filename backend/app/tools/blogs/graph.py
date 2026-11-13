@@ -36,6 +36,9 @@ class State(TypedDict):
 
     final: str
 
+    # False for temporary chats: nothing may be written to disk.
+    persist: bool
+
 
 def build_blog_graph():
     # Build reducer subgraph

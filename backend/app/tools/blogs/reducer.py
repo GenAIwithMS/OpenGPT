@@ -1,3 +1,4 @@
+import uuid
 import os
 import re
 from pathlib import Path
@@ -118,6 +119,14 @@ def generate_and_place_images(state: TypedDict) -> dict:
 
     md = state.get("md_with_placeholders") or state["merged_md"]
     image_specs = state.get("image_specs", []) or []
+    persist = state.get("persist", True)
+
+    # Temporary chats must not leave files behind: skip images (they would
+    # need to be saved) and don't write the blog to disk.
+    if not persist:
+        for spec in image_specs:
+            md = md.replace(spec["placeholder"], f"*Image: {spec.get('caption', '')}*")
+        return {"final": md}
 
     # If no images requested, just write merged markdown
     if not image_specs:
@@ -130,7 +139,10 @@ def generate_and_place_images(state: TypedDict) -> dict:
 
     for spec in image_specs:
         placeholder = spec["placeholder"]
-        filename = spec["filename"]
+        # Never use the model's filename: it could point outside images/
+        # (e.g. "../x" or "/tmp/x"). A random name also avoids reusing another
+        # blog's image.
+        filename = f"{uuid.uuid4().hex}.png"
         out_path = images_dir / filename
 
         # generate only if needed

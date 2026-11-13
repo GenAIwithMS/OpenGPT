@@ -1,3 +1,7 @@
+import logging
+import threading
+import time
+from collections import OrderedDict
 from dotenv import load_dotenv
 from langsmith import traceable
 from typing import TypedDict, Annotated
@@ -12,6 +16,8 @@ from app.tools import Search, Weather, Calculator, Stock_price
 from app.services.rag import has_document, retrieve_from_document
 from app.database import DatabaseConfig,MySQLCheckpointSaver,ThreadMetadata
 import os
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -56,7 +62,7 @@ def chat_node(state: Chatstate):
     thread_id = state.get("thread_id")
     has_doc = state.get("has_document", False)
     
-    print(f"[DEBUG] chat_node - thread_id: {thread_id}, has_document: {has_doc}")
+    logger.debug(f"chat_node - thread_id: {thread_id}, has_document: {has_doc}")
     
     # Only check document if state indicates one exists (optimization)
     if thread_id and has_doc:
@@ -71,12 +77,12 @@ def chat_node(state: Chatstate):
         if last_user_message:
             try:
                 retrieval_result = retrieve_from_document(last_user_message, thread_id)
-                print(f"[DEBUG] Retrieval result: {retrieval_result.keys() if isinstance(retrieval_result, dict) else 'Not a dict'}")
+                logger.debug(f"Retrieval result: {retrieval_result.keys() if isinstance(retrieval_result, dict) else 'Not a dict'}")
                 
                 # If retrieval was successful, prepend context to messages
                 if "context" in retrieval_result and retrieval_result["context"]:
                     context_text = "\n\n".join(retrieval_result["context"])
-                    print(f"[DEBUG] Adding document context ({len(retrieval_result['context'])} chunks)")
+                    logger.debug(f"Adding document context ({len(retrieval_result['context'])} chunks)")
                     context_message = SystemMessage(
                         content=f"""You have access to information from an uploaded document. Use this context to answer the user's question if relevant:
 
@@ -88,11 +94,11 @@ If the user's question is related to the document, base your answer on this cont
                     # Insert context before the last user message
                     messages = list(messages[:-1]) + [context_message, messages[-1]]
                 else:
-                    print(f"[DEBUG] No context retrieved or empty context")
+                    logger.debug(f"No context retrieved or empty context")
             except Exception as e:
-                print(f"Error retrieving document context: {e}")
+                logger.warning(f"Error retrieving document context: {e}")
     else:
-        print(f"[DEBUG] Skipping document retrieval - thread_id: {thread_id}, has_doc: {has_doc}")
+        logger.debug(f"Skipping document retrieval - thread_id: {thread_id}, has_doc: {has_doc}")
     
     if not messages or not isinstance(messages[0], SystemMessage):
         messages = [SYSTEM_PROMPT] + list(messages)
@@ -131,6 +137,38 @@ chatbot = graph.compile(checkpointer=check_pointer)
 memory_checkpointer = MemorySaver()
 chatbot_memory = graph.compile(checkpointer=memory_checkpointer)
 
+# Temporary sessions held in memory, oldest first: {thread_id: last_used}.
+# Sessions are removed when the client ends them, after an hour idle, or when
+# there are too many, so memory doesn't grow until the next restart.
+_TEMP_SESSION_TTL_SECONDS = 60 * 60
+_MAX_TEMP_SESSIONS = 200
+_temp_sessions: "OrderedDict[str, float]" = OrderedDict()
+_temp_sessions_lock = threading.Lock()
+
+
+def _forget_temp_session(thread_id: str) -> None:
+    _temp_sessions.pop(thread_id, None)
+    memory_checkpointer.delete_thread(thread_id)
+
+
+def touch_temp_session(thread_id: str) -> None:
+    """Mark a temporary session as used and evict stale ones."""
+    now = time.monotonic()
+    with _temp_sessions_lock:
+        _temp_sessions[thread_id] = now
+        _temp_sessions.move_to_end(thread_id)
+        for tid, last_used in list(_temp_sessions.items()):
+            expired = now - last_used > _TEMP_SESSION_TTL_SECONDS
+            over_cap = len(_temp_sessions) > _MAX_TEMP_SESSIONS
+            if tid != thread_id and (expired or over_cap):
+                _forget_temp_session(tid)
+
+
+def end_temp_session(thread_id: str) -> None:
+    """Delete a temporary session's memory as soon as the client leaves it."""
+    with _temp_sessions_lock:
+        _forget_temp_session(thread_id)
+
 # Database session factory
 Session = DatabaseConfig.get_session_factory()
 
@@ -145,7 +183,7 @@ def retrieve_all_threads():
             # checkpoint_tuple is a CheckpointTuple with .config attribute
             all_threads.add(checkpoint_tuple.config["configurable"]["thread_id"])
     except Exception as e:
-        print(f"Error retrieving threads: {e}")
+        logger.warning(f"Error retrieving threads: {e}")
     return list(all_threads)
 
 

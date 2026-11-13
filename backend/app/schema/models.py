@@ -10,6 +10,16 @@ class ChatRequest(BaseModel):
     tools: Optional[List[str]] = Field(None, description="List of tools to use (e.g., ['search', 'blogs'])")
 
 
+class ChatStreamRequest(BaseModel):
+    """Request model for streaming a chat message (sent in the body, not the URL)"""
+
+    message: str = Field(..., min_length=1, description="User message")
+    thread_id: Optional[str] = Field(None, description="Thread ID; omit to start a new thread")
+    tools: Optional[List[str]] = Field(None, description="Tools to use (e.g., ['blogs'])")
+    temporary: bool = Field(False, description="If true, the chat is session-only (never persisted)")
+    session_id: Optional[str] = Field(None, description="Client-generated UUID for one temporary chat session")
+
+
 class RegenerateRequest(BaseModel):
     """Request model for regenerating the last AI response"""
 

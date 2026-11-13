@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
 import { Check, Copy, ExternalLink, Pencil, X } from 'lucide-react';
 import DownloadMenu from './DownloadMenu';
 import ResearchActivity from './ResearchActivity';
@@ -229,7 +230,7 @@ const ResearchPanel = ({ message, view, onViewChange, onClose, onSaveReport }) =
         ) : hasReport ? (
           <div ref={reportScrollRef} className="thin-scroll h-full overflow-y-auto px-6 py-5">
             <div className="prose prose-invert max-w-none text-[15px]">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={markdownComponents}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw, rehypeSanitize]} components={markdownComponents}>
                 {content}
               </ReactMarkdown>
               {running && <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-gray-400 align-middle" />}

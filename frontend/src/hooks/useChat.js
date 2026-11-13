@@ -13,6 +13,14 @@ const researchPlaceholder = () => ({
   research: [],
 });
 
+// Random id for one temporary chat session, so temporary chats never share memory.
+const newTempSessionId = () =>
+  (globalThis.crypto?.randomUUID?.() ??
+    'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+    }));
+
 export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = false) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -20,8 +28,37 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
   const [streamingProgress, setStreamingProgress] = useState(null);
   const eventSourceRef = useRef(null);
   const lastPromptRef = useRef('');
+  const tempSessionRef = useRef(newTempSessionId());
+  // True once the current temporary session has sent a message to the backend.
+  const tempUsedRef = useRef(false);
+
+  // Free the current temporary chat's server memory and start a fresh session.
+  const endTempSession = () => {
+    if (tempUsedRef.current) {
+      chatService.endTempSession(tempSessionRef.current);
+      tempUsedRef.current = false;
+    }
+    tempSessionRef.current = newTempSessionId();
+  };
+
+  const claimTempSession = () => {
+    tempUsedRef.current = true;
+    return tempSessionRef.current;
+  };
+
+  // Closing or reloading the tab also ends the temporary chat.
+  useEffect(() => {
+    const onUnload = () => {
+      if (tempUsedRef.current) chatService.endTempSession(tempSessionRef.current);
+    };
+    window.addEventListener('pagehide', onUnload);
+    return () => window.removeEventListener('pagehide', onUnload);
+  }, []);
 
   useEffect(() => {
+    // Any switch (new chat, another thread, leaving temporary mode) ends the
+    // previous temporary chat, so a new one never sees its memory.
+    endTempSession();
     if (threadId) {
       // When a brand-new thread was just created by streaming the first
       // message, the UI already holds the messages — skip the backend reload
@@ -283,7 +320,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
           }
         };
 
-        eventSourceRef.current = chatService.streamMessage(streamThreadId, message, tools, handleMessage, handleError, isTempChat);
+        eventSourceRef.current = chatService.streamMessage(streamThreadId, message, tools, handleMessage, handleError, isTempChat ? claimTempSession() : null);
         return;
       }
 
@@ -292,7 +329,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
       if (tools.includes('deep_research')) {
         setStreamingProgress({ isStreaming: true, toolName: 'deep_research' });
         setMessages(prev => [...prev, researchPlaceholder()]);
-        eventSourceRef.current = chatService.streamMessage(streamThreadId, message, tools, handleChatChunk, handleStreamError, isTempChat);
+        eventSourceRef.current = chatService.streamMessage(streamThreadId, message, tools, handleChatChunk, handleStreamError, isTempChat ? claimTempSession() : null);
         return;
       }
 
@@ -314,7 +351,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
         },
       ]);
 
-      eventSourceRef.current = chatService.streamMessage(streamThreadId, message, tools, handleChatChunk, handleStreamError, isTempChat);
+      eventSourceRef.current = chatService.streamMessage(streamThreadId, message, tools, handleChatChunk, handleStreamError, isTempChat ? claimTempSession() : null);
     } catch (err) {
       setError(err.message);
       console.error('Error sending message:', err);
@@ -408,7 +445,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
         return updated;
       });
 
-      chatService.editStream(threadId, newContent, humanIndex, tools, handleChatChunk, handleStreamError);
+      eventSourceRef.current = chatService.editStream(threadId, newContent, humanIndex, tools, handleChatChunk, handleStreamError);
     } catch (err) {
       setError(err.message);
       console.error('Error editing message:', err);

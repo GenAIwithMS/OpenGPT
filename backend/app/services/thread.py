@@ -1,9 +1,12 @@
+import logging
 from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
 from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 import uuid
 import os
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 # api = os.getenv("OPENAI_API_KEY")
@@ -41,7 +44,7 @@ def generate_id_name(question: str):
         if llm and hasattr(llm, "title") and llm.title:
             return llm.title
     except Exception as e:
-        print("STRUCTURED PARSE ERROR:", e)
+        logger.warning("STRUCTURED PARSE ERROR: %s", e)
 
     # fallback to raw text
     raw = model.invoke(prompt)
