@@ -16,6 +16,7 @@ from app.services.chatbot import (
 from app.services.thread import generate_thread_id, generate_id_name
 from app.services.rag import has_document
 from app.services.citations import extract_sources, link_citations
+from app.error_handlers import log_error, public_error
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +146,7 @@ class ChatService:
                         }
                     else:
                         return {
-                            "response": f"⚠️ **Blog Generation Failed**\n\nAn error occurred while generating the blog:\n```\n{error_msg}\n```\n\nPlease try again or use the regular chat without the blog tool.",
+                            "response": f"⚠️ **Blog Generation Failed**\n\nAn error occurred while generating the blog (ref {log_error('Blog tool failed', blog_error)}).\n\nPlease try again or use the regular chat without the blog tool.",
                             "thread_id": thread_id,
                             "tool_used": "blogs"
                         }
@@ -176,7 +177,7 @@ class ChatService:
                     error_msg = str(deep_error)
                     logger.warning(f"Error using deep research tool: {error_msg}")
                     return {
-                        "response": f"⚠️ **Deep Research Failed**\n\nAn error occurred:\n```\n{error_msg}\n```",
+                        "response": f"⚠️ **Deep Research Failed**\n\n{public_error(log_error('Deep research failed', deep_error))}",
                         "thread_id": thread_id,
                         "tool_used": "deep_research"
                     }
@@ -488,10 +489,11 @@ class ChatService:
             failed = True
             error_msg = str(deep_error)
             logger.warning(f"Error streaming deep research: {error_msg}")
-            event = {"id": len(activity), "kind": "error", "text": error_msg}
+            message = public_error(log_error("Deep research stream failed", deep_error))
+            event = {"id": len(activity), "kind": "error", "text": message}
             activity.append(event)
             yield {"message_type": "research", "event": event}
-            final_report = f"⚠️ **Deep Research Failed**\n\nAn error occurred:\n```\n{error_msg}\n```"
+            final_report = f"⚠️ **Deep Research Failed**\n\n{message}"
             report_parts = []
 
         report = "".join(report_parts) or final_report
@@ -595,7 +597,7 @@ class ChatService:
                         }
                     else:
                         yield {
-                            "content": f"⚠️ **Blog Generation Failed**\n\nAn error occurred while generating the blog:\n```\n{error_msg}\n```\n\nPlease try again or use the regular chat without the blog tool.",
+                            "content": f"⚠️ **Blog Generation Failed**\n\nAn error occurred while generating the blog (ref {log_error('Blog tool failed', blog_error)}).\n\nPlease try again or use the regular chat without the blog tool.",
                             "message_type": "ai"
                         }
                     return
@@ -715,7 +717,7 @@ class ChatService:
                         }
                     else:
                         yield {
-                            "content": f"⚠️ **Blog Generation Failed**\n\nAn error occurred while generating the blog:\n```\n{error_msg}\n```\n\nPlease try again or use the regular chat without the blog tool.",
+                            "content": f"⚠️ **Blog Generation Failed**\n\nAn error occurred while generating the blog (ref {log_error('Blog tool failed', blog_error)}).\n\nPlease try again or use the regular chat without the blog tool.",
                             "message_type": "ai",
                         }
                     return

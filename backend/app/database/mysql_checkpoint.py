@@ -1,10 +1,11 @@
-import pickle
 import threading
 import time
+import weakref
 from typing import Optional, Any, Iterator
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from langgraph.checkpoint.base import BaseCheckpointSaver, Checkpoint, CheckpointTuple
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from app.database.config import DatabaseConfig
 from app.database.models import Checkpoint as CheckpointModel, CheckpointWrite as CheckpointWriteModel
 
@@ -20,10 +21,46 @@ from app.database.models import Checkpoint as CheckpointModel, CheckpointWrite a
 # updates. We serialize every put/put_writes for a given thread_id so that
 # only one writer touches that thread's rows at a time, and retry transient
 # DB conflicts as a safety net.
-_thread_locks: dict[str, threading.RLock] = {}
+# Weak values: a thread's lock is dropped once no request holds it, so the map
+# doesn't grow by one entry for every thread id ever seen.
+_thread_locks: "weakref.WeakValueDictionary[str, threading.RLock]" = weakref.WeakValueDictionary()
 _thread_locks_guard = threading.Lock()
 
 MAX_CONCURRENCY_RETRIES = 3
+
+
+# ---------------------------------------------------------------------------
+# Serialization
+# ---------------------------------------------------------------------------
+# Values are stored with LangGraph's JsonPlusSerializer (msgpack), never with
+# pickle: unpickling database content would let anyone who can write to the
+# database run code in this process. Each blob is self-describing:
+#   SERDE_MAGIC + <serde type> + b"\0" + <data>
+SERDE_MAGIC = b"LGSERDE1:"
+_serde = JsonPlusSerializer()  # pickle_fallback stays off
+
+
+class LegacyCheckpointError(RuntimeError):
+    """A stored value is in the old pickle format and must be migrated."""
+
+
+def dumps(value: Any) -> bytes:
+    type_, data = _serde.dumps_typed(value)
+    return SERDE_MAGIC + type_.encode() + b"\0" + data
+
+
+def loads(blob: Optional[bytes]) -> Any:
+    if blob is None:
+        return None
+    if not blob.startswith(SERDE_MAGIC):
+        raise LegacyCheckpointError(
+            "Found a checkpoint in the old pickle format. It is not loaded, for "
+            "security. Convert it once with: python -m scripts.migrate_checkpoints"
+        )
+    type_, _, data = blob[len(SERDE_MAGIC):].partition(b"\0")
+    if type_ == b"pickle":
+        raise LegacyCheckpointError("Refusing to load a pickled value")
+    return _serde.loads_typed((type_.decode(), data))
 
 
 def _lock_for(thread_id: str) -> threading.RLock:
@@ -76,8 +113,8 @@ class MySQLCheckpointSaver(BaseCheckpointSaver):
         parent_checkpoint_id = checkpoint.get("parent_id")
 
         def _op(session):
-            checkpoint_blob = pickle.dumps(checkpoint)
-            metadata_blob = pickle.dumps(metadata)
+            checkpoint_blob = dumps(checkpoint)
+            metadata_blob = dumps(metadata)
 
             existing = session.query(CheckpointModel).filter_by(
                 thread_id=thread_id,
@@ -142,15 +179,15 @@ class MySQLCheckpointSaver(BaseCheckpointSaver):
                     checkpoint_id=checkpoint_id,
                     parent_checkpoint_id=None,
                     type=None,
-                    checkpoint=pickle.dumps(placeholder_checkpoint),
-                    meta=pickle.dumps({})
+                    checkpoint=dumps(placeholder_checkpoint),
+                    meta=dumps({})
                 ))
                 session.flush()
 
             # Use no_autoflush to prevent premature flush during queries.
             with session.no_autoflush:
                 for idx, (channel, value) in enumerate(writes):
-                    value_blob = pickle.dumps(value)
+                    value_blob = dumps(value)
 
                     existing = session.query(CheckpointWriteModel).filter_by(
                         thread_id=thread_id,
@@ -198,8 +235,8 @@ class MySQLCheckpointSaver(BaseCheckpointSaver):
                 ).order_by(CheckpointModel.checkpoint_id.desc()).first()
 
             if result:
-                checkpoint = pickle.loads(result.checkpoint)
-                metadata = pickle.loads(result.meta)
+                checkpoint = loads(result.checkpoint)
+                metadata = loads(result.meta)
                 config_with_id = {
                     "configurable": {
                         "thread_id": thread_id,
@@ -244,8 +281,8 @@ class MySQLCheckpointSaver(BaseCheckpointSaver):
                 )
 
             for result in query:
-                checkpoint = pickle.loads(result.checkpoint)
-                metadata = pickle.loads(result.meta)
+                checkpoint = loads(result.checkpoint)
+                metadata = loads(result.meta)
                 config_dict = {
                     "configurable": {
                         "thread_id": result.thread_id,

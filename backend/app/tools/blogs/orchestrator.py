@@ -5,6 +5,11 @@ from langgraph.types import Send
 from .llm import llm
 from .schemas import Plan
 
+import os
+
+# Each section is a separate paid model call, so cap how many one blog may have.
+MAX_BLOG_SECTIONS = int(os.getenv("MAX_BLOG_SECTIONS", "10"))
+
 
 ORCH_SYSTEM = """You are a senior technical writer and developer advocate.
 Produce a highly actionable outline for a technical blog post.
@@ -66,5 +71,5 @@ def fanout(state: TypedDict):
                 "evidence": [e.model_dump() for e in state.get("evidence", [])],
             },
         )
-        for task in state["plan"].tasks
+        for task in state["plan"].tasks[:MAX_BLOG_SECTIONS]
     ]

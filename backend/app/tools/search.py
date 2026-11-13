@@ -6,6 +6,10 @@ from langchain_core.tools import tool
 
 from app.tools.parallel_search import parallel_configured, search as parallel_search
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 load_dotenv()
 
 BRAVE_API_KEY = os.getenv("BRAVE_API_KEY")
@@ -30,7 +34,8 @@ def _brave_search(query: str) -> str:
         resp.raise_for_status()
         data = resp.json()
     except Exception as e:
-        return f"Brave Search request failed: {e}"
+        logger.warning("Tool call failed: %s", e, exc_info=e)
+        return f"Brave Search request failed ({type(e).__name__})."
 
     results = data.get("web", {}).get("results", [])
     if not results:
@@ -69,4 +74,5 @@ def Search(query: str, objective: str, config: RunnableConfig) -> str:
             client_model=CHAT_MODEL,
         )
     except Exception as e:
-        return f"Web search failed: {e}"
+        logger.warning("Tool call failed: %s", e, exc_info=e)
+        return f"Web search failed ({type(e).__name__})."

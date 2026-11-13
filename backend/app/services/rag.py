@@ -2,6 +2,8 @@ import logging
 import json
 import uuid
 import os
+import threading
+from collections import OrderedDict
 from typing import Dict, Any, Optional, Tuple
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_community.vectorstores import FAISS
@@ -22,8 +24,36 @@ except Exception as e:
     _DEFAULT_EMBEDDINGS = None
 
 
-_THREAD_RETRIEVERS: Dict[str, Any] = {}
-_THREAD_METADATA: Dict[str, dict] = {}
+class _LRUCache(OrderedDict):
+    """Dict that keeps only the most recently used `maxsize` entries.
+
+    Evicted retrievers are rebuilt from the stored file on next use, so the cap
+    only bounds memory; it doesn't lose documents.
+    """
+
+    def __init__(self, maxsize: int):
+        super().__init__()
+        self.maxsize = maxsize
+        self._lock = threading.RLock()
+
+    def __getitem__(self, key):
+        with self._lock:
+            value = super().__getitem__(key)
+            self.move_to_end(key)
+            return value
+
+    def __setitem__(self, key, value):
+        with self._lock:
+            super().__setitem__(key, value)
+            self.move_to_end(key)
+            while len(self) > self.maxsize:
+                self.popitem(last=False)
+
+
+# Each FAISS index holds a document's embeddings in memory.
+_MAX_CACHED_RETRIEVERS = int(os.getenv("MAX_CACHED_RETRIEVERS", "32"))
+_THREAD_RETRIEVERS: Dict[str, Any] = _LRUCache(_MAX_CACHED_RETRIEVERS)
+_THREAD_METADATA: Dict[str, dict] = _LRUCache(_MAX_CACHED_RETRIEVERS * 8)
 
 _STORAGE_DIR = os.path.join(os.path.dirname(__file__), "..", "storage", "documents")
 os.makedirs(_STORAGE_DIR, exist_ok=True)
@@ -202,7 +232,7 @@ def retrieve_from_document(query: str, thread_id: str) -> dict:
         logger.debug(f"Successfully retrieved {len(results)} documents")
     except Exception as e:
         logger.warning(f"Exception during retrieval: {type(e).__name__}: {e}")
-        return {"error": f"Retrieval failed: {e}", "query": query}
+        return {"error": "Document retrieval failed", "query": query}
 
     context = [doc.page_content for doc in results]
     metadata = [getattr(doc, "metadata", {}) for doc in results]

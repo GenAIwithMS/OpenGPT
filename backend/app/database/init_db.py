@@ -3,6 +3,7 @@ import logging
 from sqlalchemy import create_engine, text
 from app.database import DatabaseConfig
 from app.database.models import Base
+from app.database.mysql_checkpoint import SERDE_MAGIC
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,21 @@ def _upgrade_blob_columns():
                 logger.info(f"Upgraded {table}.{column} to LONGBLOB")
 
 
+def _warn_about_pickled_checkpoints():
+    """Old checkpoints were pickled; the app refuses to load those."""
+    with DatabaseConfig.get_engine().connect() as conn:
+        legacy = conn.execute(
+            text("SELECT COUNT(*) FROM checkpoints WHERE LEFT(checkpoint, :n) <> :magic"),
+            {"n": len(SERDE_MAGIC), "magic": SERDE_MAGIC},
+        ).scalar()
+    if legacy:
+        logger.error(
+            "%d checkpoints are still in the old pickle format and will not load. "
+            "Convert them once with: cd backend && python -m scripts.migrate_checkpoints",
+            legacy,
+        )
+
+
 def init_database():
     """Initialize database and create tables"""
     try:
@@ -49,6 +65,7 @@ def init_database():
         # Create tables
         Base.metadata.create_all(DatabaseConfig.get_engine())
         _upgrade_blob_columns()
+        _warn_about_pickled_checkpoints()
 
         return True
     except Exception as e:

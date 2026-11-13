@@ -1,46 +1,57 @@
+import os
+
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
+
+# Size limits for request bodies, so one request can't send megabytes of text
+# to the model (cost) or the database. Override with env vars if needed.
+MAX_MESSAGE_CHARS = int(os.getenv("MAX_MESSAGE_CHARS", "20000"))
+MAX_REPORT_CHARS = int(os.getenv("MAX_REPORT_CHARS", "200000"))
+MAX_TOOLS = 5
+ID_MAX_CHARS = 64  # UUIDs are 36 characters
+
+ToolList = Optional[List[str]]
 
 
 class ChatRequest(BaseModel):
     """Request model for sending a chat message"""
     
-    message: str = Field(..., description="User message to send to the chatbot")
-    thread_id: Optional[str] = Field(None, description="Thread ID for conversation continuity")
-    tools: Optional[List[str]] = Field(None, description="List of tools to use (e.g., ['search', 'blogs'])")
+    message: str = Field(..., min_length=1, max_length=MAX_MESSAGE_CHARS, description="User message to send to the chatbot")
+    thread_id: Optional[str] = Field(None, max_length=ID_MAX_CHARS, description="Thread ID for conversation continuity")
+    tools: ToolList = Field(None, max_length=MAX_TOOLS, description="List of tools to use (e.g., ['search', 'blogs'])")
 
 
 class ChatStreamRequest(BaseModel):
     """Request model for streaming a chat message (sent in the body, not the URL)"""
 
-    message: str = Field(..., min_length=1, description="User message")
-    thread_id: Optional[str] = Field(None, description="Thread ID; omit to start a new thread")
-    tools: Optional[List[str]] = Field(None, description="Tools to use (e.g., ['blogs'])")
+    message: str = Field(..., min_length=1, max_length=MAX_MESSAGE_CHARS, description="User message")
+    thread_id: Optional[str] = Field(None, max_length=ID_MAX_CHARS, description="Thread ID; omit to start a new thread")
+    tools: ToolList = Field(None, max_length=MAX_TOOLS, description="Tools to use (e.g., ['blogs'])")
     temporary: bool = Field(False, description="If true, the chat is session-only (never persisted)")
-    session_id: Optional[str] = Field(None, description="Client-generated UUID for one temporary chat session")
+    session_id: Optional[str] = Field(None, max_length=ID_MAX_CHARS, description="Client-generated UUID for one temporary chat session")
 
 
 class RegenerateRequest(BaseModel):
     """Request model for regenerating the last AI response"""
 
-    thread_id: str = Field(..., description="Thread ID for the conversation")
-    tools: Optional[List[str]] = Field(None, description="List of tools used (e.g., ['blogs'])")
+    thread_id: str = Field(..., max_length=ID_MAX_CHARS, description="Thread ID for the conversation")
+    tools: ToolList = Field(None, max_length=MAX_TOOLS, description="List of tools used (e.g., ['blogs'])")
 
 
 class EditMessageRequest(BaseModel):
     """Request model for editing a previously sent user message"""
 
-    thread_id: str = Field(..., description="Thread ID for the conversation")
-    message: str = Field(..., description="New (edited) content of the user message")
-    index: int = Field(..., description="0-based index of the human message among human turns")
-    tools: Optional[List[str]] = Field(None, description="List of tools used (e.g., ['blogs'])")
+    thread_id: str = Field(..., max_length=ID_MAX_CHARS, description="Thread ID for the conversation")
+    message: str = Field(..., min_length=1, max_length=MAX_MESSAGE_CHARS, description="New (edited) content of the user message")
+    index: int = Field(..., ge=0, le=10000, description="0-based index of the human message among human turns")
+    tools: ToolList = Field(None, max_length=MAX_TOOLS, description="List of tools used (e.g., ['blogs'])")
 
 
 class ChatResponse(BaseModel):
     """Response model for chat messages"""
 
     response: str = Field(..., description="AI response message")
-    thread_id: str = Field(..., description="Thread ID for the conversation")
+    thread_id: str = Field(..., max_length=ID_MAX_CHARS, description="Thread ID for the conversation")
     has_tool_calls: bool = Field(default=False, description="Whether tools were called")
 
 
@@ -91,7 +102,7 @@ class UpdateTitleRequest(BaseModel):
 class UpdateReportRequest(BaseModel):
     """Request model for saving an edited deep research report"""
 
-    content: str = Field(..., min_length=1, description="Edited report (markdown)")
+    content: str = Field(..., min_length=1, max_length=MAX_REPORT_CHARS, description="Edited report (markdown)")
 
 
 class NewThreadResponse(BaseModel):
@@ -120,8 +131,8 @@ class ErrorResponse(BaseModel):
 class DocumentQueryRequest(BaseModel):
     """Request model for querying uploaded documents"""
 
-    query: str = Field(..., description="Question to ask about the document")
-    thread_id: str = Field(..., description="Thread ID with uploaded document")
+    query: str = Field(..., min_length=1, max_length=MAX_MESSAGE_CHARS, description="Question to ask about the document")
+    thread_id: str = Field(..., max_length=ID_MAX_CHARS, description="Thread ID with uploaded document")
 
 
 class DocumentQueryResponse(BaseModel):

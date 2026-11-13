@@ -6,6 +6,10 @@ from langchain_core.tools import InjectedToolArg, tool
 from langchain_core.runnables import RunnableConfig
 from ddgs import DDGS
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 @tool
 async def duckduckgo_search_tool(
@@ -27,10 +31,11 @@ async def duckduckgo_search_tool(
                         "query": query,
                     })
         except Exception as e:
+            logger.warning("DuckDuckGo search failed: %s", e, exc_info=e)
             all_results.append({
                 "title": "Error",
                 "url": "",
-                "content": f"DuckDuckGo search failed for '{query}': {e}",
+                "content": f"DuckDuckGo search failed for '{query}' ({type(e).__name__}).",
                 "query": query,
             })
 
