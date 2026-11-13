@@ -346,7 +346,7 @@ class ChatService:
         # ``【n†source】`` citation markers once the answer is complete.
         sources = {}
 
-        for message_chunk, metadata in graph.stream(
+        stream = graph.stream(
             {
                 "messages": input_messages,
                 "has_document": doc_exists,
@@ -354,7 +354,65 @@ class ChatService:
             },
             config=config,
             stream_mode="messages",
-        ):
+        )
+        try:
+            yield from ChatService._relay_chat_stream(
+                stream, seen_tool_calls, answer_parts, reasoning_parts, sources
+            )
+        except GeneratorExit:
+            # The client stopped the response (Stop button or closed tab).
+            # End the graph run now and keep what was already streamed, so the
+            # answer isn't lost. A tool call left unanswered by the stop is
+            # repaired by close_dangling_tool_calls on the next message.
+            stream.close()
+            if not temporary:
+                partial = "".join(answer_parts).strip()
+                if partial:
+                    ChatService._save_stopped_answer(config, partial)
+            raise
+
+        # Persist the full assistant response. langgraph's streamed-chunk merge
+        # leaves the stored AIMessage empty for this model, so write it back
+        # explicitly: drop the trailing (empty) assistant message and append one
+        # with the real content. The answer lives in ``content``; only fall back
+        # to reasoning when the model emitted no final answer. Temporary chats
+        # are never persisted — they live only in the in-memory graph.
+        # Citation markers are rewritten as links in one pass at the end; the
+        # client swaps its streamed text for this final version.
+        answer = "".join(answer_parts)
+        linked = link_citations(answer, sources)
+        if linked != answer:
+            yield {"content": linked, "message_type": "ai_replace"}
+
+        if temporary:
+            return
+        persist_text = linked.strip() or "".join(reasoning_parts).strip()
+        if persist_text:
+            try:
+                current = chatbot.get_state(config=config)
+                msgs = list(current.values.get("messages", []))
+                if msgs and isinstance(msgs[-1], AIMessage):
+                    chatbot.update_state(
+                        config, {"messages": [RemoveMessage(id=msgs[-1].id)]}
+                    )
+                chatbot.update_state(
+                    config, {"messages": [AIMessage(content=persist_text)]}
+                )
+            except Exception as e:
+                logger.warning(f"Error persisting final assistant message: {e}")
+
+    @staticmethod
+    def _save_stopped_answer(config, partial: str) -> None:
+        """Save the part of an answer that streamed before the user pressed Stop."""
+        try:
+            chatbot.update_state(config, {"messages": [AIMessage(content=partial)]})
+        except Exception as e:
+            logger.warning(f"Error saving stopped answer: {e}")
+
+    @staticmethod
+    def _relay_chat_stream(stream, seen_tool_calls, answer_parts, reasoning_parts, sources):
+        """Turn graph message chunks into client events, collecting the answer."""
+        for message_chunk, metadata in stream:
             # Tool produced a result -> live "finished" signal
             if isinstance(message_chunk, ToolMessage):
                 name = getattr(message_chunk, "name", None) or "tool"
@@ -389,36 +447,6 @@ class ChatService:
                 if reasoning:
                     reasoning_parts.append(reasoning)
                     yield {"content": reasoning, "message_type": "thinking"}
-
-        # Persist the full assistant response. langgraph's streamed-chunk merge
-        # leaves the stored AIMessage empty for this model, so write it back
-        # explicitly: drop the trailing (empty) assistant message and append one
-        # with the real content. The answer lives in ``content``; only fall back
-        # to reasoning when the model emitted no final answer. Temporary chats
-        # are never persisted — they live only in the in-memory graph.
-        # Citation markers are rewritten as links in one pass at the end; the
-        # client swaps its streamed text for this final version.
-        answer = "".join(answer_parts)
-        linked = link_citations(answer, sources)
-        if linked != answer:
-            yield {"content": linked, "message_type": "ai_replace"}
-
-        if temporary:
-            return
-        persist_text = linked.strip() or "".join(reasoning_parts).strip()
-        if persist_text:
-            try:
-                current = chatbot.get_state(config=config)
-                msgs = list(current.values.get("messages", []))
-                if msgs and isinstance(msgs[-1], AIMessage):
-                    chatbot.update_state(
-                        config, {"messages": [RemoveMessage(id=msgs[-1].id)]}
-                    )
-                chatbot.update_state(
-                    config, {"messages": [AIMessage(content=persist_text)]}
-                )
-            except Exception as e:
-                logger.warning(f"Error persisting final assistant message: {e}")
 
     @staticmethod
     def _stream_deep_research(graph, config, message: str, human_in_state: bool = False):

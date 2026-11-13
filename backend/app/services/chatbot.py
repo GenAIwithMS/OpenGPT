@@ -5,7 +5,7 @@ from collections import OrderedDict
 from dotenv import load_dotenv
 from langsmith import traceable
 from typing import TypedDict, Annotated
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.graph.message import add_messages
 from langchain_openai import ChatOpenAI
 from langchain_groq import ChatGroq
@@ -55,6 +55,40 @@ class Chatstate(TypedDict):
     has_document: bool
 
 
+CANCELLED_TOOL_RESULT = "Cancelled: the user stopped the response before this tool finished."
+
+
+def close_dangling_tool_calls(messages: list) -> list:
+    """Give every tool call a result, so the history is valid for the model.
+
+    If the user presses Stop while a tool is running, the saved history can end
+    with an assistant message that requested a tool but has no matching tool
+    result. Model APIs reject that (HTTP 400), which would break every later
+    message in the thread. This adds a "cancelled" result right after such a
+    call. It only changes what is sent to the model, not the saved history.
+    """
+    answered = {m.tool_call_id for m in messages if isinstance(m, ToolMessage)}
+    result = []
+    i = 0
+    while i < len(messages):
+        msg = messages[i]
+        result.append(msg)
+        i += 1
+        if not isinstance(msg, AIMessage) or not msg.tool_calls:
+            continue
+        # Keep the real results that follow this call, then add the missing ones.
+        while i < len(messages) and isinstance(messages[i], ToolMessage):
+            result.append(messages[i])
+            i += 1
+        for tc in msg.tool_calls:
+            if tc.get("id") not in answered:
+                result.append(ToolMessage(
+                    content=CANCELLED_TOOL_RESULT, tool_call_id=tc["id"], name=tc.get("name"),
+                ))
+                answered.add(tc["id"])
+    return result
+
+
 @traceable(name="My GPT")
 def chat_node(state: Chatstate):
     """Main chat node that processes messages and uses tools"""
@@ -102,6 +136,8 @@ If the user's question is related to the document, base your answer on this cont
     
     if not messages or not isinstance(messages[0], SystemMessage):
         messages = [SYSTEM_PROMPT] + list(messages)
+
+    messages = close_dangling_tool_calls(list(messages))
 
     # Stream for live tokens (picked up by stream_mode="messages"), but store a
     # single merged message: ``add_messages`` replaces a message that shares an
