@@ -30,14 +30,19 @@ export const chatService = {
   },
 
   // Stream messages (using EventSource for SSE)
-  streamMessage: (threadId, message, tools = [], onMessage, onError, temporary = false) => {
+  // `tempSessionId` is set only for temporary chats: it marks the chat as
+  // session-only and keeps each temporary chat's memory separate.
+  streamMessage: (threadId, message, tools = [], onMessage, onError, tempSessionId = null) => {
     const params = new URLSearchParams();
     params.set('message', message);
     // Omit thread_id for a brand-new ("New Chat") conversation so the backend
     // creates the thread and returns its id in the final `done` event.
     if (threadId) params.set('thread_id', threadId);
     if (tools.length > 0) params.set('tools', tools.join(','));
-    if (temporary) params.set('temporary', 'true');
+    if (tempSessionId) {
+      params.set('temporary', 'true');
+      params.set('session_id', tempSessionId);
+    }
     const eventSource = new EventSource(
       `${API_BASE_URL}/chat/stream?${params.toString()}`
     );
@@ -171,7 +176,9 @@ export const chatService = {
   uploadPDF: async (threadId, file) => {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('thread_id', threadId);
+    // A new chat has no thread yet. Leave the field out so the backend creates
+    // one; appending null would send the literal string "null".
+    if (threadId) formData.append('thread_id', threadId);
 
     const response = await api.post('/upload-pdf', formData, {
       headers: {

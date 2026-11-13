@@ -1,4 +1,5 @@
 import json
+import uuid
 import os
 from typing import Dict, Any, Optional, Tuple
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
@@ -26,8 +27,14 @@ os.makedirs(_STORAGE_DIR, exist_ok=True)
 
 
 def _thread_paths(thread_id: str, ext: str = ".pdf") -> Tuple[str, str]:
-    doc_path = os.path.join(_STORAGE_DIR, f"{thread_id}{ext}")
-    meta_path = os.path.join(_STORAGE_DIR, f"{thread_id}.json")
+    # Thread ids are UUIDs. Refuse anything else so an id like "../../x" or an
+    # absolute path can never point outside the storage folder.
+    try:
+        safe_id = str(uuid.UUID(str(thread_id)))
+    except ValueError:
+        raise ValueError(f"Invalid thread_id: {thread_id!r}")
+    doc_path = os.path.join(_STORAGE_DIR, f"{safe_id}{ext}")
+    meta_path = os.path.join(_STORAGE_DIR, f"{safe_id}.json")
     return doc_path, meta_path
 
 

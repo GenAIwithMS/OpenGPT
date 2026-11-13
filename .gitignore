@@ -11,3 +11,4 @@ wheels/
 chatbot.db
 chatbot.db-shm
 chatbot.db-wal
+CODE_REVIEW_REPORT.md

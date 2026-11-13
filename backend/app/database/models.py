@@ -3,10 +3,15 @@ SQLAlchemy ORM Models for Chatbot Database
 """
 from datetime import datetime
 from sqlalchemy import Column, String, Integer, TIMESTAMP, Text, LargeBinary, ForeignKeyConstraint, Index
+from sqlalchemy.dialects.mysql import LONGBLOB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 
 Base = declarative_base()
+
+# Checkpoints hold the whole conversation, which quickly outgrows MySQL's plain
+# BLOB (64 KB). LONGBLOB allows up to 4 GB; other databases keep LargeBinary.
+BigBinary = LargeBinary().with_variant(LONGBLOB(), "mysql")
 
 
 class ThreadMetadata(Base):
@@ -54,8 +59,8 @@ class Checkpoint(Base):
     checkpoint_id = Column(String(191), primary_key=True)
     parent_checkpoint_id = Column(String(191), nullable=True)
     type = Column(String(128), nullable=True)
-    checkpoint = Column(LargeBinary, nullable=False)
-    meta = Column(LargeBinary, nullable=False)
+    checkpoint = Column(BigBinary, nullable=False)
+    meta = Column(BigBinary, nullable=False)
     
     __table_args__ = (
         Index("idx_parent", "thread_id", "checkpoint_ns", "parent_checkpoint_id"),
@@ -73,7 +78,7 @@ class CheckpointWrite(Base):
     idx = Column(Integer, primary_key=True)
     channel = Column(String(128), nullable=False)
     type = Column(String(128), nullable=True)
-    value = Column(LargeBinary, nullable=True)
+    value = Column(BigBinary, nullable=True)
     
     __table_args__ = (
         ForeignKeyConstraint(

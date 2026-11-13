@@ -4,6 +4,33 @@ from app.database import DatabaseConfig
 from app.database.models import Base
 
 
+# (table, column, NOT NULL?) for columns that must be LONGBLOB. create_all()
+# never changes existing tables, so older databases are upgraded here.
+_LONGBLOB_COLUMNS = [
+    ("checkpoints", "checkpoint", True),
+    ("checkpoints", "meta", True),
+    ("checkpoint_writes", "value", False),
+]
+
+
+def _upgrade_blob_columns():
+    """Upgrade checkpoint columns from BLOB (64 KB limit) to LONGBLOB."""
+    engine = DatabaseConfig.get_engine()
+    with engine.begin() as conn:
+        for table, column, not_null in _LONGBLOB_COLUMNS:
+            data_type = conn.execute(
+                text(
+                    "SELECT DATA_TYPE FROM information_schema.COLUMNS "
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c"
+                ),
+                {"t": table, "c": column},
+            ).scalar()
+            if data_type and data_type.lower() != "longblob":
+                null_sql = "NOT NULL" if not_null else "NULL"
+                conn.execute(text(f"ALTER TABLE `{table}` MODIFY `{column}` LONGBLOB {null_sql}"))
+                print(f"Upgraded {table}.{column} to LONGBLOB")
+
+
 def init_database():
     """Initialize database and create tables"""
     try:
@@ -18,7 +45,8 @@ def init_database():
         
         # Create tables
         Base.metadata.create_all(DatabaseConfig.get_engine())
-        
+        _upgrade_blob_columns()
+
         return True
     except Exception as e:
         print(f"Database initialization error: {e}")

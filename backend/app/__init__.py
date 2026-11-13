@@ -1,3 +1,5 @@
+import os
+
 from app.observability import configure_langsmith
 
 configure_langsmith()
@@ -20,12 +22,22 @@ def create_app():
     register_error_handlers(app)
 
     # Configure CORS
+    # Only the frontend may call the API from a browser. A wildcard would let
+    # any website you visit read and change your chats. Override with a
+    # comma-separated CORS_ORIGINS env var.
+    origins = [
+        o.strip()
+        for o in os.getenv(
+            "CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+        ).split(",")
+        if o.strip()
+    ]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_origins=origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "PUT", "DELETE"],
+        allow_headers=["Content-Type"],
     )
     
 
