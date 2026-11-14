@@ -47,6 +47,28 @@ _TRANSIENT_MYSQL_ERRORS = {1205, 1213, 1062}
 MAX_CHECKPOINTS_PER_THREAD = int(os.getenv("MAX_CHECKPOINTS_PER_THREAD", "20"))
 
 
+# Threads deleted while a reply may still be streaming: {thread_id: when}.
+# Late checkpoint writes from that reply are ignored, so a deleted thread
+# can't reappear in the sidebar as a "ghost". Thread ids are never reused.
+_DELETED_TTL_SECONDS = 60 * 60
+_deleted_threads: dict[str, float] = {}
+_deleted_guard = threading.Lock()
+
+
+def _mark_deleted(thread_id: str) -> None:
+    now = time.monotonic()
+    with _deleted_guard:
+        _deleted_threads[thread_id] = now
+        for tid, when in list(_deleted_threads.items()):
+            if now - when > _DELETED_TTL_SECONDS:
+                del _deleted_threads[tid]
+
+
+def _is_deleted(thread_id: str) -> bool:
+    with _deleted_guard:
+        return thread_id in _deleted_threads
+
+
 def _is_transient(exc: Exception) -> bool:
     if not isinstance(exc, (OperationalError, IntegrityError)):
         return False
@@ -197,6 +219,9 @@ class MySQLCheckpointSaver(BaseCheckpointSaver):
         checkpoint_ns = configurable.get("checkpoint_ns", "")
         checkpoint_id = checkpoint["id"]
         parent_checkpoint_id = configurable.get("checkpoint_id")
+        if _is_deleted(thread_id):
+            # The thread was deleted while this run was going: don't recreate it.
+            return _config(thread_id, checkpoint_ns, checkpoint_id)
         checkpoint_blob = dumps(checkpoint)
         metadata_blob = dumps(get_checkpoint_metadata(config, metadata))
 
@@ -235,6 +260,8 @@ class MySQLCheckpointSaver(BaseCheckpointSaver):
         thread_id = configurable["thread_id"]
         checkpoint_ns = configurable.get("checkpoint_ns", "")
         checkpoint_id = configurable["checkpoint_id"]
+        if _is_deleted(thread_id):
+            return
         overwrite = all(channel in WRITES_IDX_MAP for channel, _ in writes)
         rows = [
             (WRITES_IDX_MAP.get(channel, idx), channel, dumps(value))
@@ -333,7 +360,12 @@ class MySQLCheckpointSaver(BaseCheckpointSaver):
             session.close()
 
     def delete_thread(self, thread_id: str) -> None:
-        """Delete every checkpoint and write of a thread."""
+        """Delete every checkpoint and write of a thread.
+
+        The thread is also remembered as deleted, so a reply that is still
+        streaming can't write it back.
+        """
+        _mark_deleted(thread_id)
 
         def _op(session):
             for model in (CheckpointWriteModel, CheckpointModel):

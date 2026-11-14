@@ -113,44 +113,12 @@ class ChatService:
         }
         
         try:
-            # If blogs tool is requested, use the blog app
+            # Blogs: run the blog writer and save the turn to the thread
             if tools and "blogs" in tools:
-                try:
-                    from app.tools.blogs.graph import app as blog_app
-                    
-                    blog_state = {
-                        "topic": message,
-                        "as_of": date.today().isoformat(),
-                    }
-                    
-                    final_state = blog_app.invoke(blog_state)
-                    
-                    # Update thread timestamp
-                    touch_thread(thread_id)
-                    
-                    return {
-                        "response": final_state.get("final", "Blog generated successfully"),
-                        "thread_id": thread_id,
-                        "tool_used": "blogs"
-                    }
-                except Exception as blog_error:
-                    error_msg = str(blog_error)
-                    logger.warning(f"Error using blog tool: {error_msg}")
-                    
-                    # Provide user-friendly error messages
-                    if "name resolution failed" in error_msg or "503" in error_msg:
-                        return {
-                            "response": "⚠️ **Blog Generation Failed**\n\nThe blog generation service is currently unavailable (network connection issue). This could be due to:\n- External API service is down\n- Network connectivity issues\n- DNS resolution problems\n\nPlease try again later or use the regular chat without the blog tool.",
-                            "thread_id": thread_id,
-                            "tool_used": "blogs"
-                        }
-                    else:
-                        return {
-                            "response": f"⚠️ **Blog Generation Failed**\n\nAn error occurred while generating the blog (ref {log_error('Blog tool failed', blog_error)}).\n\nPlease try again or use the regular chat without the blog tool.",
-                            "thread_id": thread_id,
-                            "tool_used": "blogs"
-                        }
-            
+                blog = ChatService._run_blog(chatbot, config, message)
+                touch_thread(thread_id)
+                return {"response": blog, "thread_id": thread_id, "tool_used": "blogs"}
+
             # If deep_research tool is requested, use the deep research graph
             if tools and "deep_research" in tools:
                 try:
@@ -233,35 +201,24 @@ class ChatService:
         }
 
         try:
-            # Blogs tool uses a separate, stateless graph keyed by topic
+            # Blogs: rewrite the blog for the thread's last prompt
             if tools and "blogs" in tools:
-                try:
-                    from app.tools.blogs.graph import app as blog_app
-
-                    blog_state_obj = blog_app.get_state(config)
-                    topic = (
-                        blog_state_obj.values.get("topic")
-                        if blog_state_obj and blog_state_obj.values
-                        else None
-                    )
-                    if not topic:
-                        raise Exception("No blog topic found to regenerate")
-
-                    final_state = blog_app.invoke(
-                        {"topic": topic, "as_of": date.today().isoformat()}
-                    )
-                    touch_thread(thread_id)
-                    return {
-                        "response": final_state.get("final", "Blog generated successfully"),
-                        "thread_id": thread_id,
-                        "tool_used": "blogs",
-                    }
-                except Exception as blog_error:
-                    return {
-                        "response": f"⚠️ **Blog Generation Failed**\n\n{str(blog_error)}",
-                        "thread_id": thread_id,
-                        "tool_used": "blogs",
-                    }
+                current = chatbot.get_state(config)
+                messages = list(current.values["messages"]) if current and current.values else []
+                last_human = next(
+                    (i for i in range(len(messages) - 1, -1, -1) if isinstance(messages[i], HumanMessage)),
+                    None,
+                )
+                if last_human is None:
+                    raise Exception("No blog topic found to regenerate")
+                removals = [RemoveMessage(id=m.id) for m in messages[last_human + 1:] if getattr(m, "id", None)]
+                if removals:
+                    chatbot.update_state(current.config, {"messages": removals})
+                blog = ChatService._run_blog(
+                    chatbot, config, messages[last_human].content, human_in_state=True
+                )
+                touch_thread(thread_id)
+                return {"response": blog, "thread_id": thread_id, "tool_used": "blogs"}
 
             # Chatbot path: drop the trailing assistant turn, then re-run
             current = chatbot.get_state(config)
@@ -454,6 +411,92 @@ class ChatService:
                     yield {"content": reasoning, "message_type": "thinking"}
 
     @staticmethod
+    def _stream_blog(graph, config, topic: str, temporary: bool = False, human_in_state: bool = False):
+        """Run the blog writer as a turn of the conversation.
+
+        Yields ``progress`` chunks for each step and the finished blog as an
+        ``ai`` chunk, then saves the turn (prompt and blog) to the thread like
+        deep research does, so blogs survive a reload and message positions
+        stay in step with the UI. A failed run saves its error message too.
+        ``human_in_state`` means the prompt is already in the thread (edit,
+        regenerate), so only the answer is added.
+        """
+        from app.tools.blogs.graph import app as blog_app
+
+        blog = ""
+        try:
+            blog_state = {
+                "topic": topic,
+                "as_of": date.today().isoformat(),
+                "persist": not temporary,
+            }
+            for event in blog_app.stream(blog_state, stream_mode="updates"):
+                for node_name, node_output in event.items():
+                    if node_name == "router":
+                        yield {
+                            "content": f"✓ Routing complete - Mode: {node_output.get('mode', 'unknown')}",
+                            "message_type": "progress",
+                            "node": "router",
+                        }
+                    elif node_name == "research":
+                        evidence_count = len(node_output.get("evidence", []))
+                        yield {
+                            "content": f"✓ Research complete - Found {evidence_count} sources",
+                            "message_type": "progress",
+                            "node": "research",
+                        }
+                    elif node_name == "orchestrator":
+                        plan = node_output.get("plan")
+                        if plan:
+                            yield {
+                                "content": f"✓ Planning complete - {len(plan.tasks)} sections planned",
+                                "message_type": "progress",
+                                "node": "orchestrator",
+                            }
+                    elif node_name == "worker":
+                        yield {"content": "✓ Section written", "message_type": "progress", "node": "worker"}
+                    elif node_name == "reducer" and "final" in node_output:
+                        blog = node_output["final"]
+                        yield {"content": blog, "message_type": "ai", "node": "final"}
+        except Exception as blog_error:
+            error_msg = str(blog_error)
+            if "name resolution failed" in error_msg or "503" in error_msg:
+                logger.warning(f"Blog service unavailable: {error_msg}")
+                blog = (
+                    "⚠️ **Blog Generation Failed**\n\nThe blog generation service is currently "
+                    "unavailable (network connection issue). This could be due to:\n"
+                    "- External API service is down\n- Network connectivity issues\n"
+                    "- DNS resolution problems\n\nPlease try again later or use the regular "
+                    "chat without the blog tool."
+                )
+            else:
+                blog = (
+                    "⚠️ **Blog Generation Failed**\n\nAn error occurred while generating the blog "
+                    f"(ref {log_error('Blog tool failed', blog_error)}).\n\n"
+                    "Please try again or use the regular chat without the blog tool."
+                )
+            yield {"content": blog, "message_type": "ai"}
+
+        if blog:
+            try:
+                turn = []
+                if not human_in_state:
+                    turn.append(HumanMessage(content=topic, additional_kwargs={"tools": ["blogs"]}))
+                turn.append(AIMessage(content=blog, additional_kwargs={"tool_used": "blogs"}))
+                graph.update_state(config, {"messages": turn}, as_node="chat_node")
+            except Exception as e:
+                logger.warning(f"Error saving blog turn: {e}")
+
+    @staticmethod
+    def _run_blog(graph, config, topic: str, human_in_state: bool = False) -> str:
+        """Non-streaming blog run: returns the finished blog (or error text)."""
+        blog = ""
+        for chunk in ChatService._stream_blog(graph, config, topic, human_in_state=human_in_state):
+            if chunk["message_type"] == "ai":
+                blog = chunk["content"]
+        return blog or "Blog generation produced no output."
+
+    @staticmethod
     def _stream_deep_research(graph, config, message: str, human_in_state: bool = False):
         """Run the deep research graph as a turn of the conversation.
 
@@ -565,75 +608,12 @@ class ChatService:
         }
 
         try:
-            # If blogs tool is requested, stream the blog generation process
+            # Blogs: stream the blog writer and save the turn to the thread
             if tools and "blogs" in tools:
-                try:
-                    from app.tools.blogs.graph import app as blog_app
-
-                    blog_state = {
-                        "topic": message,
-                        "as_of": date.today().isoformat(),
-                        "persist": not temporary,
-                    }
-
-                    for event in blog_app.stream(blog_state, stream_mode="updates"):
-                        for node_name, node_output in event.items():
-                            # Stream progress updates for different nodes
-                            if node_name == "router":
-                                yield {
-                                    "content": f"✓ Routing complete - Mode: {node_output.get('mode', 'unknown')}",
-                                    "message_type": "progress",
-                                    "node": "router"
-                                }
-                            elif node_name == "research":
-                                evidence_count = len(node_output.get('evidence', []))
-                                yield {
-                                    "content": f"✓ Research complete - Found {evidence_count} sources",
-                                    "message_type": "progress",
-                                    "node": "research"
-                                }
-                            elif node_name == "orchestrator":
-                                plan = node_output.get('plan')
-                                if plan:
-                                    yield {
-                                        "content": f"✓ Planning complete - {len(plan.tasks)} sections planned",
-                                        "message_type": "progress",
-                                        "node": "orchestrator"
-                                    }
-                            elif node_name == "worker":
-                                yield {
-                                    "content": "✓ Section written",
-                                    "message_type": "progress",
-                                    "node": "worker"
-                                }
-                            elif node_name == "reducer":
-                                if 'final' in node_output:
-                                    yield {
-                                        "content": node_output['final'],
-                                        "message_type": "ai",
-                                        "node": "final"
-                                    }
-
-                    # Update thread timestamp
-                    if not temporary:
-                        touch_thread(thread_id)
-                    return
-                except Exception as blog_error:
-                    error_msg = str(blog_error)
-                    logger.warning(f"Error streaming blog tool: {error_msg}")
-
-                    # Provide user-friendly error messages
-                    if "name resolution failed" in error_msg or "503" in error_msg:
-                        yield {
-                            "content": "⚠️ **Blog Generation Failed**\n\nThe blog generation service is currently unavailable (network connection issue). This could be due to:\n- External API service is down\n- Network connectivity issues\n- DNS resolution problems\n\nPlease try again later or use the regular chat without the blog tool.",
-                            "message_type": "ai"
-                        }
-                    else:
-                        yield {
-                            "content": f"⚠️ **Blog Generation Failed**\n\nAn error occurred while generating the blog (ref {log_error('Blog tool failed', blog_error)}).\n\nPlease try again or use the regular chat without the blog tool.",
-                            "message_type": "ai"
-                        }
-                    return
+                yield from ChatService._stream_blog(graph, config, message, temporary=temporary)
+                if not temporary:
+                    touch_thread(thread_id)
+                return
 
             # If deep_research tool is requested, run the deep research graph
             if tools and "deep_research" in tools:
@@ -691,69 +671,11 @@ class ChatService:
             )
             chatbot.update_state(current.config, {"messages": edit_ops})
 
-            # Blogs tool uses a separate, stateless graph keyed by topic
+            # Blogs: rewrite the blog for the edited prompt and save it
             if tools and "blogs" in tools:
-                try:
-                    from app.tools.blogs.graph import app as blog_app
-
-                    blog_state = {
-                        "topic": new_content,
-                        "as_of": date.today().isoformat(),
-                    }
-
-                    for event in blog_app.stream(blog_state, stream_mode="updates"):
-                        for node_name, node_output in event.items():
-                            if node_name == "router":
-                                yield {
-                                    "content": f"✓ Routing complete - Mode: {node_output.get('mode', 'unknown')}",
-                                    "message_type": "progress",
-                                    "node": "router",
-                                }
-                            elif node_name == "research":
-                                evidence_count = len(node_output.get('evidence', []))
-                                yield {
-                                    "content": f"✓ Research complete - Found {evidence_count} sources",
-                                    "message_type": "progress",
-                                    "node": "research",
-                                }
-                            elif node_name == "orchestrator":
-                                plan = node_output.get('plan')
-                                if plan:
-                                    yield {
-                                        "content": f"✓ Planning complete - {len(plan.tasks)} sections planned",
-                                        "message_type": "progress",
-                                        "node": "orchestrator",
-                                    }
-                            elif node_name == "worker":
-                                yield {
-                                    "content": "✓ Section written",
-                                    "message_type": "progress",
-                                    "node": "worker",
-                                }
-                            elif node_name == "reducer":
-                                if 'final' in node_output:
-                                    yield {
-                                        "content": node_output['final'],
-                                        "message_type": "ai",
-                                        "node": "final",
-                                    }
-
-                    touch_thread(thread_id)
-                    return
-                except Exception as blog_error:
-                    error_msg = str(blog_error)
-                    logger.warning(f"Error editing blog tool: {error_msg}")
-                    if "name resolution failed" in error_msg or "503" in error_msg:
-                        yield {
-                            "content": "⚠️ **Blog Generation Failed**\n\nThe blog generation service is currently unavailable (network connection issue). This could be due to:\n- External API service is down\n- Network connectivity issues\n- DNS resolution problems\n\nPlease try again later or use the regular chat without the blog tool.",
-                            "message_type": "ai",
-                        }
-                    else:
-                        yield {
-                            "content": f"⚠️ **Blog Generation Failed**\n\nAn error occurred while generating the blog (ref {log_error('Blog tool failed', blog_error)}).\n\nPlease try again or use the regular chat without the blog tool.",
-                            "message_type": "ai",
-                        }
-                    return
+                yield from ChatService._stream_blog(chatbot, config, new_content, human_in_state=True)
+                touch_thread(thread_id)
+                return
 
             # If deep_research tool is requested, run the deep research graph
             if tools and "deep_research" in tools:
@@ -811,8 +733,7 @@ class ChatService:
         """Delete a thread and all its associated data"""
         from app.database import DatabaseConfig, ThreadMetadata, DocumentMetadata
         from app.services.chatbot import check_pointer
-        from app.services.rag import _thread_paths
-        import os
+        from app.services.rag import delete_documents
         
         session = DatabaseConfig.get_session_factory()()
         try:
@@ -829,36 +750,13 @@ class ChatService:
             
             session.commit()
             
-            # Clean up storage files (uploaded document + metadata JSON). The
-            # document path lives in the thread's RAG metadata (extension may
-            # vary: .pdf/.md/.txt), so read it from there.
+            # Remove every uploaded document, its metadata file and cached index.
             try:
-                from app.services.rag import _read_metadata
-                meta_path = os.path.join(
-                    os.path.dirname(__file__), "..", "storage", "documents", f"{thread_id}.json"
-                )
-                meta = _read_metadata(thread_id) or {}
-                doc_path = meta.get("file_path")
-                if doc_path and os.path.exists(doc_path):
-                    os.remove(doc_path)
-                    logger.info(f"Deleted document file: {doc_path}")
-                if os.path.exists(meta_path):
-                    os.remove(meta_path)
-                    logger.info(f"Deleted metadata file: {meta_path}")
+                delete_documents(thread_id)
             except Exception as e:
-                logger.warning(f"Warning: Failed to delete storage files for thread {thread_id}: {e}")
                 # Don't fail the whole operation if file cleanup fails
-            
-            # Clear any in-memory caches
-            try:
-                from app.services.rag import _THREAD_RETRIEVERS, _THREAD_METADATA
-                if thread_id in _THREAD_RETRIEVERS:
-                    del _THREAD_RETRIEVERS[thread_id]
-                if thread_id in _THREAD_METADATA:
-                    del _THREAD_METADATA[thread_id]
-            except Exception as e:
-                logger.warning(f"Warning: Failed to clear thread cache for {thread_id}: {e}")
-            
+                logger.warning(f"Failed to delete storage files for thread {thread_id}: {e}")
+
             logger.info(f"Successfully deleted thread: {thread_id}")
             return True
             
