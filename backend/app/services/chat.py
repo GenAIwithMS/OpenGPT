@@ -15,7 +15,7 @@ from app.services.chatbot import (
 )
 from app.services.thread import generate_thread_id, generate_id_name
 from app.services.rag import has_document
-from app.services.citations import extract_sources, link_citations
+from app.services.citations import extract_sources, link_citations, renumber_sources
 from app.error_handlers import log_error, public_error
 
 logger = logging.getLogger(__name__)
@@ -342,9 +342,10 @@ class ChatService:
         # reasoning in the thinking bar so the saved response stays clean.
         answer_parts = []
         reasoning_parts = []
-        # Search results the model saw, by source number, for resolving its
-        # ``【n†source】`` citation markers once the answer is complete.
-        sources = {}
+        # Search results the model saw, in order. Once the answer is complete
+        # they are numbered across the whole turn (like the model saw them)
+        # to resolve its ``【n†source】`` citation markers.
+        tool_outputs = []
 
         stream = graph.stream(
             {
@@ -357,7 +358,7 @@ class ChatService:
         )
         try:
             yield from ChatService._relay_chat_stream(
-                stream, seen_tool_calls, answer_parts, reasoning_parts, sources
+                stream, seen_tool_calls, answer_parts, reasoning_parts, tool_outputs
             )
         except GeneratorExit:
             # The client stopped the response (Stop button or closed tab).
@@ -379,6 +380,9 @@ class ChatService:
         # are never persisted — they live only in the in-memory graph.
         # Citation markers are rewritten as links in one pass at the end; the
         # client swaps its streamed text for this final version.
+        sources = {}
+        for output in renumber_sources(tool_outputs):
+            sources.update(extract_sources(output))
         answer = "".join(answer_parts)
         linked = link_citations(answer, sources)
         if linked != answer:
@@ -399,6 +403,8 @@ class ChatService:
                 chatbot.update_state(config, {"messages": ops})
             except Exception as e:
                 logger.warning(f"Error persisting final assistant message: {e}")
+        # Move the thread to the top of the sidebar.
+        touch_thread(config["configurable"]["thread_id"])
 
     @staticmethod
     def _save_stopped_answer(config, partial: str) -> None:
@@ -409,14 +415,14 @@ class ChatService:
             logger.warning(f"Error saving stopped answer: {e}")
 
     @staticmethod
-    def _relay_chat_stream(stream, seen_tool_calls, answer_parts, reasoning_parts, sources):
+    def _relay_chat_stream(stream, seen_tool_calls, answer_parts, reasoning_parts, tool_outputs):
         """Turn graph message chunks into client events, collecting the answer."""
         for message_chunk, metadata in stream:
             # Tool produced a result -> live "finished" signal
             if isinstance(message_chunk, ToolMessage):
                 name = getattr(message_chunk, "name", None) or "tool"
                 if isinstance(message_chunk.content, str):
-                    sources.update(extract_sources(message_chunk.content))
+                    tool_outputs.append(message_chunk.content)
                 yield {
                     "content": f"Finished using {name}.",
                     "message_type": "thinking",

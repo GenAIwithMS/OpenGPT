@@ -8,7 +8,7 @@ carries the page title and date so the frontend can show them in a hover card;
 in any other markdown renderer it is just a normal link.
 """
 import re
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
 # ``--- SOURCE n: title ---`` blocks as produced by app.tools.parallel_search.format_results
@@ -21,6 +21,28 @@ _TITLE_SPLIT_RE = re.compile(r"\s+(?:[|\-–—]|::)\s+")
 # GFM table delimiter row, e.g. "|---|:--:|" or "--- | ---"
 _TABLE_DELIM_RE = re.compile(r"^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$")
 _MD_LINK_RE = re.compile(r"\[([^\]]*)\]\((?:[^()\s]|\([^()]*\))*(?:\s+\"[^\"]*\")?\)")
+
+
+_SOURCE_NUM_RE = re.compile(r"^--- SOURCE (\d+):", re.M)
+
+
+def renumber_sources(tool_outputs: List[str]) -> List[str]:
+    """Number search sources consecutively across all searches of one turn.
+
+    Every search numbers its own results from 1, so a second search in the
+    same answer would reuse 1, 2, 3... and its citations would resolve to the
+    first search's pages. Shifting each output past the previous ones makes
+    every number unique. The model input and the citation resolver both use
+    this, so they always agree.
+    """
+    renumbered, offset = [], 0
+    for text in tool_outputs:
+        numbers = [int(n) for n in _SOURCE_NUM_RE.findall(text or "")]
+        if offset and numbers:
+            text = _SOURCE_NUM_RE.sub(lambda m: f"--- SOURCE {int(m.group(1)) + offset}:", text)
+        renumbered.append(text)
+        offset += max(numbers, default=0)
+    return renumbered
 
 
 def extract_sources(tool_output: str) -> Dict[int, dict]:
