@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000/api';
+// Backend base URL. The Vite dev server proxies /api to the backend; set
+// VITE_API_URL (e.g. https://api.example.com/api) when it lives elsewhere.
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 // Optional API token (VITE_API_TOKEN in frontend/.env.local). It must match
 // API_TOKEN in backend/.env when the backend requires one.
@@ -14,6 +16,26 @@ const api = axios.create({
     ...authHeaders(),
   },
 });
+
+// Pull the readable message out of a backend error body.
+// App errors: {error: {message}}. Request validation: {detail: [{msg}]}.
+const errorMessageFrom = (body) => {
+  if (!body || typeof body !== 'object') return null;
+  const validation = Array.isArray(body.detail) ? body.detail[0]?.msg : body.detail;
+  return body.error?.message || (typeof validation === 'string' ? validation : null);
+};
+
+// Show the backend's message instead of axios' "Request failed with status code 400".
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const message = errorMessageFrom(error.response?.data);
+    if (message) error.message = message;
+    return Promise.reject(error);
+  },
+);
+
+const enc = encodeURIComponent;
 
 // POST a JSON body and read the Server-Sent Events reply. Returns an object
 // with close(), which aborts the request (used by the Stop button).
@@ -38,10 +60,7 @@ const postStream = (path, body, onMessage, onError) => {
       if (!response.ok) {
         let detail = `Request failed (${response.status})`;
         try {
-          const err = await response.json();
-          // App errors: {error: {message}}. Request validation: {detail: [{msg}]}.
-          const validation = Array.isArray(err?.detail) ? err.detail[0]?.msg : err?.detail;
-          detail = err?.error?.message || validation || detail;
+          detail = errorMessageFrom(await response.json()) || detail;
         } catch { /* not JSON */ }
         fail(new Error(detail));
         return;
@@ -81,16 +100,6 @@ const postStream = (path, body, onMessage, onError) => {
 };
 
 export const chatService = {
-  // Send a message to the chatbot
-  sendMessage: async (threadId, message, tools = []) => {
-    const response = await api.post('/chat', {
-      thread_id: threadId,
-      message: message,
-      tools: tools,
-    });
-    return response.data;
-  },
-
   // Regenerate the last AI response for a thread (no new user message sent)
   regenerateMessage: async (threadId, tools = []) => {
     const response = await api.post('/chat/regenerate', {
@@ -124,7 +133,7 @@ export const chatService = {
   // request finish even while the tab is closing.
   endTempSession: (tempSessionId) => {
     if (!tempSessionId) return;
-    fetch(`${API_BASE_URL}/chat/temp/${encodeURIComponent(tempSessionId)}/end`, {
+    fetch(`${API_BASE_URL}/chat/temp/${enc(tempSessionId)}/end`, {
       method: 'POST',
       keepalive: true,
       headers: authHeaders(),
@@ -159,26 +168,26 @@ export const chatService = {
 
   // Get messages from a specific thread
   getThreadMessages: async (threadId) => {
-    const response = await api.get(`/threads/${threadId}`);
+    const response = await api.get(`/threads/${enc(threadId)}`);
+    return response.data;
+  },
+
+  // Save an edited deep research report (reportIndex: its position among the
+  // thread's deep research answers)
+  updateReport: async (threadId, reportIndex, content) => {
+    const response = await api.put(`/threads/${enc(threadId)}/reports/${enc(reportIndex)}`, { content });
     return response.data;
   },
 
   // Update thread title
-  // Save an edited deep research report (reportIndex: its position among the
-  // thread's deep research answers)
-  updateReport: async (threadId, reportIndex, content) => {
-    const response = await api.put(`/threads/${threadId}/reports/${reportIndex}`, { content });
-    return response.data;
-  },
-
   updateThreadTitle: async (threadId, title) => {
-    const response = await api.put(`/threads/${threadId}/title`, { title });
+    const response = await api.put(`/threads/${enc(threadId)}/title`, { title });
     return response.data;
   },
 
   // Delete thread
   deleteThread: async (threadId) => {
-    const response = await api.delete(`/threads/${threadId}`);
+    const response = await api.delete(`/threads/${enc(threadId)}`);
     return response.data;
   },
 
@@ -195,21 +204,6 @@ export const chatService = {
         'Content-Type': 'multipart/form-data',
       },
     });
-    return response.data;
-  },
-
-  // Query document
-  queryDocument: async (threadId, query) => {
-    const response = await api.post('/query-document', {
-      thread_id: threadId,
-      query: query,
-    });
-    return response.data;
-  },
-
-  // Get document info
-  getDocumentInfo: async (threadId) => {
-    const response = await api.get(`/threads/${threadId}/document`);
     return response.data;
   },
 };

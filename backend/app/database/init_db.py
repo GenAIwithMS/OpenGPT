@@ -1,5 +1,8 @@
 """Database Initialization Script"""
 import logging
+import re
+from urllib.parse import quote_plus
+
 from sqlalchemy import create_engine, text
 from app.database import DatabaseConfig
 from app.database.models import Base
@@ -64,28 +67,56 @@ def _warn_about_pickled_checkpoints():
         )
 
 
+class DatabaseInitError(RuntimeError):
+    """The database could not be created or upgraded; the app can't run."""
+
+
 def init_database():
-    """Initialize database and create tables"""
+    """Create the database and tables, and upgrade older schemas.
+
+    Raises DatabaseInitError with a readable message on failure, so the app
+    stops at startup instead of starting and failing every request.
+    """
+    database = DatabaseConfig.DATABASE
+    if DatabaseConfig.USER == "root" and not DatabaseConfig.PASSWORD:
+        logger.warning(
+            "Connecting to MySQL as root with no password. For anything beyond local "
+            "testing, create a dedicated MySQL user with a password and set MYSQL_USER "
+            "and MYSQL_PASSWORD."
+        )
+    if not re.fullmatch(r"\w+", database or ""):
+        raise DatabaseInitError(
+            f"Invalid MYSQL_DATABASE {database!r}: use letters, digits and underscores only."
+        )
     try:
-        # Create database
+        # Connect to the server (no database yet). The password is URL-escaped,
+        # so characters like @ : / in it don't break the URL.
+        password = quote_plus(DatabaseConfig.PASSWORD) if DatabaseConfig.PASSWORD else ""
         engine = create_engine(
-            f"mysql+pymysql://{DatabaseConfig.USER}:{DatabaseConfig.PASSWORD}@{DatabaseConfig.HOST}:{DatabaseConfig.PORT}",
+            f"mysql+pymysql://{DatabaseConfig.USER}:{password}@{DatabaseConfig.HOST}:{DatabaseConfig.PORT}",
             isolation_level="AUTOCOMMIT"
         )
-        with engine.connect() as conn:
-            conn.execute(text(f"CREATE DATABASE IF NOT EXISTS {DatabaseConfig.DATABASE} CHARACTER SET utf8mb4"))
-        engine.dispose()
-        
+        try:
+            with engine.connect() as conn:
+                conn.execute(text(f"CREATE DATABASE IF NOT EXISTS `{database}` CHARACTER SET utf8mb4"))
+        finally:
+            engine.dispose()
+
         # Create tables
         Base.metadata.create_all(DatabaseConfig.get_engine())
         _upgrade_blob_columns()
         _drop_checkpoint_writes_foreign_key()
         _warn_about_pickled_checkpoints()
-
         return True
     except Exception as e:
-        logger.error(f"Database initialization error: {e}")
-        return False
+        # Log the details; the message names what to check without echoing SQL.
+        logger.error("Database initialization failed: %s", e)
+        raise DatabaseInitError(
+            f"Could not set up the MySQL database '{database}' on "
+            f"{DatabaseConfig.HOST}:{DatabaseConfig.PORT} as user '{DatabaseConfig.USER}'. "
+            "Check that MySQL is running and the MYSQL_* settings in backend/.env are correct. "
+            f"Cause: {type(e).__name__}"
+        ) from e
 
 
 if __name__ == "__main__":

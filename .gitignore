@@ -12,3 +12,6 @@ chatbot.db
 chatbot.db-shm
 chatbot.db-wal
 CODE_REVIEW_REPORT.md
+
+# Uploaded documents, generated blogs and images (user data)
+backend/app/storage/

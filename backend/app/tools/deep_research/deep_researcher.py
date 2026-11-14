@@ -1,11 +1,11 @@
 """Main LangGraph implementation for the Deep Research agent."""
 
 import asyncio
+import concurrent.futures
 import re
 import time
 from typing import Literal
 
-from langchain.chat_models import init_chat_model
 from langchain_core.messages import (
     AIMessage,
     HumanMessage,
@@ -16,6 +16,10 @@ from langchain_core.messages import (
 from langchain_core.runnables import RunnableConfig
 from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import Command
+
+from app import llm as llm_config
+from app.llm import chat_model, structured
 
 from .configuration import (
     Configuration,
@@ -41,13 +45,8 @@ from .state import (
     SupervisorState,
 )
 from .utils import (
-    anthropic_websearch_called,
     get_all_tools,
-    get_api_key_for_model,
-    get_notes_from_tool_calls,
     get_today_str,
-    is_token_limit_exceeded,
-    openai_websearch_called,
     think_tool,
 )
 
@@ -102,7 +101,13 @@ def _emit_model_thoughts(response: AIMessage, agent: str):
 _RETRY_AFTER_PATTERN = re.compile(r"try again in (?:(\d+)m)?([\d.]+)s")
 
 
-def _invoke_model(model, messages, attempts: int = 6):
+# Rate-limit retries: at most RATE_LIMIT_RETRIES waits of up to
+# MAX_RATE_LIMIT_WAIT seconds each, so a run can't stall for many minutes.
+RATE_LIMIT_RETRIES = 4
+MAX_RATE_LIMIT_WAIT = 30
+
+
+def _invoke_model(model, messages, attempts: int = RATE_LIMIT_RETRIES):
     """Invoke a model, waiting out provider rate limits instead of failing.
 
     A research run makes many calls in quick succession and easily exceeds a
@@ -118,9 +123,24 @@ def _invoke_model(model, messages, attempts: int = 6):
                 raise
             match = _RETRY_AFTER_PATTERN.search(str(e))
             wait = (int(match.group(1) or 0) * 60 + float(match.group(2))) if match else 20
-            wait = min(int(wait) + 2, 90)
+            wait = min(int(wait) + 2, MAX_RATE_LIMIT_WAIT)
             emit("status", text=f"Rate limit reached, continuing in {wait}s")
             time.sleep(wait)
+
+
+def _run_async(coro):
+    """Run a coroutine from a sync node.
+
+    asyncio.run() fails when an event loop is already running in this thread
+    (e.g. the graph is used with ainvoke), so in that case the coroutine runs
+    in a short-lived worker thread with its own loop.
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(asyncio.run, coro).result()
 
 
 # Share of a research topic's findings echoed back to the supervisor
@@ -171,27 +191,22 @@ def _extract_sources(search_result: str) -> list[dict]:
 # Model initialisation helpers (called inside node functions, not at import)
 ################################################################################
 
+def _model_name(name: str | None) -> str:
+    """The model set for this step, or RESEARCH_MODEL (provider from app.llm)."""
+    return name or llm_config.model_name("research_model")
+
+
 def _init_research_model(config: RunnableConfig, tags: list | None = None):
     """Initialise the research model (supervisor) from config."""
     c = Configuration.from_runnable_config(config)
-    model_api_key = get_api_key_for_model(c.research_model, config)
-    return init_chat_model(
-        model=c.research_model,
-        api_key=model_api_key,
-        max_tokens=c.research_model_max_tokens,
-        tags=tags,
-    )
+    return chat_model(_model_name(c.research_model), max_tokens=c.research_model_max_tokens, tags=tags)
 
 
 def _init_research_model_structured(config: RunnableConfig, pydantic_cls, tags: list | None = None):
-    """Initialise the research model with a structured-output wrapper.
-
-    Uses json_mode to avoid forcing a tool call — some API providers (e.g. Groq
-    with certain models) reject the default function_calling method when the
-    model returns text instead of calling the structured-output tool.
-    """
-    model = _init_research_model(config, tags=tags)
-    return model.with_structured_output(pydantic_cls, method="json_mode").with_retry(
+    """Initialise the research model with a structured-output wrapper."""
+    return structured(
+        _init_research_model(config, tags=tags),
+        pydantic_cls,
         stop_after_attempt=Configuration.from_runnable_config(config).max_structured_output_retries,
     )
 
@@ -199,37 +214,34 @@ def _init_research_model_structured(config: RunnableConfig, pydantic_cls, tags: 
 def _init_compression_model(config: RunnableConfig):
     """Initialise the compression model from config."""
     c = Configuration.from_runnable_config(config)
-    model_api_key = get_api_key_for_model(c.compression_model, config)
-    return init_chat_model(
-        model=c.compression_model,
-        api_key=model_api_key,
-        max_tokens=c.compression_model_max_tokens,
-    )
+    return chat_model(_model_name(c.compression_model), max_tokens=c.compression_model_max_tokens)
 
 
 def _init_final_report_model(config: RunnableConfig):
     """Initialise the final report generation model from config."""
     c = Configuration.from_runnable_config(config)
-    model_api_key = get_api_key_for_model(c.final_report_model, config)
-    return init_chat_model(
-        model=c.final_report_model,
-        api_key=model_api_key,
-        max_tokens=c.final_report_model_max_tokens,
-    )
+    return chat_model(_model_name(c.final_report_model), max_tokens=c.final_report_model_max_tokens)
 
 
 ################################################################################
 # Node: clarify_with_user
 ################################################################################
 
-def clarify_with_user(state: AgentState, config: RunnableConfig):
-    """Clarification node that asks the user questions if needed."""
+def clarify_with_user(state: AgentState, config: RunnableConfig) -> Command:
+    """Clarification node that asks the user questions if needed.
+
+    Ends the run with the question when clarification is needed; otherwise
+    continues to the research brief.
+    """
     configurable = Configuration.from_runnable_config(config)
     emit("step", title="Understanding the request")
 
     # Check if clarification is allowed in this configuration
     if not configurable.allow_clarification:
-        return {"messages": [AIMessage(content="No clarification needed. Proceeding with research.")]}
+        return Command(
+            goto="write_research_brief",
+            update={"messages": [AIMessage(content="No clarification needed. Proceeding with research.")]},
+        )
 
     # Get the research model with structured output for clarification
     model = _init_research_model_structured(config, ClarifyWithUser, tags=["clarify_with_user"])
@@ -243,14 +255,18 @@ def clarify_with_user(state: AgentState, config: RunnableConfig):
 
     # If clarification is needed, return a response asking the user
     if response.need_clarification:
-        return {
-            "messages": [AIMessage(content=response.question)],
-            "research_brief": {"type": "override", "value": None},
-        }
-    else:
-        return {
-            "messages": [AIMessage(content=response.verification)],
-        }
+        # Stop here: the question is the answer to this turn.
+        return Command(
+            goto=END,
+            update={
+                "messages": [AIMessage(content=response.question)],
+                "final_report": response.question,
+            },
+        )
+    return Command(
+        goto="write_research_brief",
+        update={"messages": [AIMessage(content=response.verification)]},
+    )
 
 
 ################################################################################
@@ -342,7 +358,7 @@ def researcher_node(state: ResearcherState, config: RunnableConfig):
     research_topic = state.get("research_topic", "No research topic provided.")
 
     # Get all available tools
-    all_tools = asyncio.run(get_all_tools(config))
+    all_tools = _run_async(get_all_tools(config))
 
     # Get the research model with tools bound
     model = _init_research_model(config, tags=["researcher"])
@@ -445,7 +461,7 @@ def researcher_tools_node(state: ResearcherState, config: RunnableConfig):
         }
 
     # Get all available tools
-    all_tools = asyncio.run(get_all_tools(config))
+    all_tools = _run_async(get_all_tools(config))
     tool_dict = {t.name if hasattr(t, "name") else "web_search": t for t in all_tools}
 
     raw_notes = []
@@ -482,7 +498,7 @@ def researcher_tools_node(state: ResearcherState, config: RunnableConfig):
 
         try:
             # The search tools are async-only, so run them to completion here.
-            result = str(asyncio.run(tool_fn.ainvoke(tool_args)))
+            result = str(_run_async(tool_fn.ainvoke(tool_args)))
             sources = _extract_sources(result)
             if sources:
                 emit("sources", sources=sources)
@@ -614,13 +630,14 @@ deep_researcher_builder = StateGraph(
     config_schema=Configuration
 )
 
-deep_researcher_builder.add_node("clarify_with_user", clarify_with_user)
+deep_researcher_builder.add_node(
+    "clarify_with_user", clarify_with_user, destinations=("write_research_brief", END)
+)
 deep_researcher_builder.add_node("write_research_brief", write_research_brief)
 deep_researcher_builder.add_node("research_supervisor", supervisor_subgraph)
 deep_researcher_builder.add_node("final_report_generation", final_report_generation)
 
 deep_researcher_builder.add_edge(START, "clarify_with_user")
-deep_researcher_builder.add_edge("clarify_with_user", "write_research_brief")
 deep_researcher_builder.add_edge("write_research_brief", "research_supervisor")
 deep_researcher_builder.add_edge("research_supervisor", "final_report_generation")
 deep_researcher_builder.add_edge("final_report_generation", END)

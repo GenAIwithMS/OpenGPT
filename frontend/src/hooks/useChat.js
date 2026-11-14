@@ -4,14 +4,21 @@ import { saveMessageAttachments, withStoredAttachments } from '../lib/attachment
 
 const STATUS_LINE = /^(Thinking\.\.\.|Using .+\.\.\.|Finished using .+\.)$/;
 
-const researchPlaceholder = () => ({
+// Stable per-message ids, used as React keys and to find a stream's placeholder.
+let messageSeq = 0;
+const newMessageId = () => `m${Date.now().toString(36)}-${++messageSeq}`;
+const withId = (m) => (m.id ? m : { ...m, id: newMessageId() });
+
+const aiPlaceholder = (extra = {}) => ({
+  id: newMessageId(),
   type: 'ai',
   content: '',
   timestamp: new Date().toISOString(),
   streaming: true,
-  tool_used: 'deep_research',
-  research: [],
+  ...extra,
 });
+
+const researchPlaceholder = () => aiPlaceholder({ tool_used: 'deep_research', research: [] });
 
 // Random id for one temporary chat session, so temporary chats never share memory.
 const newTempSessionId = () =>
@@ -21,13 +28,31 @@ const newTempSessionId = () =>
       return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
     }));
 
+const BLOG_STEPS = [
+  { label: 'Routing...', status: 'in-progress' },
+  { label: 'Researching...', status: 'pending' },
+  { label: 'Planning...', status: 'pending' },
+  { label: 'Writing sections...', status: 'pending' },
+  { label: 'Finalizing...', status: 'pending' },
+];
+
+// Blog progress events: which step finishes for each graph node.
+const BLOG_NODE_STEP = {
+  router: ['Routing...', 'Researching...'],
+  research: ['Researching...', 'Planning...'],
+  orchestrator: ['Planning...', 'Writing sections...'],
+};
+
 export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = false) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [streamingProgress, setStreamingProgress] = useState(null);
   const eventSourceRef = useRef(null);
-  const lastPromptRef = useRef('');
+  // Bumped whenever a request starts or is abandoned; replies from an older
+  // request (another thread, a stopped stream) are dropped.
+  const requestIdRef = useRef(0);
+  const loadIdRef = useRef(0);
   const tempSessionRef = useRef(newTempSessionId());
   // True once the current temporary session has sent a message to the backend.
   const tempUsedRef = useRef(false);
@@ -46,155 +71,232 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
     return tempSessionRef.current;
   };
 
+  // Close the active stream (if any) and invalidate every pending request.
+  const abandonRequests = () => {
+    requestIdRef.current += 1;
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+  };
+
+  const startRequest = () => {
+    abandonRequests();
+    return requestIdRef.current;
+  };
+
+  const isCurrent = (requestId) => requestIdRef.current === requestId;
+
   // Closing or reloading the tab also ends the temporary chat.
   useEffect(() => {
     const onUnload = () => {
       if (tempUsedRef.current) chatService.endTempSession(tempSessionRef.current);
     };
     window.addEventListener('pagehide', onUnload);
-    return () => window.removeEventListener('pagehide', onUnload);
+    return () => {
+      window.removeEventListener('pagehide', onUnload);
+      abandonRequests();
+    };
   }, []);
 
   useEffect(() => {
     // Any switch (new chat, another thread, leaving temporary mode) ends the
     // previous temporary chat, so a new one never sees its memory.
     endTempSession();
+    // When a brand-new thread was just created by our own stream, the UI
+    // already holds the messages and the stream may still be running: keep it
+    // and skip the reload.
+    if (threadId && skipLoadRef?.current) {
+      skipLoadRef.current = false;
+      return;
+    }
+    abandonRequests();
+    setStreamingProgress(null);
+    setLoading(false);
+    setError(null);
     if (threadId) {
-      // When a brand-new thread was just created by streaming the first
-      // message, the UI already holds the messages — skip the backend reload
-      // (which can briefly return an empty/partial state and wipe the answer).
-      if (skipLoadRef?.current) {
-        skipLoadRef.current = false;
-        return;
-      }
       loadMessages();
     } else {
+      loadIdRef.current += 1;
       setMessages([]);
     }
   }, [threadId, isTempChat]);
 
   const loadMessages = async () => {
     if (!threadId) return;
-    
+    const loadId = ++loadIdRef.current;
+    const forThread = threadId;
+
     try {
       setLoading(true);
-      const data = await chatService.getThreadMessages(threadId);
-      setMessages(withStoredAttachments(threadId, data.messages || []));
+      const data = await chatService.getThreadMessages(forThread);
+      if (loadIdRef.current !== loadId) return;
+      setMessages(withStoredAttachments(forThread, data.messages || []).map(withId));
       setError(null);
     } catch (err) {
+      if (loadIdRef.current !== loadId) return;
       setError(err.message);
       console.error('Error loading messages:', err);
     } finally {
-      setLoading(false);
+      if (loadIdRef.current === loadId) setLoading(false);
     }
   };
 
-  const updateProgressStep = (stepLabel, status) => {
-    setStreamingProgress(prev => {
-      if (!prev) return null;
-      
-      const stepIndex = prev.steps.findIndex(s => s.label === stepLabel);
-      if (stepIndex === -1) return prev;
-      
-      const newSteps = [...prev.steps];
-      newSteps[stepIndex] = { ...newSteps[stepIndex], status };
-      
-      // Mark previous steps as completed
-      for (let i = 0; i < stepIndex; i++) {
-        if (newSteps[i].status !== 'completed') {
-          newSteps[i] = { ...newSteps[i], status: 'completed' };
-        }
-      }
-      
-      return { ...prev, steps: newSteps };
-    });
-  };
-
-  const handleStreamError = (err) => {
-    setError('Streaming error occurred');
-    setMessages(prev => prev.filter(m => !m.streaming));
+  // Start a fresh "new chat" even while its first reply is still streaming.
+  const reset = () => {
+    abandonRequests();
+    loadIdRef.current += 1;
+    endTempSession();
+    setMessages([]);
     setStreamingProgress(null);
     setLoading(false);
+    setError(null);
   };
 
-  // Shared SSE handler for the chatbot path (token streaming + live thinking)
-  const handleChatChunk = (data) => {
-    if (data.error) {
-      setError(data.error);
-      setMessages(prev => prev.filter(m => !m.streaming));
-      setStreamingProgress(null);
-      setLoading(false);
-      return;
-    }
+  const updateMessage = (id, fn) =>
+    setMessages(prev => prev.map(m => (m.id === id ? fn(m) : m)));
 
-    if (data.message_type === 'thinking') {
-      // Thinking events are either short status lines ("Using search...") or
-      // token chunks of the model's reasoning. Status lines become the label;
-      // reasoning tokens are appended into one running text.
-      const isStatus = STATUS_LINE.test(data.content);
-      setStreamingProgress(prev => {
-        if (!prev) return prev;
-        return isStatus
-          ? { ...prev, current: data.content }
-          : { ...prev, reasoning: (prev.reasoning || '') + data.content };
-      });
-    } else if (data.message_type === 'research') {
-      // Deep research activity (planning, searches, sources, ...) is kept on
-      // the message so it stays with the conversation.
-      setMessages(prev => {
-        const copy = [...prev];
-        const idx = copy.findIndex(m => m.streaming);
-        if (idx !== -1) {
-          copy[idx] = { ...copy[idx], research: [...(copy[idx].research || []), data.event] };
-        }
-        return copy;
-      });
-    } else if (data.message_type === 'ai_replace') {
-      // Final answer with citation markers rewritten as source links
-      setMessages(prev => {
-        const copy = [...prev];
-        const idx = copy.findIndex(m => m.streaming);
-        if (idx !== -1) copy[idx] = { ...copy[idx], content: data.content };
-        return copy;
-      });
-    } else if (data.message_type === 'ai') {
-      // The answer has started — the thinking row steps aside.
-      setStreamingProgress(prev =>
-        prev && !prev.answering ? { ...prev, answering: true } : prev
-      );
-      setMessages(prev => {
-        const copy = [...prev];
-        const idx = copy.findIndex(m => m.streaming);
-        if (idx !== -1) {
-          copy[idx] = { ...copy[idx], content: copy[idx].content + data.content };
-        }
-        return copy;
-      });
-    }
+  // End a stream with an error: keep any partial text, drop an empty bubble.
+  const failStream = (placeholderId, message) => {
+    setError(message || 'Something went wrong while generating the reply.');
+    setMessages(prev =>
+      prev.flatMap(m => {
+        if (m.id !== placeholderId) return [m];
+        const hasContent = !!m.content || (m.research && m.research.length > 0);
+        return hasContent ? [{ ...m, streaming: false, unsaved: true }] : [];
+      })
+    );
+    setStreamingProgress(null);
+    setLoading(false);
+    eventSourceRef.current = null;
+  };
 
-    if (data.done) {
-      // If the backend created a brand-new thread (first message in a New Chat),
-      // update the URL silently via the callback from App.
-      if (data.thread_id && onThreadCreated && data.thread_id !== threadId) {
-        onThreadCreated(data.thread_id);
+  const finishStream = (placeholderId, data, originThreadId) => {
+    // If the backend created a brand-new thread (first message in a New Chat),
+    // update the URL silently via the callback from App.
+    if (data.thread_id && onThreadCreated && data.thread_id !== originThreadId) {
+      onThreadCreated(data.thread_id);
+    }
+    updateMessage(placeholderId, m => ({ ...m, streaming: false }));
+    setStreamingProgress(null);
+    setLoading(false);
+    eventSourceRef.current = null;
+  };
+
+  // SSE handler for the chatbot and deep research paths (token streaming,
+  // live thinking and research activity), bound to one request and bubble.
+  const chatHandlers = (requestId, placeholderId, originThreadId) => {
+    const onMessage = (data) => {
+      if (!isCurrent(requestId)) return;
+      if (data.error) {
+        failStream(placeholderId, data.error);
+        return;
       }
-      setMessages(prev =>
-        prev.map(m => (m.streaming ? { ...m, streaming: false } : m))
-      );
-      setStreamingProgress(null);
-      setLoading(false);
-    }
+
+      if (data.message_type === 'thinking') {
+        // Thinking events are either short status lines ("Using search...") or
+        // token chunks of the model's reasoning. Status lines become the label;
+        // reasoning tokens are appended into one running text.
+        const isStatus = STATUS_LINE.test(data.content);
+        setStreamingProgress(prev => {
+          if (!prev) return prev;
+          return isStatus
+            ? { ...prev, current: data.content }
+            : { ...prev, reasoning: (prev.reasoning || '') + data.content };
+        });
+      } else if (data.message_type === 'research') {
+        // Deep research activity (planning, searches, sources, ...) is kept on
+        // the message so it stays with the conversation.
+        updateMessage(placeholderId, m => ({ ...m, research: [...(m.research || []), data.event] }));
+      } else if (data.message_type === 'ai_replace') {
+        // Final answer with citation markers rewritten as source links
+        updateMessage(placeholderId, m => ({ ...m, content: data.content }));
+      } else if (data.message_type === 'ai') {
+        // The answer has started — the thinking row steps aside.
+        setStreamingProgress(prev =>
+          prev && !prev.answering ? { ...prev, answering: true } : prev
+        );
+        updateMessage(placeholderId, m => ({ ...m, content: m.content + data.content }));
+      }
+
+      if (data.done) finishStream(placeholderId, data, originThreadId);
+    };
+    const onError = (err) => {
+      if (!isCurrent(requestId)) return;
+      failStream(placeholderId, err?.message);
+    };
+    return [onMessage, onError];
   };
 
-  const sendMessage = async (message, tools = [], threadIdOverride = null, attachments = []) => {
-    if (!message.trim()) return;
+  const blogHandlers = (requestId, placeholderId, originThreadId) => {
+    let aiResponse = '';
 
+    const setStep = (label, status, details) =>
+      setStreamingProgress(prev => {
+        if (!prev?.steps) return prev;
+        const idx = prev.steps.findIndex(s => s.label === label);
+        if (idx === -1) return prev;
+        const steps = prev.steps.map((s, i) => {
+          if (i === idx) return { ...s, status, ...(details !== undefined ? { details } : {}) };
+          // Earlier steps are done once a later one moves
+          return i < idx && s.status !== 'completed' ? { ...s, status: 'completed' } : s;
+        });
+        return { ...prev, steps };
+      });
+
+    const onMessage = (data) => {
+      if (!isCurrent(requestId)) return;
+      if (data.error) {
+        failStream(placeholderId, data.error);
+        return;
+      }
+
+      if (data.message_type === 'progress') {
+        const step = BLOG_NODE_STEP[data.node];
+        if (step) {
+          setStep(step[0], 'completed', data.content);
+          setStep(step[1], 'in-progress');
+        } else if (data.node === 'worker') {
+          setStreamingProgress(prev => {
+            if (!prev?.steps) return prev;
+            const steps = prev.steps.map(s => {
+              if (s.label !== 'Writing sections...') return s;
+              const count = (s.sectionCount || 0) + 1;
+              return { ...s, sectionCount: count, details: `${count} sections completed` };
+            });
+            return { ...prev, steps };
+          });
+        }
+      } else if (data.message_type === 'ai') {
+        aiResponse += data.content;
+        setStep('Finalizing...', 'completed');
+      }
+
+      if (data.done) {
+        updateMessage(placeholderId, m => ({ ...m, content: aiResponse }));
+        finishStream(placeholderId, data, originThreadId);
+      }
+    };
+    const onError = (err) => {
+      if (!isCurrent(requestId)) return;
+      failStream(placeholderId, err?.message);
+    };
+    return [onMessage, onError];
+  };
+
+  // Returns true when the message was sent. Throws when an attached document
+  // could not be uploaded; the error carries `remainingAttachments` (the ones
+  // not uploaded yet) so the caller can put them back for a retry.
+  const sendMessage = async (message, tools = [], threadIdOverride = null, attachments = []) => {
+    if (!message.trim()) return false;
+
+    const requestId = startRequest();
     const activeThreadId = threadIdOverride || threadId;
-    lastPromptRef.current = message;
 
     // Optimistically render the user's message right away (with any attached
     // documents) so it appears instantly — no waiting on network round-trips.
     const userMessage = {
+      id: newMessageId(),
       type: 'human',
       content: message,
       timestamp: new Date().toISOString(),
@@ -203,6 +305,7 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
         ? attachments.map((a) => ({
             name: a.file?.name || a.name,
             size: a.file?.size,
+            type: a.file?.type,
             file: a.file,
             preview: a.preview,
           }))
@@ -210,154 +313,74 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
     };
     const humanIndex = messages.filter((m) => m.type === 'human').length;
     setMessages(prev => [...prev, userMessage]);
+    setLoading(true);
+    setError(null);
 
-    try {
-      setLoading(true);
-      setError(null);
-
-      const handleError = (error) => {
-        setError('Streaming error occurred');
-        setStreamingProgress(null);
+    // Upload attached documents before streaming so the AI sees them with
+    // this prompt (and the doc is linked to the same thread as the message).
+    let uploadThreadId = activeThreadId;
+    for (let i = 0; i < attachments.length; i++) {
+      try {
+        const response = await chatService.uploadPDF(uploadThreadId, attachments[i].file);
+        if (response.thread_id) uploadThreadId = response.thread_id;
+      } catch (err) {
+        console.error('Error uploading document:', err);
+        if (!isCurrent(requestId)) return false;
+        // Take the message back so the user can retry it as is.
+        setMessages(prev => prev.filter(m => m.id !== userMessage.id));
+        setError(err.message || 'Could not upload the document.');
         setLoading(false);
-      };
-
-      // Upload attached documents before streaming so the AI sees them with
-      // this prompt (and the doc is linked to the same thread as the message).
-      // The user message is already rendered above, so this adds no perceived
-      // latency to sending — only the AI answer waits on ingestion.
-      let uploadThreadId = activeThreadId;
-      if (attachments.length > 0) {
-        for (const att of attachments) {
-          const response = await chatService.uploadPDF(uploadThreadId, att.file);
-          if (response.thread_id && response.thread_id !== uploadThreadId) {
-            uploadThreadId = response.thread_id;
-          }
-        }
-        if (uploadThreadId !== activeThreadId && onThreadCreated && uploadThreadId) {
+        // A new chat may already exist from an earlier file; keep using it.
+        if (uploadThreadId && uploadThreadId !== activeThreadId && onThreadCreated) {
           onThreadCreated(uploadThreadId);
         }
+        const failure = new Error(err.message || 'Could not upload the document.');
+        failure.remainingAttachments = attachments.slice(i);
+        throw failure;
       }
-      const streamThreadId = uploadThreadId;
-      saveMessageAttachments(streamThreadId, humanIndex, userMessage.attachments);
-
-      // Blogs tool: keep the fixed-step progress UI
-      if (tools.includes('blogs')) {
-        setStreamingProgress({
-          isStreaming: true,
-          toolName: 'blogs',
-          steps: [
-            { label: 'Routing...', status: 'in-progress' },
-            { label: 'Researching...', status: 'pending' },
-            { label: 'Planning...', status: 'pending' },
-            { label: 'Writing sections...', status: 'pending' },
-            { label: 'Finalizing...', status: 'pending' },
-          ],
-        });
-
-        let aiResponse = '';
-
-        const handleMessage = (data) => {
-          if (data.message_type === 'progress') {
-            if (data.node === 'router') {
-              updateProgressStep('Routing...', 'completed');
-              updateProgressStep('Researching...', 'in-progress');
-              setStreamingProgress(prev => {
-                if (!prev) return null;
-                const newSteps = [...prev.steps];
-                const idx = newSteps.findIndex(s => s.label === 'Routing...');
-                if (idx !== -1) newSteps[idx] = { ...newSteps[idx], details: data.content };
-                return { ...prev, steps: newSteps };
-              });
-            } else if (data.node === 'research') {
-              updateProgressStep('Researching...', 'completed');
-              updateProgressStep('Planning...', 'in-progress');
-              setStreamingProgress(prev => {
-                if (!prev) return null;
-                const newSteps = [...prev.steps];
-                const idx = newSteps.findIndex(s => s.label === 'Researching...');
-                if (idx !== -1) newSteps[idx] = { ...newSteps[idx], details: data.content };
-                return { ...prev, steps: newSteps };
-              });
-            } else if (data.node === 'orchestrator') {
-              updateProgressStep('Planning...', 'completed');
-              updateProgressStep('Writing sections...', 'in-progress');
-              setStreamingProgress(prev => {
-                if (!prev) return null;
-                const newSteps = [...prev.steps];
-                const idx = newSteps.findIndex(s => s.label === 'Planning...');
-                if (idx !== -1) newSteps[idx] = { ...newSteps[idx], details: data.content };
-                return { ...prev, steps: newSteps };
-              });
-            } else if (data.node === 'worker') {
-              setStreamingProgress(prev => {
-                if (!prev) return null;
-                const newSteps = [...prev.steps];
-                const idx = newSteps.findIndex(s => s.label === 'Writing sections...');
-                if (idx !== -1) {
-                  const currentCount = newSteps[idx].sectionCount || 0;
-                  newSteps[idx] = { ...newSteps[idx], sectionCount: currentCount + 1, details: `${currentCount + 1} sections completed` };
-                }
-                return { ...prev, steps: newSteps };
-              });
-            }
-          } else if (data.message_type === 'ai') {
-            aiResponse += data.content;
-            updateProgressStep('Writing sections...', 'completed');
-            updateProgressStep('Finalizing...', 'completed');
-          }
-
-          if (data.done) {
-            if (data.thread_id && onThreadCreated && data.thread_id !== threadId) {
-              onThreadCreated(data.thread_id);
-            }
-            setMessages(prev => [...prev, {
-              type: 'ai',
-              content: aiResponse,
-              timestamp: new Date().toISOString(),
-            }]);
-            setStreamingProgress(null);
-            setLoading(false);
-          }
-        };
-
-        eventSourceRef.current = chatService.streamMessage(streamThreadId, message, tools, handleMessage, handleError, isTempChat ? claimTempSession() : null);
-        return;
-      }
-
-      // Deep Research tool: the run's activity streams into the message itself
-      // (shown in the research side panel) and the report streams in as content.
-      if (tools.includes('deep_research')) {
-        setStreamingProgress({ isStreaming: true, toolName: 'deep_research' });
-        setMessages(prev => [...prev, researchPlaceholder()]);
-        eventSourceRef.current = chatService.streamMessage(streamThreadId, message, tools, handleChatChunk, handleStreamError, isTempChat ? claimTempSession() : null);
-        return;
-      }
-
-      // Chatbot path: live thinking bar + token streaming into a placeholder message
-      setStreamingProgress({
-        isStreaming: true,
-        toolName: 'chat',
-        current: 'Thinking...',
-        reasoning: '',
-      });
-
-      setMessages(prev => [
-        ...prev,
-        {
-          type: 'ai',
-          content: '',
-          timestamp: new Date().toISOString(),
-          streaming: true,
-        },
-      ]);
-
-      eventSourceRef.current = chatService.streamMessage(streamThreadId, message, tools, handleChatChunk, handleStreamError, isTempChat ? claimTempSession() : null);
-    } catch (err) {
-      setError(err.message);
-      console.error('Error sending message:', err);
-      setStreamingProgress(null);
-      setLoading(false);
+      // The user switched chats while the file was uploading.
+      if (!isCurrent(requestId)) return false;
     }
+    if (uploadThreadId && uploadThreadId !== activeThreadId && onThreadCreated) {
+      onThreadCreated(uploadThreadId);
+    }
+    const streamThreadId = uploadThreadId;
+    saveMessageAttachments(streamThreadId, humanIndex, userMessage.attachments);
+    const tempSession = isTempChat ? claimTempSession() : null;
+
+    // Blogs tool: fixed-step progress UI, the post is shown when it is done
+    if (tools.includes('blogs')) {
+      const placeholder = aiPlaceholder();
+      setStreamingProgress({ isStreaming: true, toolName: 'blogs', steps: BLOG_STEPS });
+      setMessages(prev => [...prev, placeholder]);
+      const [onMessage, onError] = blogHandlers(requestId, placeholder.id, streamThreadId);
+      eventSourceRef.current = chatService.streamMessage(streamThreadId, message, tools, onMessage, onError, tempSession);
+      return true;
+    }
+
+    // Deep Research tool: the run's activity streams into the message itself
+    // (shown in the research side panel) and the report streams in as content.
+    if (tools.includes('deep_research')) {
+      const placeholder = researchPlaceholder();
+      setStreamingProgress({ isStreaming: true, toolName: 'deep_research' });
+      setMessages(prev => [...prev, placeholder]);
+      const [onMessage, onError] = chatHandlers(requestId, placeholder.id, streamThreadId);
+      eventSourceRef.current = chatService.streamMessage(streamThreadId, message, tools, onMessage, onError, tempSession);
+      return true;
+    }
+
+    // Chatbot path: live thinking bar + token streaming into a placeholder message
+    const placeholder = aiPlaceholder();
+    setStreamingProgress({
+      isStreaming: true,
+      toolName: 'chat',
+      current: 'Thinking...',
+      reasoning: '',
+    });
+    setMessages(prev => [...prev, placeholder]);
+    const [onMessage, onError] = chatHandlers(requestId, placeholder.id, streamThreadId);
+    eventSourceRef.current = chatService.streamMessage(streamThreadId, message, tools, onMessage, onError, tempSession);
+    return true;
   };
 
   const regenerate = async () => {
@@ -374,6 +397,9 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
       return editMessage(lastHuman.content, messages.lastIndexOf(lastHuman));
     }
 
+    const requestId = startRequest();
+    const placeholder = aiPlaceholder();
+    let previous = null;
     try {
       setLoading(true);
       setError(null);
@@ -384,30 +410,22 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
         reasoning: '',
       });
 
-      // Drop the trailing AI message and add a placeholder that fills live
-      setMessages(prev => {
-        const copy = [...prev];
-        if (copy.length && copy[copy.length - 1].type === 'ai') copy.pop();
-        copy.push({
-          type: 'ai',
-          content: '',
-          timestamp: new Date().toISOString(),
-          streaming: true,
-        });
-        return copy;
-      });
+      // Swap the trailing AI message for a placeholder that fills live
+      const last = messages[messages.length - 1];
+      previous = last?.type === 'ai' ? last : null;
+      setMessages(prev => [...(previous ? prev.slice(0, -1) : prev), placeholder]);
 
       const response = await chatService.regenerateMessage(threadId, tools);
-
-      setMessages(prev =>
-        prev.map(m =>
-          m.streaming ? { ...m, content: response.response, streaming: false } : m
-        )
-      );
+      if (!isCurrent(requestId)) return;
+      updateMessage(placeholder.id, m => ({ ...m, content: response.response, streaming: false }));
+      setLoading(false);
+      setStreamingProgress(null);
     } catch (err) {
-      setError(err.message);
       console.error('Error regenerating:', err);
-    } finally {
+      if (!isCurrent(requestId)) return;
+      // Put the old answer back
+      setMessages(prev => prev.flatMap(m => (m.id === placeholder.id ? (previous ? [previous] : []) : [m])));
+      setError(err.message);
       setLoading(false);
       setStreamingProgress(null);
     }
@@ -415,69 +433,53 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
 
   const editMessage = async (newContent, messageIndex) => {
     if (!threadId || !newContent.trim()) return;
-    lastPromptRef.current = newContent;
 
     // 0-based index of the edited human message among all human turns
     const humanIndex = messages.slice(0, messageIndex + 1).filter(m => m.type === 'human').length - 1;
     const targetMsg = messages[messageIndex];
     const tools = targetMsg?.tools && targetMsg.tools.length > 0 ? targetMsg.tools : [];
 
-    try {
-      setLoading(true);
-      setError(null);
-      const isResearch = tools.includes('deep_research');
-      setStreamingProgress(
-        isResearch
-          ? { isStreaming: true, toolName: 'deep_research' }
-          : { isStreaming: true, toolName: 'chat', current: 'Updating...', reasoning: '' }
-      );
+    const requestId = startRequest();
+    setLoading(true);
+    setError(null);
+    const isResearch = tools.includes('deep_research');
+    setStreamingProgress(
+      isResearch
+        ? { isStreaming: true, toolName: 'deep_research' }
+        : { isStreaming: true, toolName: 'chat', current: 'Updating...', reasoning: '' }
+    );
 
-      // Rewrite the edited message, drop everything after it, and add a
-      // placeholder bubble that fills live (like regenerate).
-      setMessages(prev => {
-        const updated = prev.slice(0, messageIndex + 1);
-        updated[messageIndex] = { ...updated[messageIndex], content: newContent, streaming: false };
-        updated.push(
-          isResearch
-            ? researchPlaceholder()
-            : { type: 'ai', content: '', timestamp: new Date().toISOString(), streaming: true }
-        );
-        return updated;
-      });
+    // Rewrite the edited message, drop everything after it, and add a
+    // placeholder bubble that fills live (like regenerate).
+    const placeholder = isResearch ? researchPlaceholder() : aiPlaceholder();
+    setMessages(prev => {
+      const updated = prev.slice(0, messageIndex + 1);
+      updated[messageIndex] = { ...updated[messageIndex], content: newContent, streaming: false };
+      updated.push(placeholder);
+      return updated;
+    });
 
-      eventSourceRef.current = chatService.editStream(threadId, newContent, humanIndex, tools, handleChatChunk, handleStreamError);
-    } catch (err) {
-      setError(err.message);
-      console.error('Error editing message:', err);
-      setStreamingProgress(null);
-      setLoading(false);
-    }
+    const [onMessage, onError] = chatHandlers(requestId, placeholder.id, threadId);
+    eventSourceRef.current = chatService.editStream(threadId, newContent, humanIndex, tools, onMessage, onError);
   };
 
-  // Abort an in-flight generation. Closes the SSE connection so streaming
-  // stops at the current point, then keeps the partial assistant message
-  // (marked as finished) visible to the user and removes the just-sent human
-  // message so the prompt can return to the input box. Returns the cancelled
-  // prompt text.
+  // Abort an in-flight generation. The backend keeps a chat answer's partial
+  // text, so the partial answer and the user's message both stay in the chat.
+  // A bubble with nothing in it yet is removed.
   const stop = () => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
+    abandonRequests();
     setLoading(false);
     setStreamingProgress(null);
-    setMessages(prev => {
-      const hadStreaming = prev.some(m => m.streaming);
-      // Keep the partial response, just stop the streaming indicator. A
-      // stopped run was never saved on the server, so mark it as such.
-      const next = prev.map(m => (m.streaming ? { ...m, streaming: false, unsaved: true } : m));
-      // Drop the just-sent human message so the prompt returns to the input.
-      if (hadStreaming && next.length && next[next.length - 1]?.type === 'human') {
-        return next.slice(0, -1);
-      }
-      return next;
-    });
-    return lastPromptRef.current || '';
+    setMessages(prev =>
+      prev.flatMap(m => {
+        if (!m.streaming) return [m];
+        const hasContent = !!m.content || (m.research && m.research.length > 0);
+        if (!hasContent) return [];
+        // Only the chat path saves a stopped answer on the server.
+        const saved = !isTempChat && m.tool_used !== 'deep_research';
+        return [{ ...m, streaming: false, ...(saved ? {} : { unsaved: true }) }];
+      })
+    );
   };
 
   // Replace a deep research report's text (edited in the side panel) and save
@@ -498,10 +500,12 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
     updateReport,
     loading,
     error,
+    clearError: () => setError(null),
     sendMessage,
     regenerate,
     editMessage,
     loadMessages,
+    reset,
     streamingProgress,
     stop,
   };

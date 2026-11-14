@@ -57,12 +57,46 @@ export const buildAttachmentPreview = async (file) => {
 
 // The backend history doesn't carry attachment info, so previews for sent
 // messages are remembered locally, keyed by thread and by the position of the
-// message among the thread's user messages.
+// message among the thread's user messages. Only name/type/size and PDF
+// thumbnails are kept (no document text), for at most MAX_THREADS threads.
+const MAX_THREADS = 30;
+
 const readStore = () => {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+    const store = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    return store && typeof store === 'object' ? store : {};
   } catch {
     return {};
+  }
+};
+
+// Drop text snippets left by older versions and evict the oldest threads.
+const pruneStore = (store, maxThreads) => {
+  const entries = Object.entries(store).map(([threadId, entry]) => {
+    const clean = {};
+    for (const [key, value] of Object.entries(entry || {})) {
+      clean[key] = Array.isArray(value)
+        ? value.map((a) => (a?.preview?.kind === 'image' ? a : { ...a, preview: null }))
+        : value;
+    }
+    return [threadId, clean];
+  });
+  entries.sort((a, b) => (b[1].savedAt || 0) - (a[1].savedAt || 0));
+  return Object.fromEntries(entries.slice(0, maxThreads));
+};
+
+const writeStore = (store) => {
+  let pruned = pruneStore(store, MAX_THREADS);
+  // On a full quota, keep fewer threads until it fits.
+  for (;;) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned));
+      return;
+    } catch (err) {
+      const count = Object.keys(pruned).length;
+      if (count <= 1) throw err;
+      pruned = pruneStore(pruned, Math.floor(count / 2));
+    }
   }
 };
 
@@ -70,13 +104,33 @@ export const saveMessageAttachments = (threadId, humanIndex, attachments) => {
   if (!threadId || !attachments?.length) return;
   try {
     const store = readStore();
+    // Always newer than every saved entry, even within the same millisecond.
+    const latest = Math.max(0, ...Object.values(store).map((e) => e?.savedAt || 0));
     store[threadId] = {
       ...store[threadId],
-      [humanIndex]: attachments.map(({ name, size, preview }) => ({ name, size, preview })),
+      savedAt: Math.max(Date.now(), latest + 1),
+      [humanIndex]: attachments.map(({ name, size, type, preview }) => ({
+        name,
+        size,
+        type,
+        preview: preview?.kind === 'image' ? preview : null,
+      })),
     };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    writeStore(store);
   } catch (err) {
     console.warn('Could not save attachment previews:', err);
+  }
+};
+
+// Forget a deleted thread's previews.
+export const removeThreadAttachments = (threadId) => {
+  try {
+    const store = readStore();
+    if (!(threadId in store)) return;
+    delete store[threadId];
+    writeStore(store);
+  } catch (err) {
+    console.warn('Could not remove attachment previews:', err);
   }
 };
 
@@ -87,7 +141,7 @@ export const withStoredAttachments = (threadId, messages) => {
   return messages.map((m) => {
     if (m.type !== 'human') return m;
     humanIndex += 1;
-    return stored[humanIndex] && !m.attachments
+    return Array.isArray(stored[humanIndex]) && !m.attachments
       ? { ...m, attachments: stored[humanIndex] }
       : m;
   });

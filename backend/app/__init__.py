@@ -7,12 +7,15 @@ configure_langsmith()
 import logging
 
 from fastapi import Depends, FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.router.chat import chat_router
 from app.router.health import health_router
-from app.database.init_db import init_database
+from app.database.init_db import DatabaseInitError, init_database
 from app.error_handlers import register_error_handlers
+from app import llm
 from app.security import is_local_host, require_api_token
+from app.tools.blogs.reducer import BLOG_IMAGE_DIR, BLOG_IMAGE_URL
 
 
 def _docs_enabled() -> bool:
@@ -61,7 +64,16 @@ def create_app():
     )
     
 
-    init_database()
+    try:
+        llm.validate()
+    except llm.LLMConfigError as e:
+        raise SystemExit(f"Startup failed: {e}") from e
+
+    try:
+        init_database()
+    except DatabaseInitError as e:
+        # Stop here with a clear message instead of serving 500s.
+        raise SystemExit(f"Startup failed: {e}") from e
             
     # Include routers
     # Every chat route needs the API token when API_TOKEN is set.
@@ -69,5 +81,10 @@ def create_app():
         chat_router, prefix="/api", tags=["chat"], dependencies=[Depends(require_api_token)]
     )
     app.include_router(health_router, prefix="/api", tags=["health"])
+
+    # Blog images (random file names) so the chat can show them. Served
+    # without the API token: <img> tags can't send one.
+    BLOG_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    app.mount(BLOG_IMAGE_URL, StaticFiles(directory=BLOG_IMAGE_DIR), name="blog-images")
     return app
 

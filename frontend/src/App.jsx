@@ -1,14 +1,19 @@
-import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect, lazy, Suspense } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import MessageList from './components/MessageList';
 import MessageInput from './components/MessageInput';
 import ConfirmationModal from './components/ConfirmationModal';
-import ResearchPanel from './components/ResearchPanel';
 import { useThreads } from './hooks/useThreads';
 import { useChat } from './hooks/useChat';
 import { chatService } from './services/api';
-import { buildAttachmentPreview } from './lib/attachmentPreview';
+import { buildAttachmentPreview, removeThreadAttachments } from './lib/attachmentPreview';
+import { X } from 'lucide-react';
+
+// Only needed for deep research, so it loads on first use.
+const ResearchPanel = lazy(() => import('./components/ResearchPanel'));
+
+const ERROR_TOAST_MS = 6000;
 
 // Derive the active thread id from the URL path:
 //   /                 -> new chat
@@ -19,7 +24,13 @@ function threadIdFromPath(pathname) {
   const path = pathname.replace(/\/+$/, '');
   if (path === '' || path === '/chat' || path === '/chat/new') return null;
   const m = path.match(/^\/chat\/(.+)$/);
-  return m ? decodeURIComponent(m[1]) : null;
+  if (!m) return null;
+  try {
+    return decodeURIComponent(m[1]);
+  } catch {
+    // Malformed escape like /chat/%E0: treat it as a new chat.
+    return null;
+  }
 }
 
 const TempChatIcon = (props) => (
@@ -112,6 +123,7 @@ function App() {
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [threadToDelete, setThreadToDelete] = useState(null);
+  const [appError, setAppError] = useState(null);
 
   const {
     threads,
@@ -119,6 +131,7 @@ function App() {
     error: threadsError,
     fetchThreads,
     updateThreadTitle,
+    clearError: clearThreadsError,
   } = useThreads();
 
   // Keep the active thread in sync with the URL (deep links, back/forward).
@@ -135,7 +148,7 @@ function App() {
     if (isTempChat) return;
     skipLoadRef.current = true;
     setCurrentThreadId(id);
-    navigate(`/chat/${id}`, { replace: true });
+    navigate(`/chat/${encodeURIComponent(id)}`, { replace: true });
     fetchThreads();
   };
 
@@ -143,11 +156,12 @@ function App() {
     messages,
     loading: chatLoading,
     error: chatError,
+    clearError: clearChatError,
     sendMessage,
     regenerate,
     editMessage,
     updateReport,
-    loadMessages,
+    reset: resetChat,
     streamingProgress,
     stop,
   } = useChat(currentThreadId, handleThreadCreated, skipLoadRef, isTempChat);
@@ -214,6 +228,8 @@ function App() {
     // New chat stays client-side until the first message is sent; the backend
     // then creates the thread and the URL is updated silently. Clearing the
     // temporary-chat query param exits temp mode.
+    // Also stops a first reply that is still streaming in a new chat.
+    resetChat();
     setCurrentThreadId(null);
     setIsTempChat(false);
     setIsSidebarOpen(false);
@@ -227,15 +243,13 @@ function App() {
   // The toggle only appears on the New Chat screen, so we reset any active
   // thread and return to a fresh new chat when toggling.
   const toggleTempChat = () => {
-    setIsTempChat((prev) => {
-      const next = !prev;
-      setCurrentThreadId(null);
-      setIsSidebarOpen(false);
-      setResearchPanel(null);
-      // Reflect temp mode in the URL so it survives refresh and is shareable.
-      navigate(next ? '/chat?temporary-chat=true' : '/chat');
-      return next;
-    });
+    const next = !isTempChat;
+    setIsTempChat(next);
+    setCurrentThreadId(null);
+    setIsSidebarOpen(false);
+    setResearchPanel(null);
+    // Reflect temp mode in the URL so it survives refresh and is shareable.
+    navigate(next ? '/chat?temporary-chat=true' : '/chat');
   };
 
   const handleThreadSelect = (threadId) => {
@@ -244,7 +258,7 @@ function App() {
     setIsSidebarOpen(false);
     setPendingAttachments([]);
     setResearchPanel(null);
-    navigate(`/chat/${threadId}`);
+    navigate(`/chat/${encodeURIComponent(threadId)}`);
   };
 
   const handleThreadDelete = (threadId) => {
@@ -258,14 +272,15 @@ function App() {
     try {
       // Call the delete API
       await chatService.deleteThread(threadToDelete);
-      
+      removeThreadAttachments(threadToDelete);
+
       // If deleting current thread, switch to another or go to new chat
       if (threadToDelete === currentThreadId) {
         const remainingThreads = threads.filter(t => t.thread_id !== threadToDelete);
         if (remainingThreads.length > 0) {
           const nextId = remainingThreads[0].thread_id;
           setCurrentThreadId(nextId);
-          navigate(`/chat/${nextId}`);
+          navigate(`/chat/${encodeURIComponent(nextId)}`);
         } else {
           setCurrentThreadId(null);
           navigate('/chat');
@@ -280,7 +295,9 @@ function App() {
       setThreadToDelete(null);
     } catch (error) {
       console.error('Error deleting thread:', error);
-      alert('Failed to delete chat. Please try again.');
+      setAppError(`Failed to delete chat: ${error.message}`);
+      setDeleteModalOpen(false);
+      setThreadToDelete(null);
     }
   };
 
@@ -289,6 +306,7 @@ function App() {
     setThreadToDelete(null);
   };
 
+  // Returns false when the message was not sent, so the input keeps the prompt.
   const handleSendMessage = async (message, tools = [], attachments = []) => {
     // ChatGPT-style attachment flow: the user's message (with its attachments)
     // is shown instantly and the document(s) are uploaded together with the
@@ -296,7 +314,7 @@ function App() {
     // cleared only after a successful send.
     if (attachments.length > 0 && isTempChat) {
       alert('Document upload is not available in Temporary Chat.');
-      return;
+      return false;
     }
 
     const pending = attachments;
@@ -307,16 +325,17 @@ function App() {
       // The previews move into the chat with the message, so clear them from
       // the input right away (restored below if the send fails).
       setPendingAttachments([]);
-      await sendMessage(message, tools, null, pending);
+      const sent = await sendMessage(message, tools, null, pending);
       // Refresh threads so a newly created chat (and updated titles) show in the
       // sidebar — skipped for temporary chats, which must not be persisted.
-      if (!isTempChat) fetchThreads();
+      if (sent && !isTempChat) fetchThreads();
+      return sent !== false;
     } catch (error) {
+      // The upload failed (the error toast shows why). Put back the files that
+      // were not uploaded; the input restores the prompt.
       console.error('Error sending message with attachments:', error);
-      alert('Failed to send message with the attached document. Please try again.');
-      // Preserve attachments (and the prompt stays in the input) so the user can
-      // retry without re-uploading the file.
-      setPendingAttachments(pending);
+      setPendingAttachments(error.remainingAttachments || pending);
+      return false;
     } finally {
       setUploadingAttachment(false);
     }
@@ -352,6 +371,19 @@ function App() {
   const toggleSidebarCollapse = () => {
     setIsSidebarCollapsed((c) => !c);
   };
+
+  // One error toast; it closes by itself after a few seconds.
+  const toastError = appError || chatError || threadsError;
+  const dismissError = () => {
+    setAppError(null);
+    clearChatError();
+    clearThreadsError();
+  };
+  useEffect(() => {
+    if (!toastError) return;
+    const timer = setTimeout(dismissError, ERROR_TOAST_MS);
+    return () => clearTimeout(timer);
+  }, [toastError]);
 
   // Keep temp mode in sync with the URL (refresh, back/forward, shared links).
   useEffect(() => {
@@ -473,15 +505,28 @@ function App() {
           </div>
 
           {/* Error Display */}
-          {(threadsError || chatError) && (
-            <div className="fixed bottom-20 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg">
-              {threadsError || chatError}
+          {toastError && (
+            <div
+              role="alert"
+              className="fixed bottom-20 right-4 z-50 flex max-w-sm items-start gap-2 bg-red-600 text-white pl-4 pr-2 py-2 rounded-lg shadow-lg"
+            >
+              <span className="flex-1 text-sm break-words">{toastError}</span>
+              <button
+                type="button"
+                onClick={dismissError}
+                aria-label="Dismiss error"
+                title="Dismiss"
+                className="shrink-0 p-0.5 rounded hover:bg-white/20 transition-colors"
+              >
+                <X size={16} />
+              </button>
             </div>
           )}
         </div>
 
         {/* Deep research side panel (report review + activity) */}
         {researchMessage?.research && (
+          <Suspense fallback={null}>
           <ResearchPanel
             key={researchPanel.index}
             message={researchMessage}
@@ -490,6 +535,7 @@ function App() {
             onClose={() => setResearchPanel(null)}
             onSaveReport={(content) => updateReport(researchPanel.index, content)}
           />
+          </Suspense>
         )}
         </div>
       </div>

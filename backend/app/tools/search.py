@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 
+from app.llm import model_name
 from app.tools.parallel_search import parallel_configured, search as parallel_search
 
 import logging
@@ -14,8 +15,6 @@ load_dotenv()
 
 BRAVE_API_KEY = os.getenv("BRAVE_API_KEY")
 BRAVE_ENDPOINT = "https://api.search.brave.com/res/v1/web/search"
-# Model that reads the results (see app/services/chatbot.py); lets Parallel tune its output
-CHAT_MODEL = "openai/gpt-oss-120b"
 
 
 def _brave_search(query: str) -> str:
@@ -71,7 +70,8 @@ def Search(query: str, objective: str, config: RunnableConfig) -> str:
             mode="fast",
             max_chars=4000,
             session_id=f"thread-{thread_id}" if thread_id else None,
-            client_model=CHAT_MODEL,
+            # The model that reads the results lets Parallel tune its output
+            client_model=model_name(),
         )
     except Exception as e:
         logger.warning("Tool call failed: %s", e, exc_info=e)

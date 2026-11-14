@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Download, FileCode, FileText, FileType, Loader2 } from 'lucide-react';
-import { downloadReport } from '../lib/exportReport';
 
 const FORMATS = [
   { key: 'pdf', label: 'PDF', icon: FileType },
@@ -34,6 +33,8 @@ const DownloadMenu = ({ content, placement = 'up', buttonClassName = '' }) => {
   const handleDownload = async (format) => {
     setBusy(format);
     try {
+      // The export code (markdown parser, pdfmake) loads on first download.
+      const { downloadReport } = await import('../lib/exportReport');
       await downloadReport(content, format);
       setOpen(false);
     } catch (err) {

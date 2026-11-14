@@ -322,18 +322,31 @@ const Sidebar = ({
                       data-thread-menu
                       className={`
                         group relative flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer
-                        transition-colors duration-100
+                        transition-colors duration-100 outline-none focus-visible:ring-2 focus-visible:ring-white/50
                         ${isActive ? 'bg-gray-700/90' : 'hover:bg-gray-700/60'}
                         ${activeIndex === index && query ? 'ring-1 ring-white/30' : ''}
                       `}
+                      role={isEditing ? undefined : 'button'}
+                      tabIndex={isEditing ? undefined : 0}
+                      aria-current={isActive ? 'page' : undefined}
                       onClick={() => {
                         if (isEditing) return;
                         openChat(thread);
+                      }}
+                      onKeyDown={(e) => {
+                        // Only the row itself, not the options button inside it
+                        if (isEditing || e.target !== e.currentTarget) return;
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          openChat(thread);
+                        }
                       }}
                     >
                       {isEditing ? (
                         <input
                           type="text"
+                          maxLength={100}
+                          aria-label="Chat title"
                           value={editTitle}
                           onChange={(e) => setEditTitle(e.target.value)}
                           onBlur={() => handleSaveRename(thread.thread_id)}

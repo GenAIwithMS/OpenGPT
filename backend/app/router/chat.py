@@ -27,8 +27,9 @@ from app.services.rag import ingest_document, retrieve_from_document, has_docume
 from app.exceptions import NotFoundError, ValidationError, AppError
 from app.error_handlers import log_error, public_error
 from app.rate_limit import rate_limit
+from app.services.run_lock import exclusive_run
 from app.services.chatbot import touch_temp_session, end_temp_session, get_thread_title_from_db
-from langchain_groq import ChatGroq
+from app.llm import chat_model, split_content
 from langsmith import tracing_context
 from dotenv import load_dotenv
 
@@ -68,6 +69,24 @@ def _stream_error(exc: Exception) -> str:
     return public_error(log_error("Stream failed", exc))
 
 
+def _sse(thread_id: str, make_chunks, done_event: dict):
+    """Stream chunks as Server-Sent Events while holding the thread.
+
+    Only one reply per thread runs at a time; a second request gets a clear
+    "busy" error event. The thread is released when the stream ends, fails or
+    the client disconnects (Stop).
+    """
+    try:
+        with exclusive_run(thread_id):
+            for chunk in make_chunks():
+                yield f"data: {json.dumps(chunk)}\n\n"
+            yield f"data: {json.dumps(done_event)}\n\n"
+    except AppError as e:
+        yield f"data: {json.dumps({'error': e.message})}\n\n"
+    except Exception as e:
+        yield f"data: {json.dumps({'error': _stream_error(e)})}\n\n"
+
+
 def _untraced(stream):
     """Iterate a generator with LangSmith tracing off.
 
@@ -82,6 +101,22 @@ def _untraced(stream):
             except StopIteration:
                 return
         yield item
+
+
+def _check_file_content(file_bytes: bytes, ext: str) -> None:
+    """Make sure the content matches the extension, not just the file name."""
+    if ext == ".pdf":
+        # PDFs start with "%PDF-" (a few junk bytes before it are tolerated).
+        if b"%PDF-" not in file_bytes[:1024]:
+            raise ValidationError("This file is not a valid PDF.")
+        return
+    # .txt / .md must be readable text
+    if b"\x00" in file_bytes[:8192]:
+        raise ValidationError("This file is not a text file.")
+    try:
+        file_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        raise ValidationError("Text files must be UTF-8 encoded.")
 
 
 def _require_thread_id(thread_id: Optional[str]) -> str:
@@ -100,7 +135,8 @@ def chat(request: ChatRequest):
 
         ChatService.get_or_create_thread_title(thread_id, request.message)
 
-        result = ChatService.send_message(request.message, thread_id, request.tools)
+        with exclusive_run(thread_id):
+            result = ChatService.send_message(request.message, thread_id, request.tools)
 
         return ChatResponse(**result)
 
@@ -114,7 +150,8 @@ def chat(request: ChatRequest):
 def regenerate(request: RegenerateRequest):
     try:
         thread_id = _require_thread_id(request.thread_id)
-        result = ChatService.regenerate_message(thread_id, request.tools)
+        with exclusive_run(thread_id):
+            result = ChatService.regenerate_message(thread_id, request.tools)
         return ChatResponse(**result)
     except AppError:
         raise
@@ -127,21 +164,14 @@ def edit_message(request: EditMessageRequest):
     try:
         thread_id = _require_thread_id(request.thread_id)
 
-        def generate_stream():
-            try:
-                for chunk in ChatService.edit_message_stream(
-                    thread_id, request.message, request.index, request.tools
-                ):
-                    yield f"data: {json.dumps(chunk)}\n\n"
-
-                yield f"data: {json.dumps({'thread_id': thread_id, 'done': True})}\n\n"
-            except Exception as e:
-                yield f"data: {json.dumps({'error': _stream_error(e)})}\n\n"
-
-        return StreamingResponse(
-            generate_stream(),
-            media_type="text/event-stream"
+        stream = _sse(
+            thread_id,
+            lambda: ChatService.edit_message_stream(
+                thread_id, request.message, request.index, request.tools
+            ),
+            {"thread_id": thread_id, "done": True},
         )
+        return StreamingResponse(stream, media_type="text/event-stream")
     except AppError:
         raise
     except Exception as e:
@@ -170,23 +200,15 @@ def chat_stream(request: ChatStreamRequest):
             thread_id = f"temp-{session}"
             touch_temp_session(thread_id)
 
-            def generate_stream():
-                try:
-                    # Temporary chats are never sent to LangSmith tracing.
-                    chunks = _untraced(
-                        ChatService.stream_message(message, thread_id, tools_list, temporary=True)
-                    )
-                    for chunk in chunks:
-                        yield f"data: {json.dumps(chunk)}\n\n"
-
-                    yield f"data: {json.dumps({'done': True})}\n\n"
-                except Exception as e:
-                    yield f"data: {json.dumps({'error': _stream_error(e)})}\n\n"
-
-            return StreamingResponse(
-                generate_stream(),
-                media_type="text/event-stream"
+            # Temporary chats are never sent to LangSmith tracing.
+            stream = _sse(
+                thread_id,
+                lambda: _untraced(
+                    ChatService.stream_message(message, thread_id, tools_list, temporary=True)
+                ),
+                {"done": True},
             )
+            return StreamingResponse(stream, media_type="text/event-stream")
 
         thread_id = _valid_thread_id(thread_id)
         if not thread_id:
@@ -194,19 +216,12 @@ def chat_stream(request: ChatStreamRequest):
 
         ChatService.get_or_create_thread_title(thread_id, message)
 
-        def generate_stream():
-            try:
-                for chunk in ChatService.stream_message(message, thread_id, tools_list):
-                    yield f"data: {json.dumps(chunk)}\n\n"
-
-                yield f"data: {json.dumps({'thread_id': thread_id, 'done': True})}\n\n"
-            except Exception as e:
-                yield f"data: {json.dumps({'error': _stream_error(e)})}\n\n"
-
-        return StreamingResponse(
-            generate_stream(),
-            media_type="text/event-stream"
+        stream = _sse(
+            thread_id,
+            lambda: ChatService.stream_message(message, thread_id, tools_list),
+            {"thread_id": thread_id, "done": True},
         )
+        return StreamingResponse(stream, media_type="text/event-stream")
 
     except AppError:
         raise
@@ -294,6 +309,9 @@ def create_new_thread():
 def update_thread_title(thread_id: str, request: UpdateTitleRequest):
     try:
         thread_id = _require_thread_id(thread_id)
+        # Renaming must not create a thread that doesn't exist.
+        if get_thread_title_from_db(thread_id) is None:
+            raise NotFoundError("Thread not found")
         success = ChatService.update_thread_title(thread_id, request.title)
 
         if not success:
@@ -342,6 +360,7 @@ def upload_pdf(
 
         if not file_bytes:
             raise ValidationError("Empty file uploaded")
+        _check_file_content(file_bytes, ext)
 
         # Create the thread only once the upload is known to be valid.
         if not thread_id:
@@ -367,6 +386,8 @@ def upload_pdf(
 def delete_thread(thread_id: str):
     try:
         thread_id = _require_thread_id(thread_id)
+        if get_thread_title_from_db(thread_id) is None:
+            raise NotFoundError("Thread not found")
         success = ChatService.delete_thread(thread_id)
 
         if not success:
@@ -400,8 +421,7 @@ def query_document(request: DocumentQueryRequest):
 
         context_text = "\n\n".join(retrieval_result["context"])
 
-        api = os.getenv("GROQ_API_KEY")
-        llm = ChatGroq(model="openai/gpt-oss-120b", openai_api_key=api)
+        llm = chat_model()
         prompt = f"""Based on the following context from a document, answer the question.
 
 Context:
@@ -414,7 +434,7 @@ Provide a clear and concise answer based only on the information in the context.
 Answer:"""
 
         response = llm.invoke(prompt)
-        answer = response.content
+        answer, _ = split_content(response)
 
         return DocumentQueryResponse(
             answer=answer,

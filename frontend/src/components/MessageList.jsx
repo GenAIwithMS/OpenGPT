@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
@@ -106,15 +106,17 @@ function MessageActions({ content, onRegenerate }) {
       >
         <ThumbsDown size={15} />
       </button>
-      <button
-        type="button"
-        title="Regenerate"
-        aria-label="Regenerate"
-        onClick={() => onRegenerate()}
-        className={btn}
-      >
-        <RotateCcw size={15} />
-      </button>
+      {onRegenerate && (
+        <button
+          type="button"
+          title="Regenerate"
+          aria-label="Regenerate"
+          onClick={() => onRegenerate()}
+          className={btn}
+        >
+          <RotateCcw size={15} />
+        </button>
+      )}
     </div>
   );
 }
@@ -180,6 +182,10 @@ const withoutCitations = (children) => {
   if (!items.some(isLink)) return children;
   return items.filter((item) => !isLink(item));
 };
+
+// True inside a message that is still streaming: code blocks skip syntax
+// highlighting until the reply is complete.
+const StreamingContext = React.createContext(false);
 
 // --- Tables -----------------------------------------------------------------
 // Borderless layout: bold header, thin row dividers, text columns left and
@@ -253,6 +259,19 @@ const TableCell = ({ as: Tag, style, colIndex, children }) => {
   );
 };
 
+const StreamingCodeBlock = ({ lang, text }) => {
+  const streaming = React.useContext(StreamingContext);
+  return (
+    <CodeBlock>
+      <CodeBlockGroup>
+        <span className="text-xs text-gray-400">{lang}</span>
+      </CodeBlockGroup>
+      <CopyButton value={text} />
+      <CodeBlockCode code={text} language={lang} theme="github-dark" highlight={!streaming} />
+    </CodeBlock>
+  );
+};
+
 export const markdownComponents = {
   pre: ({ children }) => <>{children}</>,
   code: ({ node, className, children, ...props }) => {
@@ -273,13 +292,7 @@ export const markdownComponents = {
 
     const lang = match ? match[1] : 'text';
     return (
-      <CodeBlock>
-        <CodeBlockGroup>
-          <span className="text-xs text-gray-400">{lang}</span>
-        </CodeBlockGroup>
-        <CopyButton value={text} />
-        <CodeBlockCode code={text} language={lang} theme="github-dark" />
-      </CodeBlock>
+      <StreamingCodeBlock lang={lang} text={text} />
     );
   },
   p: ({ children }) => (
@@ -327,218 +340,258 @@ export const markdownComponents = {
   br: () => <br />,
 };
 
-const MessageList = ({ messages, loading, streaming, streamingProgress, onRegenerate, onEditMessage, onOpenResearch, openResearch }) => {
-  const messagesEndRef = useRef(null);
-  const previousLengthRef = useRef(0);
-  const [editIndex, setEditIndex] = useState(null);
+const remarkPlugins = [remarkGfm];
+const rehypePlugins = [rehypeRaw, rehypeSanitize];
+
+// One message. Memoized so a streaming token only re-renders the message it
+// belongs to, not every message's markdown.
+const MessageItem = memo(function MessageItem({
+  message,
+  index,
+  progress,
+  openView,
+  canRegenerate,
+  onRegenerate,
+  onEditMessage,
+  onOpenResearch,
+}) {
+  const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+  const isUser = message.type === 'human';
+  const isResearch = !isUser && message.tool_used === 'deep_research' && !!message.research;
+  // A research report is shown as a card that opens in the side panel; a
+  // failed run's error text stays inline like a normal answer.
+  const asReportCard = isResearch && !!message.content.trim() && !message.content.startsWith('⚠️');
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setEditValue('');
   };
 
-  useEffect(() => {
-    // Always keep the latest content in view: initial load, switching between
-    // conversations, sending a new message, and live streaming.
-    scrollToBottom();
-    previousLengthRef.current = messages.length;
-  }, [messages, streaming]);
+  const commitEdit = () => {
+    const value = editValue;
+    cancelEdit();
+    if (value.trim() && value !== message.content) {
+      onEditMessage(value, index);
+    }
+  };
 
-  const renderMessage = (message, index) => {
-    const isUser = message.type === 'human';
-    const isResearch = !isUser && message.tool_used === 'deep_research' && !!message.research;
-    // A research report is shown as a card that opens in the side panel; a
-    // failed run's error text stays inline like a normal answer.
-    const asReportCard = isResearch && !!message.content.trim() && !message.content.startsWith('⚠️');
-    const openView = openResearch?.index === index ? openResearch.view : null;
-
-    const commitEdit = () => {
-      if (editIndex === null) return;
-      const original = messages[editIndex]?.content;
-      const value = editValue;
-      setEditIndex(null);
-      setEditValue('');
-      if (value.trim() && value !== original) {
-        onEditMessage(value, editIndex);
-      }
-    };
-
-    // Edit mode for user messages
-    if (isUser && editIndex === index) {
-      return (
-        <div key={index} className="py-4 px-4">
-          <div className="max-w-3xl mx-auto flex justify-end">
-            <div className="w-full max-w-[80%]">
-              <textarea
-                className="w-full resize-none rounded-lg border border-gray-600 bg-[#1a1b1e] p-3 text-sm text-gray-100 outline-none focus:border-gray-400"
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                rows={Math.min(12, editValue.split('\n').length + 1)}
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    commitEdit();
-                  } else if (e.key === 'Escape') {
-                    setEditIndex(null);
-                    setEditValue('');
-                  }
-                }}
-              />
-              <div className="mt-2 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditIndex(null);
-                    setEditValue('');
-                  }}
-                  className="px-3 py-1 text-xs rounded-md text-gray-300 hover:bg-white/5"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={commitEdit}
-                  className="px-3 py-1 text-xs rounded-md bg-blue-600 text-white hover:bg-blue-500"
-                >
-                  Save
-                </button>
-              </div>
+  // Edit mode for user messages
+  if (isUser && editing) {
+    return (
+      <div className="py-4 px-4">
+        <div className="max-w-3xl mx-auto flex justify-end">
+          <div className="w-full max-w-[80%]">
+            <textarea
+              className="w-full resize-none rounded-lg border border-gray-600 bg-[#1a1b1e] p-3 text-sm text-gray-100 outline-none focus:border-gray-400"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              rows={Math.min(12, editValue.split('\n').length + 1)}
+              aria-label="Edit message"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  commitEdit();
+                } else if (e.key === 'Escape') {
+                  cancelEdit();
+                }
+              }}
+            />
+            <div className="mt-2 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={cancelEdit}
+                className="px-3 py-1 text-xs rounded-md text-gray-300 hover:bg-white/5"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={commitEdit}
+                className="px-3 py-1 text-xs rounded-md bg-blue-600 text-white hover:bg-blue-500"
+              >
+                Save
+              </button>
             </div>
           </div>
         </div>
-      );
-    }
+      </div>
+    );
+  }
 
-    const bubbleInner = (
-      <div className="prose prose-invert max-w-none min-w-0">
-        {isResearch && (
-          <ResearchCard
-            events={message.research}
-            running={!!message.streaming && !asReportCard}
-            active={openView === 'activity'}
-            onOpen={() => onOpenResearch?.(index, 'activity')}
-          />
-        )}
+  const bubbleInner = (
+    <div className="prose prose-invert max-w-none min-w-0">
+      {isResearch && (
+        <ResearchCard
+          events={message.research}
+          running={!!message.streaming && !asReportCard}
+          active={openView === 'activity'}
+          onOpen={() => onOpenResearch(index, 'activity')}
+        />
+      )}
 
-        {asReportCard && (
-          <ReportCard
-            content={message.content}
-            writing={!!message.streaming}
-            active={openView === 'report'}
-            onOpen={() => onOpenResearch?.(index, 'report')}
-          />
-        )}
+      {asReportCard && (
+        <ReportCard
+          content={message.content}
+          writing={!!message.streaming}
+          active={openView === 'report'}
+          onOpen={() => onOpenResearch(index, 'report')}
+        />
+      )}
 
-        {message.streaming && streamingProgress?.toolName === 'chat' && !streamingProgress.answering && (
-          <ThinkingIndicator
-            label={streamingProgress.current}
-            reasoning={streamingProgress.reasoning}
-          />
-        )}
+      {message.streaming && progress?.toolName === 'chat' && !progress.answering && (
+        <ThinkingIndicator
+          label={progress.current}
+          reasoning={progress.reasoning}
+        />
+      )}
 
-        {message.streaming && streamingProgress?.isStreaming && streamingProgress.steps && (
-          <div className="mb-3 rounded-md border border-gray-700 bg-[#1a1b1e]/60 p-3">
-            <div className="flex items-center gap-2 text-sm text-gray-300">
-              <Loader2 size={15} className="animate-spin text-blue-400 shrink-0" />
-              <span className="font-medium">
-                {streamingProgress.current || 'Thinking...'}
-              </span>
-            </div>
-
-            {streamingProgress.steps?.length > 0 && (
-              <div className="mt-1.5 space-y-1">
-                {streamingProgress.steps.map((s, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs">
-                    <span
-                      className={
-                        s.status === 'completed'
-                          ? 'text-green-400'
-                          : s.status === 'in-progress'
-                          ? 'text-gray-200'
-                          : 'text-gray-600'
-                      }
-                    >
-                      •
-                    </span>
-                    <span
-                      className={
-                        s.status === 'in-progress'
-                          ? 'text-gray-200'
-                          : s.status === 'completed'
-                          ? 'text-gray-400'
-                          : 'text-gray-600'
-                      }
-                    >
-                      {s.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
+      {message.streaming && progress?.isStreaming && progress.steps && (
+        <div className="mb-3 rounded-md border border-gray-700 bg-[#1a1b1e]/60 p-3">
+          <div className="flex items-center gap-2 text-sm text-gray-300">
+            <Loader2 size={15} className="animate-spin text-blue-400 shrink-0" />
+            <span className="font-medium">
+              {progress.current || 'Thinking...'}
+            </span>
           </div>
-        )}
 
-        {!asReportCard && (
+          {progress.steps?.length > 0 && (
+            <div className="mt-1.5 space-y-1">
+              {progress.steps.map((s) => (
+                <div key={s.label} className="flex items-center gap-2 text-xs">
+                  <span
+                    className={
+                      s.status === 'completed'
+                        ? 'text-green-400'
+                        : s.status === 'in-progress'
+                        ? 'text-gray-200'
+                        : 'text-gray-600'
+                    }
+                  >
+                    •
+                  </span>
+                  <span
+                    className={
+                      s.status === 'in-progress'
+                        ? 'text-gray-200'
+                        : s.status === 'completed'
+                        ? 'text-gray-400'
+                        : 'text-gray-600'
+                    }
+                  >
+                    {s.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {!asReportCard && (
+        <StreamingContext.Provider value={!!message.streaming}>
           <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeRaw, rehypeSanitize]}
+            remarkPlugins={remarkPlugins}
+            rehypePlugins={rehypePlugins}
             components={markdownComponents}
           >
             {cleanTableRows(message.streaming ? stripCitationMarkers(message.content) : message.content)}
           </ReactMarkdown>
-        )}
-        {message.streaming && !isResearch && (
-          <span className="inline-block w-1.5 h-4 ml-0.5 align-middle bg-gray-400 animate-pulse" />
-        )}
-      </div>
-    );
+        </StreamingContext.Provider>
+      )}
+      {message.streaming && !isResearch && (
+        <span className="inline-block w-1.5 h-4 ml-0.5 align-middle bg-gray-400 animate-pulse" />
+      )}
+    </div>
+  );
 
-    // User messages: actions live below the bubble (not inside it)
-    if (isUser) {
-      const attachments = message.attachments;
-      return (
-        <div key={index} className="py-4 px-4">
-          <div className="max-w-3xl mx-auto flex justify-end">
-            <div className="max-w-[80%] flex flex-col items-end gap-1">
-              {attachments && attachments.length > 0 && (
-                <div className="flex flex-wrap justify-end gap-2.5 mb-1">
-                  {attachments.map((att, i) => (
-                    <AttachmentCard key={i} attachment={att} />
-                  ))}
-                </div>
-              )}
-              <div className="px-4 py-3 rounded-2xl bg-[#2a2b32] text-gray-100">
-                {bubbleInner}
-              </div>
-              <UserActions
-                content={message.content}
-                onEdit={() => {
-                  setEditValue(message.content);
-                  setEditIndex(index);
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      );
-    }
-
+  // User messages: actions live below the bubble (not inside it)
+  if (isUser) {
+    const attachments = message.attachments;
     return (
-      <div key={index} className="py-4 px-4">
-        <div className="max-w-3xl mx-auto flex justify-start">
-          <div className="w-full min-w-0 px-4 py-3 rounded-lg text-gray-100">
-            {bubbleInner}
-            <MessageActions content={message.content} onRegenerate={onRegenerate} />
+      <div className="py-4 px-4">
+        <div className="max-w-3xl mx-auto flex justify-end">
+          <div className="max-w-[80%] flex flex-col items-end gap-1">
+            {attachments && attachments.length > 0 && (
+              <div className="flex flex-wrap justify-end gap-2.5 mb-1">
+                {attachments.map((att, i) => (
+                  <AttachmentCard key={`${att.name}-${i}`} attachment={att} />
+                ))}
+              </div>
+            )}
+            <div className="px-4 py-3 rounded-2xl bg-[#2a2b32] text-gray-100">
+              {bubbleInner}
+            </div>
+            <UserActions
+              content={message.content}
+              onEdit={() => {
+                setEditValue(message.content);
+                setEditing(true);
+              }}
+            />
           </div>
         </div>
       </div>
     );
-  };
+  }
+
+  return (
+    <div className="py-4 px-4">
+      <div className="max-w-3xl mx-auto flex justify-start">
+        <div className="w-full min-w-0 px-4 py-3 rounded-lg text-gray-100">
+          {bubbleInner}
+          <MessageActions
+            content={message.content}
+            onRegenerate={canRegenerate ? onRegenerate : undefined}
+          />
+        </div>
+      </div>
+    </div>
+  );
+});
+
+const MessageList = ({ messages, loading, streaming, streamingProgress, onRegenerate, onEditMessage, onOpenResearch, openResearch }) => {
+  const messagesEndRef = useRef(null);
+
+  // Stable callbacks so memoized messages don't re-render when App does.
+  const handlersRef = useRef({});
+  handlersRef.current = { onRegenerate, onEditMessage, onOpenResearch };
+  const handleRegenerate = useCallback(() => handlersRef.current.onRegenerate?.(), []);
+  const handleEdit = useCallback((value, index) => handlersRef.current.onEditMessage?.(value, index), []);
+  const handleOpenResearch = useCallback((index, view) => handlersRef.current.onOpenResearch?.(index, view), []);
+
+  useEffect(() => {
+    // Always keep the latest content in view: initial load, switching between
+    // conversations, sending a new message, and live streaming.
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+  }, [messages, streaming]);
+
+  // Regenerate always redoes the latest answer, so only that one offers it.
+  let lastAiIndex = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].type === 'ai') {
+      lastAiIndex = i;
+      break;
+    }
+  }
 
   return (
     <div className="flex-1 overflow-y-auto">
-      {messages.map((message, index) => renderMessage(message, index))}
+      {messages.map((message, index) => (
+        <MessageItem
+          key={message.id ?? index}
+          message={message}
+          index={index}
+          progress={message.streaming ? streamingProgress : null}
+          openView={openResearch?.index === index ? openResearch.view : null}
+          canRegenerate={index === lastAiIndex && !message.streaming && !loading}
+          onRegenerate={handleRegenerate}
+          onEditMessage={handleEdit}
+          onOpenResearch={handleOpenResearch}
+        />
+      ))}
 
       {loading && !streaming && (
         <div className="py-4 px-4">

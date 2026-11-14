@@ -50,6 +50,7 @@ export const useThreads = () => {
     threads,
     loading,
     error,
+    clearError: () => setError(null),
     fetchThreads,
     createNewThread,
     updateThreadTitle,

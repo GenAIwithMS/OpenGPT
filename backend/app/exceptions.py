@@ -30,6 +30,11 @@ class UnauthorizedError(AppError):
     code = "UNAUTHORIZED"
 
 
+class ConflictError(AppError):
+    status_code = 409
+    code = "CONFLICT"
+
+
 class RateLimitError(AppError):
     status_code = 429
     code = "RATE_LIMIT"

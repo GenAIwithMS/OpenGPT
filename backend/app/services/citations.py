@@ -1,6 +1,6 @@
 """Turn the model's ``【n†source】`` citation markers into markdown links.
 
-gpt-oss cites search results with opaque markers such as ``【1†source】`` or
+Some models cite search results with opaque markers such as ``【1†source】`` or
 ``【Source 2†https://...】``. The chat UI cannot render those, so once an answer
 is complete the markers are resolved against the search results the model saw
 and rewritten as ``[Site](url "Page title (YYYY-MM-DD)")``. The link *title*
@@ -8,7 +8,7 @@ carries the page title and date so the frontend can show them in a hover card;
 in any other markdown renderer it is just a normal link.
 """
 import re
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
 # ``--- SOURCE n: title ---`` blocks as produced by app.tools.parallel_search.format_results
@@ -23,11 +23,41 @@ _TABLE_DELIM_RE = re.compile(r"^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$")
 _MD_LINK_RE = re.compile(r"\[([^\]]*)\]\((?:[^()\s]|\([^()]*\))*(?:\s+\"[^\"]*\")?\)")
 
 
+_SOURCE_NUM_RE = re.compile(r"^--- SOURCE (\d+):", re.M)
+
+
+def renumber_sources(tool_outputs: List[str]) -> List[str]:
+    """Number search sources consecutively across all searches of one turn.
+
+    Every search numbers its own results from 1, so a second search in the
+    same answer would reuse 1, 2, 3... and its citations would resolve to the
+    first search's pages. Shifting each output past the previous ones makes
+    every number unique. The model input and the citation resolver both use
+    this, so they always agree.
+    """
+    renumbered, offset = [], 0
+    for text in tool_outputs:
+        numbers = [int(n) for n in _SOURCE_NUM_RE.findall(text or "")]
+        if offset and numbers:
+            text = _SOURCE_NUM_RE.sub(lambda m: f"--- SOURCE {int(m.group(1)) + offset}:", text)
+        renumbered.append(text)
+        offset += max(numbers, default=0)
+    return renumbered
+
+
+def _is_web_url(url: str) -> bool:
+    scheme = urlparse(url or "").scheme.lower()
+    return scheme in ("http", "https")
+
+
 def extract_sources(tool_output: str) -> Dict[int, dict]:
     """Map source number -> {url, title, date} for one search result blob."""
     sources = {}
     for num, title, url, date in _SOURCE_RE.findall(tool_output or ""):
-        sources[int(num)] = {"url": url, "title": title.strip(), "date": date or ""}
+        # Search results are untrusted: only web links may become citations
+        # (no javascript:, data:, file: ...).
+        if _is_web_url(url):
+            sources[int(num)] = {"url": url, "title": title.strip(), "date": date or ""}
     return sources
 
 
@@ -55,15 +85,39 @@ def _link(source: dict) -> str:
     return f"[{label}]({url} \"{title}\")"
 
 
+_FENCE_RE = re.compile(r"^\s*(```|~~~)")
+
+
+def _code_lines(lines):
+    """Indexes of lines inside fenced code blocks (``` or ~~~), fences included."""
+    inside, fence, result = False, "", set()
+    for i, line in enumerate(lines):
+        match = _FENCE_RE.match(line)
+        if match and (not inside or match.group(1) == fence):
+            inside, fence = not inside, match.group(1)
+            result.add(i)
+        elif inside:
+            result.add(i)
+    return result
+
+
 def _table_rows(lines):
-    """Indexes of lines that belong to a GFM table (header, delimiter, body)."""
+    """Indexes of lines that belong to a GFM table (header, delimiter, body).
+
+    Lines inside fenced code blocks are never table rows, so code containing
+    "|" (shell pipes, ASCII tables) keeps its URLs.
+    """
+    code = _code_lines(lines)
     rows = set()
     i = 0
     while i < len(lines):
-        if _TABLE_DELIM_RE.match(lines[i]) and i > 0 and "|" in lines[i - 1]:
+        if i in code:
+            i += 1
+            continue
+        if _TABLE_DELIM_RE.match(lines[i]) and i > 0 and "|" in lines[i - 1] and i - 1 not in code:
             rows.update({i - 1, i})
             j = i + 1
-            while j < len(lines) and lines[j].strip() and "|" in lines[j]:
+            while j < len(lines) and j not in code and lines[j].strip() and "|" in lines[j]:
                 rows.add(j)
                 j += 1
             i = j
@@ -101,7 +155,8 @@ def _resolve(marker: str, sources: Dict[int, dict]) -> Optional[dict]:
         return {"url": url, "title": "", "date": ""}
     num_match = re.search(r"\d+", marker)
     if num_match:
-        return sources.get(int(num_match.group(0)))
+        src = sources.get(int(num_match.group(0)))
+        return src if src and _is_web_url(src.get("url")) else None
     return None
 
 

@@ -2,7 +2,7 @@
 from .config import DatabaseConfig
 from .init_db import init_database
 from .mysql_checkpoint import MySQLCheckpointSaver
-from .models import Base, ThreadMetadata, DocumentMetadata, Checkpoint, CheckpointWrite
+from .models import Base, ThreadMetadata, Checkpoint, CheckpointWrite
 
 __all__ = [
     "DatabaseConfig",
@@ -10,7 +10,6 @@ __all__ = [
     "MySQLCheckpointSaver",
     "Base",
     "ThreadMetadata",
-    "DocumentMetadata",
     "Checkpoint",
     "CheckpointWrite"
 ]

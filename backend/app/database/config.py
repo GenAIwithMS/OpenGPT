@@ -43,8 +43,3 @@ class DatabaseConfig:
         if cls._session_factory is None:
             cls._session_factory = sessionmaker(bind=cls.get_engine())
         return cls._session_factory
-    
-    @classmethod
-    def create_session(cls):
-        """Create new database session"""
-        return cls.get_session_factory()()

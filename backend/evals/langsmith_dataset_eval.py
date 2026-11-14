@@ -341,11 +341,17 @@ def _run_native_evaluation(
 # ---------------------------------------------------------------------------
 
 def _predict_chat(inputs: dict[str, Any]) -> dict[str, Any]:
-    thread_id = _first_non_empty(inputs.get("thread_id")) or ChatService.create_new_thread()
-    result = ChatService.send_message(inputs["message"], thread_id, tools=inputs.get("tools"))
+    # Always a fresh thread, deleted afterwards. The dataset's thread_id comes
+    # from real traced chats; replaying into it would add eval turns to a
+    # user's conversation.
+    thread_id = ChatService.create_new_thread()
+    try:
+        result = ChatService.send_message(inputs["message"], thread_id, tools=inputs.get("tools"))
+    finally:
+        ChatService.delete_thread(thread_id)
     return {
         "response": result.get("response", ""),
-        "thread_id": result.get("thread_id", thread_id),
+        "thread_id": thread_id,
         "has_tool_calls": result.get("has_tool_calls", False),
         "tool_used": result.get("tool_used"),
     }

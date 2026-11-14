@@ -19,6 +19,15 @@ const hostOf = (url) => {
   }
 };
 
+// Only real web links become clickable (no javascript:, data:, ...).
+const isWebUrl = (url) => {
+  try {
+    return ['http:', 'https:'].includes(new URL(url).protocol);
+  } catch {
+    return false;
+  }
+};
+
 // Long text is clamped to a few lines with a "Show more" toggle
 const Expandable = ({ text, lines = 4, className = '' }) => {
   const [open, setOpen] = useState(false);
@@ -66,16 +75,23 @@ const Sources = ({ sources }) => {
       <ul className="space-y-1">
         {shown.map((s, i) => (
           <li key={i} className="truncate text-xs">
-            <a
-              href={s.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              title={s.title}
-              className="text-gray-400 hover:text-blue-300"
-            >
-              <span className="text-gray-300">{hostOf(s.url)}</span>
-              {s.title && <span className="text-gray-500"> · {s.title}</span>}
-            </a>
+            {isWebUrl(s.url) ? (
+              <a
+                href={s.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={s.title}
+                className="text-gray-400 hover:text-blue-300"
+              >
+                <span className="text-gray-300">{hostOf(s.url)}</span>
+                {s.title && <span className="text-gray-500"> · {s.title}</span>}
+              </a>
+            ) : (
+              <span title={s.title} className="text-gray-400">
+                <span className="text-gray-300">{String(s.url ?? '')}</span>
+                {s.title && <span className="text-gray-500"> · {s.title}</span>}
+              </span>
+            )}
           </li>
         ))}
       </ul>
