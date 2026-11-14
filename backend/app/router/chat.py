@@ -27,6 +27,7 @@ from app.services.rag import ingest_document, retrieve_from_document, has_docume
 from app.exceptions import NotFoundError, ValidationError, AppError
 from app.error_handlers import log_error, public_error
 from app.rate_limit import rate_limit
+from app.services.run_lock import exclusive_run
 from app.services.chatbot import touch_temp_session, end_temp_session, get_thread_title_from_db
 from langchain_groq import ChatGroq
 from langsmith import tracing_context
@@ -68,6 +69,24 @@ def _stream_error(exc: Exception) -> str:
     return public_error(log_error("Stream failed", exc))
 
 
+def _sse(thread_id: str, make_chunks, done_event: dict):
+    """Stream chunks as Server-Sent Events while holding the thread.
+
+    Only one reply per thread runs at a time; a second request gets a clear
+    "busy" error event. The thread is released when the stream ends, fails or
+    the client disconnects (Stop).
+    """
+    try:
+        with exclusive_run(thread_id):
+            for chunk in make_chunks():
+                yield f"data: {json.dumps(chunk)}\n\n"
+            yield f"data: {json.dumps(done_event)}\n\n"
+    except AppError as e:
+        yield f"data: {json.dumps({'error': e.message})}\n\n"
+    except Exception as e:
+        yield f"data: {json.dumps({'error': _stream_error(e)})}\n\n"
+
+
 def _untraced(stream):
     """Iterate a generator with LangSmith tracing off.
 
@@ -100,7 +119,8 @@ def chat(request: ChatRequest):
 
         ChatService.get_or_create_thread_title(thread_id, request.message)
 
-        result = ChatService.send_message(request.message, thread_id, request.tools)
+        with exclusive_run(thread_id):
+            result = ChatService.send_message(request.message, thread_id, request.tools)
 
         return ChatResponse(**result)
 
@@ -114,7 +134,8 @@ def chat(request: ChatRequest):
 def regenerate(request: RegenerateRequest):
     try:
         thread_id = _require_thread_id(request.thread_id)
-        result = ChatService.regenerate_message(thread_id, request.tools)
+        with exclusive_run(thread_id):
+            result = ChatService.regenerate_message(thread_id, request.tools)
         return ChatResponse(**result)
     except AppError:
         raise
@@ -127,21 +148,14 @@ def edit_message(request: EditMessageRequest):
     try:
         thread_id = _require_thread_id(request.thread_id)
 
-        def generate_stream():
-            try:
-                for chunk in ChatService.edit_message_stream(
-                    thread_id, request.message, request.index, request.tools
-                ):
-                    yield f"data: {json.dumps(chunk)}\n\n"
-
-                yield f"data: {json.dumps({'thread_id': thread_id, 'done': True})}\n\n"
-            except Exception as e:
-                yield f"data: {json.dumps({'error': _stream_error(e)})}\n\n"
-
-        return StreamingResponse(
-            generate_stream(),
-            media_type="text/event-stream"
+        stream = _sse(
+            thread_id,
+            lambda: ChatService.edit_message_stream(
+                thread_id, request.message, request.index, request.tools
+            ),
+            {"thread_id": thread_id, "done": True},
         )
+        return StreamingResponse(stream, media_type="text/event-stream")
     except AppError:
         raise
     except Exception as e:
@@ -170,23 +184,15 @@ def chat_stream(request: ChatStreamRequest):
             thread_id = f"temp-{session}"
             touch_temp_session(thread_id)
 
-            def generate_stream():
-                try:
-                    # Temporary chats are never sent to LangSmith tracing.
-                    chunks = _untraced(
-                        ChatService.stream_message(message, thread_id, tools_list, temporary=True)
-                    )
-                    for chunk in chunks:
-                        yield f"data: {json.dumps(chunk)}\n\n"
-
-                    yield f"data: {json.dumps({'done': True})}\n\n"
-                except Exception as e:
-                    yield f"data: {json.dumps({'error': _stream_error(e)})}\n\n"
-
-            return StreamingResponse(
-                generate_stream(),
-                media_type="text/event-stream"
+            # Temporary chats are never sent to LangSmith tracing.
+            stream = _sse(
+                thread_id,
+                lambda: _untraced(
+                    ChatService.stream_message(message, thread_id, tools_list, temporary=True)
+                ),
+                {"done": True},
             )
+            return StreamingResponse(stream, media_type="text/event-stream")
 
         thread_id = _valid_thread_id(thread_id)
         if not thread_id:
@@ -194,19 +200,12 @@ def chat_stream(request: ChatStreamRequest):
 
         ChatService.get_or_create_thread_title(thread_id, message)
 
-        def generate_stream():
-            try:
-                for chunk in ChatService.stream_message(message, thread_id, tools_list):
-                    yield f"data: {json.dumps(chunk)}\n\n"
-
-                yield f"data: {json.dumps({'thread_id': thread_id, 'done': True})}\n\n"
-            except Exception as e:
-                yield f"data: {json.dumps({'error': _stream_error(e)})}\n\n"
-
-        return StreamingResponse(
-            generate_stream(),
-            media_type="text/event-stream"
+        stream = _sse(
+            thread_id,
+            lambda: ChatService.stream_message(message, thread_id, tools_list),
+            {"thread_id": thread_id, "done": True},
         )
+        return StreamingResponse(stream, media_type="text/event-stream")
 
     except AppError:
         raise

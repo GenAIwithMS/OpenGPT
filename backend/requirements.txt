@@ -23,3 +23,4 @@ sqlalchemy
 pymysql
 tavily-python
 parallel-web
+google-genai

@@ -113,6 +113,37 @@ def _safe_slug(title: str) -> str:
     return s or "blog"
 
 
+# Where blogs and their images are saved. Images are served by the API at
+# BLOG_IMAGE_URL (see app/__init__.py) so the chat can display them.
+STORAGE_DIR = Path(__file__).resolve().parents[2] / "storage"
+BLOG_DIR = STORAGE_DIR / "blogs"
+BLOG_IMAGE_DIR = STORAGE_DIR / "blog_images"
+BLOG_IMAGE_URL = "/api/blog-images"
+
+
+def image_generation_available() -> bool:
+    """Gemini image generation needs the google-genai package and GOOGLE_API_KEY."""
+    if not os.environ.get("GOOGLE_API_KEY"):
+        return False
+    try:
+        import google.genai  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+def _caption_only(md: str, image_specs: list) -> str:
+    for spec in image_specs:
+        md = md.replace(spec["placeholder"], f"*Image: {spec.get('caption', '')}*")
+    return md
+
+
+def _save_blog(title: str, md: str) -> None:
+    BLOG_DIR.mkdir(parents=True, exist_ok=True)
+    # Unique name, so blogs with the same title don't overwrite each other.
+    (BLOG_DIR / f"{_safe_slug(title)}-{uuid.uuid4().hex[:8]}.md").write_text(md, encoding="utf-8")
+
+
 def generate_and_place_images(state: TypedDict) -> dict:
     plan = state["plan"]
     assert plan is not None
@@ -124,48 +155,39 @@ def generate_and_place_images(state: TypedDict) -> dict:
     # Temporary chats must not leave files behind: skip images (they would
     # need to be saved) and don't write the blog to disk.
     if not persist:
-        for spec in image_specs:
-            md = md.replace(spec["placeholder"], f"*Image: {spec.get('caption', '')}*")
-        return {"final": md}
+        return {"final": _caption_only(md, image_specs)}
 
-    # If no images requested, just write merged markdown
-    if not image_specs:
-        filename = f"{_safe_slug(plan.blog_title)}.md"
-        Path(filename).write_text(md, encoding="utf-8")
-        return {"final": md}
+    # Without image generation, keep the captions instead of error blocks.
+    if image_specs and not image_generation_available():
+        md = _caption_only(md, image_specs)
+        image_specs = []
 
-    images_dir = Path("images")
-    images_dir.mkdir(exist_ok=True)
+    if image_specs:
+        BLOG_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
 
     for spec in image_specs:
         placeholder = spec["placeholder"]
-        # Never use the model's filename: it could point outside images/
+        # Never use the model's filename: it could point outside the folder
         # (e.g. "../x" or "/tmp/x"). A random name also avoids reusing another
         # blog's image.
         filename = f"{uuid.uuid4().hex}.png"
-        out_path = images_dir / filename
+        try:
+            (BLOG_IMAGE_DIR / filename).write_bytes(_gemini_generate_image_bytes(spec["prompt"]))
+        except Exception as e:
+            # graceful fallback: keep doc usable
+            prompt_block = (
+                f"> **[IMAGE GENERATION FAILED]** {spec.get('caption','')}\n>\n"
+                f"> **Alt:** {spec.get('alt','')}\n>\n"
+                f"> **Prompt:** {spec.get('prompt','')}\n>\n"
+                f"> **Error:** {type(e).__name__}\n"
+            )
+            md = md.replace(placeholder, prompt_block)
+            continue
 
-        # generate only if needed
-        if not out_path.exists():
-            try:
-                img_bytes = _gemini_generate_image_bytes(spec["prompt"])
-                out_path.write_bytes(img_bytes)
-            except Exception as e:
-                # graceful fallback: keep doc usable
-                prompt_block = (
-                    f"> **[IMAGE GENERATION FAILED]** {spec.get('caption','')}\n>\n"
-                    f"> **Alt:** {spec.get('alt','')}\n>\n"
-                    f"> **Prompt:** {spec.get('prompt','')}\n>\n"
-                    f"> **Error:** {type(e).__name__}\n"
-                )
-                md = md.replace(placeholder, prompt_block)
-                continue
-
-        img_md = f"![{spec['alt']}](images/{filename})\n*{spec['caption']}*"
+        img_md = f"![{spec['alt']}]({BLOG_IMAGE_URL}/{filename})\n*{spec['caption']}*"
         md = md.replace(placeholder, img_md)
 
-    filename = f"{_safe_slug(plan.blog_title)}.md"
-    Path(filename).write_text(md, encoding="utf-8")
+    _save_blog(plan.blog_title, md)
     return {"final": md}
 
 
