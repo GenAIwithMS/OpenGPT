@@ -2,7 +2,6 @@
 
 import { cn } from "../../lib/utils"
 import React, { useEffect, useState } from "react"
-import { codeToHtml } from "shiki"
 import { Copy, Check } from "lucide-react"
 
 function escapeHtml(s) {
@@ -62,17 +61,32 @@ export function CodeBlock({ children, className, ...props }) {
   )
 }
 
-export function CodeBlockCode({ code, language = "tsx", theme = "github-dark", className, ...props }) {
+// shiki is large, so it loads the first time a code block is highlighted.
+let shikiPromise = null
+const loadShiki = () =>
+  (shikiPromise ??= import("shiki").catch((e) => {
+    shikiPromise = null
+    throw e
+  }))
+
+// `highlight={false}` (while a reply is streaming) shows plain code and skips
+// shiki, which would otherwise re-run on every token.
+export function CodeBlockCode({ code, language = "tsx", theme = "github-dark", highlight = true, className, ...props }) {
   const [highlightedHtml, setHighlightedHtml] = useState(null)
 
   useEffect(() => {
+    if (!highlight) {
+      setHighlightedHtml(null)
+      return
+    }
     let active = true
-    async function highlight() {
+    async function run() {
       if (!code) {
         if (active) setHighlightedHtml("<pre><code></code></pre>")
         return
       }
       try {
+        const { codeToHtml } = await loadShiki()
         const html = await codeToHtml(code, { lang: language, theme })
         if (active) setHighlightedHtml(html)
       } catch (e) {
@@ -80,11 +94,11 @@ export function CodeBlockCode({ code, language = "tsx", theme = "github-dark", c
         if (active) setHighlightedHtml(`<pre><code>${escapeHtml(code)}</code></pre>`)
       }
     }
-    highlight()
+    run()
     return () => {
       active = false
     }
-  }, [code, language, theme])
+  }, [code, language, theme, highlight])
 
   const classNames = cn(
     "w-full overflow-x-auto text-[13px] [&>pre]:px-4 [&>pre]:py-4 [&>pre]:bg-transparent [&>pre]:m-0",

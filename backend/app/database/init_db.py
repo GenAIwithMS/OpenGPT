@@ -78,6 +78,12 @@ def init_database():
     stops at startup instead of starting and failing every request.
     """
     database = DatabaseConfig.DATABASE
+    if DatabaseConfig.USER == "root" and not DatabaseConfig.PASSWORD:
+        logger.warning(
+            "Connecting to MySQL as root with no password. For anything beyond local "
+            "testing, create a dedicated MySQL user with a password and set MYSQL_USER "
+            "and MYSQL_PASSWORD."
+        )
     if not re.fullmatch(r"\w+", database or ""):
         raise DatabaseInitError(
             f"Invalid MYSQL_DATABASE {database!r}: use letters, digits and underscores only."

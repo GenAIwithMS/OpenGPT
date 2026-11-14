@@ -1,34 +1,37 @@
+# Versions are pinned for reproducible installs (the versions the app is
+# tested with). To upgrade: change a version, reinstall, run the tests.
+
 # Web server
-fastapi
-uvicorn[standard]
-python-multipart
-pydantic
-python-dotenv
+fastapi==0.139.0
+uvicorn[standard]==0.51.0
+python-multipart==0.0.32
+pydantic==2.13.4
+python-dotenv==1.2.2
 
 # LangChain / LangGraph
-langchain
-langchain-core
-langgraph
-langsmith
+langchain==1.3.14
+langchain-core==1.8.0
+langgraph==1.2.9
+langsmith==0.14.17
 
 # Model providers: any OpenAI- or Anthropic-compatible endpoint (see app/llm.py)
-langchain-openai
-langchain-anthropic
+langchain-openai==1.3.5
+langchain-anthropic==1.7.10
 
 # Documents (RAG): loaders, embeddings and vector store
-langchain_community
-langchain-huggingface
-sentence-transformers
-faiss-cpu
-pypdf
+langchain_community==0.4.2
+langchain-huggingface==1.2.2
+sentence-transformers==5.6.0
+faiss-cpu==1.14.3
+pypdf==6.14.2
 
 # Database
-sqlalchemy
-pymysql
+sqlalchemy==2.0.51
+pymysql==1.2.0
 
 # Tools: web search, deep research, blog images
-requests
-parallel-web
-tavily-python
-ddgs
-google-genai
+requests==2.34.2
+parallel-web==1.3.7
+tavily-python==0.7.26
+ddgs==9.16.0
+google-genai==3.3.0

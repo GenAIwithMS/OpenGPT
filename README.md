@@ -171,6 +171,7 @@ All settings live in `backend/.env`. [`backend/.env.example`](backend/.env.examp
 | Security | `API_TOKEN` (required when `HOST` is not local; set `VITE_API_TOKEN` in `frontend/.env.local` to match) |
 | Limits | `RATE_LIMIT_PER_MINUTE`, `MAX_MESSAGE_CHARS`, `MAX_UPLOAD_MB`, `MAX_BLOG_SECTIONS`, `MAX_CHECKPOINTS_PER_THREAD`, ... |
 | Tracing | `LANGSMITH_TRACING` (off by default), `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT` |
+| Frontend (`frontend/.env.local`) | `VITE_API_URL` (default `/api`: the Vite dev server forwards it to the backend; set the backend URL for other setups), `VITE_API_TOKEN` (when `API_TOKEN` is set) |
 
 Tools without a key are simply unavailable. For example, without `GOOGLE_API_KEY` blogs show image captions instead of images.
 
@@ -244,8 +245,9 @@ All routes are under `/api`. When `API_TOKEN` is set, send `Authorization: Beare
 ## Development
 
 ```bash
-# Backend tests
-cd backend && python -m unittest discover -s tests
+# Backend tests (no MySQL or API keys needed)
+cd backend && python -m unittest discover -s tests -t .
+# or, with the dev tools: pip install -r requirements-dev.txt && pytest
 
 # Frontend production build
 cd frontend && npm run build

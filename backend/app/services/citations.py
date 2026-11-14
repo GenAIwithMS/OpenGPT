@@ -45,11 +45,19 @@ def renumber_sources(tool_outputs: List[str]) -> List[str]:
     return renumbered
 
 
+def _is_web_url(url: str) -> bool:
+    scheme = urlparse(url or "").scheme.lower()
+    return scheme in ("http", "https")
+
+
 def extract_sources(tool_output: str) -> Dict[int, dict]:
     """Map source number -> {url, title, date} for one search result blob."""
     sources = {}
     for num, title, url, date in _SOURCE_RE.findall(tool_output or ""):
-        sources[int(num)] = {"url": url, "title": title.strip(), "date": date or ""}
+        # Search results are untrusted: only web links may become citations
+        # (no javascript:, data:, file: ...).
+        if _is_web_url(url):
+            sources[int(num)] = {"url": url, "title": title.strip(), "date": date or ""}
     return sources
 
 
@@ -147,7 +155,8 @@ def _resolve(marker: str, sources: Dict[int, dict]) -> Optional[dict]:
         return {"url": url, "title": "", "date": ""}
     num_match = re.search(r"\d+", marker)
     if num_match:
-        return sources.get(int(num_match.group(0)))
+        src = sources.get(int(num_match.group(0)))
+        return src if src and _is_web_url(src.get("url")) else None
     return None
 
 

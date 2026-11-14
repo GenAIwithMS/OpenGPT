@@ -3,7 +3,7 @@ SQLAlchemy ORM Models for Chatbot Database
 """
 from sqlalchemy import Column, String, Integer, TIMESTAMP, LargeBinary, Index
 from sqlalchemy.dialects.mysql import LONGBLOB
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.sql import func
 
 Base = declarative_base()

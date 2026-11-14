@@ -103,6 +103,22 @@ def _untraced(stream):
         yield item
 
 
+def _check_file_content(file_bytes: bytes, ext: str) -> None:
+    """Make sure the content matches the extension, not just the file name."""
+    if ext == ".pdf":
+        # PDFs start with "%PDF-" (a few junk bytes before it are tolerated).
+        if b"%PDF-" not in file_bytes[:1024]:
+            raise ValidationError("This file is not a valid PDF.")
+        return
+    # .txt / .md must be readable text
+    if b"\x00" in file_bytes[:8192]:
+        raise ValidationError("This file is not a text file.")
+    try:
+        file_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        raise ValidationError("Text files must be UTF-8 encoded.")
+
+
 def _require_thread_id(thread_id: Optional[str]) -> str:
     valid = _valid_thread_id(thread_id)
     if valid is None:
@@ -344,6 +360,7 @@ def upload_pdf(
 
         if not file_bytes:
             raise ValidationError("Empty file uploaded")
+        _check_file_content(file_bytes, ext)
 
         # Create the thread only once the upload is known to be valid.
         if not thread_id:

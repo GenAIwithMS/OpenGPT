@@ -115,15 +115,25 @@ const MessageInput = ({
 
   const handleSubmit = () => {
     if (message.trim() && !disabled) {
-      onSendMessage(message, selectedTools, pendingAttachments);
+      const sentText = message;
+      const sentTools = selectedTools;
+      const result = onSendMessage(sentText, sentTools, pendingAttachments);
       setMessage("");
       setSelectedTools([]);
+      // Not sent (e.g. the upload failed): give the prompt back for a retry,
+      // unless the user already started typing something new.
+      Promise.resolve(result).then((sent) => {
+        if (sent === false) {
+          setMessage((current) => current || sentText);
+          setSelectedTools((current) => (current.length ? current : sentTools));
+        }
+      });
     }
   };
 
+  // The partial answer stays in the chat, so the prompt isn't put back.
   const handleStop = () => {
-    const prompt = onStop?.();
-    if (prompt) setMessage(prompt);
+    onStop?.();
   };
 
   // Search, Blog and Deep Research each route the message to a different
@@ -352,6 +362,7 @@ const MessageInput = ({
                 onClick={handleStop}
                 className="p-2 text-red-400 hover:text-red-300 hover:bg-gray-700 rounded-lg transition-colors"
                 title="Stop generating"
+                aria-label="Stop generating"
               >
                 <Square size={18} />
               </button>
@@ -360,6 +371,8 @@ const MessageInput = ({
                 type="button"
                 onClick={handleSubmit}
                 disabled={!message.trim() || disabled}
+                title="Send message"
+                aria-label="Send message"
                 className="p-2 text-gray-400 hover:text-white disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
               >
                 <Send size={18} />
