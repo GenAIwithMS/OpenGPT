@@ -81,16 +81,6 @@ const postStream = (path, body, onMessage, onError) => {
 };
 
 export const chatService = {
-  // Send a message to the chatbot
-  sendMessage: async (threadId, message, tools = []) => {
-    const response = await api.post('/chat', {
-      thread_id: threadId,
-      message: message,
-      tools: tools,
-    });
-    return response.data;
-  },
-
   // Regenerate the last AI response for a thread (no new user message sent)
   regenerateMessage: async (threadId, tools = []) => {
     const response = await api.post('/chat/regenerate', {
@@ -195,21 +185,6 @@ export const chatService = {
         'Content-Type': 'multipart/form-data',
       },
     });
-    return response.data;
-  },
-
-  // Query document
-  queryDocument: async (threadId, query) => {
-    const response = await api.post('/query-document', {
-      thread_id: threadId,
-      query: query,
-    });
-    return response.data;
-  },
-
-  // Get document info
-  getDocumentInfo: async (threadId) => {
-    const response = await api.get(`/threads/${threadId}/document`);
     return response.data;
   },
 };

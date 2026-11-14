@@ -7,36 +7,30 @@ from langsmith import traceable
 from typing import TypedDict, Annotated
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.graph.message import add_messages
-from langchain_openai import ChatOpenAI
-from langchain_groq import ChatGroq
-from langgraph.graph import StateGraph, START, END
+from app.llm import LazyChatModel
+from langgraph.graph import StateGraph, START
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.memory import MemorySaver
 from app.tools import Search, Weather, Calculator, Stock_price
-from app.services.rag import has_document, retrieve_from_document
+from app.services.rag import retrieve_from_document
 from app.services.citations import renumber_sources
 from app.database import DatabaseConfig,MySQLCheckpointSaver,ThreadMetadata
 from sqlalchemy.sql import func
-import os
 
 logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-api = os.getenv("GROQ_API_KEY")
-
-model = ChatGroq(
-    model="openai/gpt-oss-120b",
-    api_key=api
-    )
+# The chat model for the configured provider (see app/llm.py), built on first use.
+model = LazyChatModel("model")
 
 # Tools the chat model may call on its own. Deep research is deliberately not
 # among them: it runs for minutes and has its own streaming path, so it only
 # starts when the user picks it from the tools menu (see ChatService).
 all_tools = [Search, Weather, Calculator, Stock_price]
 
-# Without this the model (gpt-oss) tends to invent tools such as "Open_URL"
-# after a search returns links, which the provider rejects.
+# Without this, some models invent tools such as "Open_URL" after a search
+# returns links, which the API then rejects.
 SYSTEM_PROMPT = SystemMessage(
     content=(
         "You are OpenGPT, a helpful assistant. The only tools available are the ones "
@@ -59,6 +53,8 @@ class Chatstate(TypedDict):
     # {"for": <human message id>, "text": <context>}. Reused across the tool
     # loop so retrieval runs once per turn, not on every model call.
     doc_context: dict
+    # Tools the user picked for this message in the UI (e.g. ["search"]).
+    tools: list
 
 
 CANCELLED_TOOL_RESULT = "Cancelled: the user stopped the response before this tool finished."
@@ -172,6 +168,14 @@ If the user's question is related to the document, base your answer on this cont
 
     if question_at >= 0:
         messages = _with_turn_wide_source_numbers(messages, question_at)
+        # The user turned on Search for this message: make sure the model
+        # searches before answering (once per turn).
+        searched = any(isinstance(m, ToolMessage) for m in messages[question_at + 1:])
+        if "search" in (state.get("tools") or []) and not searched:
+            messages.append(SystemMessage(
+                content="The user turned on web search for this message. Call the Search "
+                "tool first, then answer from its results."
+            ))
 
     messages = close_dangling_tool_calls(list(messages))
 
@@ -189,7 +193,14 @@ If the user's question is related to the document, base your answer on this cont
 
 
 # Create tool node
-tool_node = ToolNode(all_tools)
+def _tool_error(e: Exception) -> str:
+    """A failed tool call becomes a short message the model can act on (fix its
+    arguments, or answer without the tool) instead of crashing the reply."""
+    logger.warning("Tool call failed: %s", e)
+    return f"Tool error ({type(e).__name__}): {e}. Check the arguments and try again, or answer without this tool."
+
+
+tool_node = ToolNode(all_tools, handle_tool_errors=_tool_error)
 
 # Build the state graph
 graph = StateGraph(Chatstate)

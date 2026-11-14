@@ -1,6 +1,6 @@
 """DuckDuckGo search tool for the deep research agent."""
 
-from typing import List, Annotated, Literal
+from typing import List, Annotated
 
 from langchain_core.tools import InjectedToolArg, tool
 from langchain_core.runnables import RunnableConfig

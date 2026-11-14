@@ -55,14 +55,6 @@ class ChatResponse(BaseModel):
     has_tool_calls: bool = Field(default=False, description="Whether tools were called")
 
 
-class ChatStreamResponse(BaseModel):
-    """Response model for streaming chat messages"""
-
-    content: str = Field(..., description="Content chunk")
-    message_type: str = Field(..., description="Type of message: ai, tool, or human")
-    tool_name: Optional[str] = Field(None, description="Name of tool if it's a tool message")
-
-
 class ThreadResponse(BaseModel):
     """Response model for thread information"""
 
@@ -119,13 +111,6 @@ class PDFUploadResponse(BaseModel):
     documents: int = Field(..., description="Number of documents processed")
     chunks: int = Field(..., description="Number of text chunks created")
     thread_id: str = Field(..., description="Thread ID associated with the document")
-
-
-class ErrorResponse(BaseModel):
-    """Response model for errors"""
-
-    detail: str = Field(..., description="Error message")
-    error_type: Optional[str] = Field(None, description="Type of error")
 
 
 class DocumentQueryRequest(BaseModel):

@@ -44,7 +44,7 @@ Agentic tool use · Deep Research · Document Q&A (RAG) · Persistent multi-thre
 
 <table>
   <tr>
-    <td align="center" width="25%">🧠<br /><b>Agentic by design</b><br /><sub>LangGraph orchestrates search, weather, stocks &amp; calculator tools</sub></td>
+    <td align="center" width="25%">🧠<br /><b>Any model, agentic</b><br /><sub>OpenAI- or Anthropic-compatible models with search, weather, stocks &amp; calculator tools</sub></td>
     <td align="center" width="25%">🔬<br /><b>Deep Research</b><br /><sub>Multi-step research that clarifies, plans, and writes a full report</sub></td>
     <td align="center" width="25%">📄<br /><b>Chat with documents</b><br /><sub>Upload files and ask questions with FAISS-backed RAG</sub></td>
     <td align="center" width="25%">💾<br /><b>Never lose a thread</b><br /><sub>MySQL-persisted conversations, plus temporary session-only chats</sub></td>
@@ -53,62 +53,61 @@ Agentic tool use · Deep Research · Document Q&A (RAG) · Persistent multi-thre
 
 ## About
 
-OpenGPT is an AI chatbot built with LangGraph & RAG, featuring a FastAPI backend and React frontend with RAG capabilities, multi-threaded conversations, temporary (session-only) chats, and persistent MySQL storage.
+OpenGPT is an open-source, ChatGPT-style assistant built with LangGraph. It has a FastAPI backend and a React frontend. It works with **any model behind an OpenAI- or Anthropic-compatible API**, hosted or self-hosted. Conversations are saved in MySQL.
 
 ## Features
 
-- **FastAPI Backend**: Modern REST API with automatic documentation
-- **React Frontend**: ChatGPT-inspired UI with Tailwind CSS
-- **Multi-threaded Conversations**: Support for multiple chat threads with unique identifiers
-- **RAG (Retrieval Augmented Generation)**: PDF upload and document Q&A
-- **Persistent Storage**: MySQL database for storing conversation history and checkpoints
-- **Tool Integration**: Multiple tools for enhanced functionality:
-  - Web Search (Brave API)
-  - Weather Information (OpenWeather API)
-  - Calculator
-  - Stock Price Lookup (Alpha Vantage API)
+- **Any model provider**: one setting picks the OpenAI- or Anthropic-compatible endpoint and model ([Choosing a model](#choosing-a-model))
+- **Streaming chat** with live "thinking" and tool status, plus edit, regenerate and stop
+- **Tools the model can use**: web search (Parallel, Brave as fallback), weather (OpenWeather), stock quotes (Alpha Vantage), calculator
+- **Inline citations**: search sources become links with title and date on hover
+- **Deep Research**: plans, searches in several rounds and writes a full report you can edit and download
+- **Blog writer**: researches and writes a structured blog post, with optional Gemini images
+- **Chat with documents (RAG)**: attach PDF, Markdown or text files; several files per chat, searched together
+- **Persistent threads** in MySQL, plus **temporary chats** that are never saved
+- **Safe defaults**: local-only server, optional API token, rate limits, size limits, sanitized rendering
 
 ## Technology Stack
 
 ### Backend
 - **Framework**: FastAPI + LangGraph
-- **Model**: OpenAI GPT (via CanopyWave API)
-- **Database**: MySQL with custom checkpoint saver
-- **RAG**: FAISS + HuggingFace Embeddings
-- **Language**: Python 3.x
+- **Models**: any OpenAI- or Anthropic-compatible endpoint (`langchain-openai`, `langchain-anthropic`)
+- **Database**: MySQL with a custom LangGraph checkpoint saver
+- **RAG**: FAISS + HuggingFace sentence-transformer embeddings (run locally)
+- **Language**: Python 3.11+ (developed on 3.13)
 
 ### Frontend
 - **Framework**: React 18 + Vite
 - **Styling**: Tailwind CSS
-- **HTTP Client**: Axios
-- **Markdown**: React Markdown with GitHub Flavored Markdown
+- **Markdown**: React Markdown with GitHub Flavored Markdown, sanitized
+- **Code highlighting**: Shiki
 - **Icons**: Lucide React
 
 ## Prerequisites
 
-- Python 3.8+
+- Python 3.11+
 - Node.js 18+ and npm
-- MySQL 5.7+ or MySQL 8.0+
-- API Keys (configured in `.env` file):
-  - OPENAI_API_KEY
-  - BRAVE_API_KEY (for search)
-  - OPENWEATHER_API_KEY (for weather)
-  - ALPHA_VANTAGE_API_KEY (for stocks)
-  - LANGSMITH_API_KEY (optional, for tracing)
+- MySQL 5.7+ or 8.0+
+- An API key for a model provider (or a local model server)
+- Optional: API keys for the tools you want (search, weather, stocks, images)
 
 ## Quick Start
 
-### Step 1: Database Setup
+### 1. Configure
 
-1. Make sure MySQL is installed and running
-2. Copy and configure environment variables:
 ```bash
 cd backend
 cp .env.example .env
 ```
 
-3. Edit `.env` with your MySQL credentials:
+Edit `backend/.env`. At minimum, set your model and MySQL settings:
+
 ```env
+LLM_PROVIDER=openai          # or anthropic
+LLM_API_KEY=your_key
+LLM_BASE_URL=                # leave empty for OpenAI / Anthropic themselves
+LLM_MODEL=your_model_name
+
 MYSQL_HOST=localhost
 MYSQL_PORT=3306
 MYSQL_USER=root
@@ -116,192 +115,162 @@ MYSQL_PASSWORD=your_password
 MYSQL_DATABASE=chatbot_db
 ```
 
-4. Initialize the database:
+The database and tables are created automatically on first start. If something is wrong (MySQL not running, wrong password, missing model settings), the backend stops with a message saying what to fix.
+
+### 2. Install
+
 ```bash
-python -m database.init_db
+# Backend (from the repo root)
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -r backend/requirements.txt
+
+# Frontend
+cd frontend && npm install
 ```
 
-See [database/README.md](database/README.md) for detailed database setup instructions.
+### 3. Start
 
-### Step 2: Start Application
+**Start scripts:** `./start.sh` (Linux/macOS) or `start.bat` (Windows). They start the backend on port 8000 and the frontend on port 3000, using `.venv` if present.
 
-**Option 1: Use Start Script**
-
-- **Windows:** double-click `start.bat` (or run `start.bat` from a terminal).
-- **Linux / macOS:** run `./start.sh`. Make it executable first with `chmod +x start.sh` if needed.
-
-These scripts start both the backend (port 8000) and the frontend (port 3000) automatically. The backend uses the project's `.venv` if present; the frontend installs dependencies via `npm install` on first run.
-
-**Option 2: Manual Start**
-
-**1. Start Backend:**
+**Or manually:**
 ```bash
-cd backend
-python main.py
+cd backend && python main.py       # API on http://127.0.0.1:8000
+cd frontend && npm run dev         # UI on http://localhost:3000
 ```
 
-**2. Start Frontend:**
-```bash
-cd frontend
-npm install  # First time only
-npm run dev
-```
+Open **http://localhost:3000**. API docs are at http://127.0.0.1:8000/docs.
 
-**Access the application:**
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- API Documentation: http://localhost:8000/docs
+## Choosing a model
+
+OpenGPT speaks two APIs. Set the one your model's endpoint supports:
+
+| Your endpoint speaks | `LLM_PROVIDER` | `LLM_BASE_URL` |
+|---|---|---|
+| The OpenAI API (OpenAI itself) | `openai` | *(empty)* |
+| An OpenAI-compatible API | `openai` | the server's URL (usually ending in `/v1`) |
+| The Anthropic API (Anthropic itself) | `anthropic` | *(empty)* |
+| An Anthropic-compatible API | `anthropic` | the server's URL |
+
+Then set `LLM_API_KEY` and `LLM_MODEL` (the model name your endpoint uses).
+
+- A self-hosted server may need no `LLM_API_KEY`; `LLM_BASE_URL` is enough.
+- Use a model that supports **tool calling**: chat tools, deep research and the blog writer depend on it.
+- Optional per-task models, each defaulting to `LLM_MODEL`: `LLM_SMALL_MODEL` (titles, summaries), `BLOG_MODEL`, `RESEARCH_MODEL`. `LLM_MAX_TOKENS` sets the output limit (default 8192).
 
 ## Configuration
 
-Edit your `.env` file with the required API keys:
+All settings live in `backend/.env`. [`backend/.env.example`](backend/.env.example) lists every option with comments. The main groups:
 
-```env
-# OpenAI API Configuration
-OPENAI_API_KEY=your_openai_api_key
+| Group | Settings |
+|---|---|
+| Model | `LLM_PROVIDER`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, optional per-task models |
+| Tools | `PARALLEL_API_KEY` / `BRAVE_API_KEY` (search), `WEATHER_API_KEY`, `STOCK_API_KEY`, `GOOGLE_API_KEY` (blog images), `TAVILY_API_KEY` |
+| Database | `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE` |
+| Server | `HOST` (default `127.0.0.1`), `PORT`, `RELOAD`, `CORS_ORIGINS`, `ENABLE_DOCS`, `LOG_LEVEL` |
+| Security | `API_TOKEN` (required when `HOST` is not local; set `VITE_API_TOKEN` in `frontend/.env.local` to match) |
+| Limits | `RATE_LIMIT_PER_MINUTE`, `MAX_MESSAGE_CHARS`, `MAX_UPLOAD_MB`, `MAX_BLOG_SECTIONS`, `MAX_CHECKPOINTS_PER_THREAD`, ... |
+| Tracing | `LANGSMITH_TRACING` (off by default), `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT` |
 
-# Tool API Keys
-BRAVE_API_KEY=your_brave_api_key
-OPENWEATHER_API_KEY=your_openweather_api_key
-ALPHA_VANTAGE_API_KEY=your_alpha_vantage_api_key
-
-# MySQL Database
-MYSQL_HOST=localhost
-MYSQL_PORT=3306
-MYSQL_USER=root
-MYSQL_PASSWORD=your_mysql_password
-MYSQL_DATABASE=chatbot_db
-
-# Optional: LangSmith tracing
-LANGCHAIN_TRACING_V2=false
-LANGCHAIN_API_KEY=your_langsmith_key
-```
+Tools without a key are simply unavailable. For example, without `GOOGLE_API_KEY` blogs show image captions instead of images.
 
 ## Project Structure
 
 ```
 .
-├── backend/                 # FastAPI application
-│   ├── app/                 # Application package
-│   │   ├── main.py          # FastAPI app initialization
-│   │   ├── router/          # API route handlers
-│   │   │   └── chat.py      # Chat, threads, RAG endpoints
-│   │   ├── schema/          # Pydantic models
-│   │   │   └── models.py    # Request/response schemas
-│   │   ├── services/        # Business logic
-│   │   │   ├── chatbot.py   # OpenGPT chatbot graph
-│   │   │   ├── chat.py      # Chat operations
-│   │   │   ├── rag.py       # RAG/document processing
-│   │   │   └── thread.py    # Thread management
-│   │   ├── database/        # Database configuration
-│   │   │   ├── init_db.py   # Database initialization
-│   │   │   ├── config.py    # Database config
-│   │   │   └── mysql_checkpoint.py # Custom MySQL checkpointer
-│   │   └── tools/           # External API tools
-│   │       └── (search, weather, calc, stocks, blogs)
-│   ├── main.py              # Backend entry point
-│   └── requirements.txt     # Python dependencies
-├── frontend/                # React frontend
+├── backend/
+│   ├── main.py                    # Entry point (python main.py)
+│   ├── app/
+│   │   ├── __init__.py            # App factory: CORS, routers, startup checks
+│   │   ├── llm.py                 # Model provider settings (OpenAI/Anthropic-compatible)
+│   │   ├── security.py            # Optional API token, network exposure check
+│   │   ├── rate_limit.py          # Per-client rate limiting
+│   │   ├── error_handlers.py      # Error responses (generic messages + ref codes)
+│   │   ├── router/                # HTTP routes (chat, threads, documents, health)
+│   │   ├── schema/models.py       # Request/response models
+│   │   ├── services/
+│   │   │   ├── chatbot.py         # LangGraph chat graph and thread metadata
+│   │   │   ├── chat.py            # Chat, blog and deep-research turns
+│   │   │   ├── rag.py             # Document upload and retrieval
+│   │   │   ├── citations.py       # Search citations -> links
+│   │   │   ├── run_lock.py        # One reply at a time per thread
+│   │   │   └── thread.py          # Thread ids and titles
+│   │   ├── database/              # MySQL config, models, checkpoint saver
+│   │   ├── tools/                 # Search, weather, stocks, calculator,
+│   │   │                          # blogs/ and deep_research/
+│   │   └── storage/               # Uploaded documents, blogs, images (git-ignored)
+│   ├── scripts/                   # One-off maintenance scripts
+│   ├── evals/                     # LangSmith evaluations
+│   └── tests/
+├── frontend/
 │   ├── src/
-│   │   ├── components/      # React components
-│   │   ├── hooks/           # Custom hooks
-│   │   ├── services/        # API client
-│   │   └── App.jsx          # Main app
-│   ├── package.json
-│   └── vite.config.js
-├── start.bat               # Windows startup script
-└── start.sh                # Linux/Mac startup script
+│   │   ├── components/            # Chat UI
+│   │   ├── hooks/                 # useChat, useThreads
+│   │   ├── services/api.js        # API client
+│   │   └── App.jsx
+│   └── vite.config.js             # Dev server; proxies /api to the backend
+├── start.sh / start.bat           # Start backend + frontend
+└── README.md
 ```
 
 ## API Endpoints
 
+All routes are under `/api`. When `API_TOKEN` is set, send `Authorization: Bearer <token>`.
+
 ### Chat
-- `POST /api/chat` - Send a message and get response
-- `POST /api/chat/stream` - Stream response using Server-Sent Events
+- `POST /api/chat/stream`: stream a reply (Server-Sent Events). Body: `message`, `thread_id`, `tools`, `temporary`, `session_id`
+- `POST /api/chat`: send a message, get the full reply
+- `POST /api/chat/edit`: edit an earlier message and stream the new reply
+- `POST /api/chat/regenerate`: regenerate the last reply
+- `POST /api/chat/temp/{session_id}/end`: forget a temporary chat
 
 ### Threads
-- `GET /api/threads` - Get all conversation threads
-- `POST /api/threads/new` - Create a new thread
-- `GET /api/threads/{id}` - Get messages from a thread
-- `PUT /api/threads/{id}/title` - Update thread title
+- `GET /api/threads`: list threads
+- `POST /api/threads/new`: create a thread
+- `GET /api/threads/{id}`: thread messages
+- `PUT /api/threads/{id}/title`: rename
+- `PUT /api/threads/{id}/reports/{n}`: save an edited deep research report
+- `DELETE /api/threads/{id}`: delete a thread with its documents
 
-### RAG/Documents
-- `POST /api/upload-pdf` - Upload a PDF document
-- `POST /api/query-document` - Query the uploaded document
-- `GET /api/threads/{id}/document` - Get document information
+### Documents
+- `POST /api/upload-pdf`: attach a PDF, Markdown or text file to a thread
+- `POST /api/query-document`: ask a question about a thread's documents
+- `GET /api/threads/{id}/document`: a thread's documents
 
-## Features in Detail
-
-### Chat Interface
-- **Real-time Messaging**: Instant message delivery with loading states
-- **Markdown Support**: Rich text formatting in responses
-- **Code Highlighting**: Syntax highlighting for code blocks
-- **Auto-scroll**: Automatically scrolls to latest messages
-
-### Thread Management
-- **Multiple Conversations**: Create and manage multiple chat threads
-- **Thread Titles**: Auto-generated or custom thread titles
-- **Conversation History**: All messages persisted in SQLite
-- **Quick Switching**: Easy navigation between threads
-
-### RAG (Document Q&A)
-- **PDF Upload**: Drag & drop or click to upload PDF files
-- **Document Chunking**: Automatic text splitting for better retrieval
-- **Vector Search**: FAISS-based similarity search
-- **Context-Aware**: Answers based on uploaded documents
-
-### Tool Integration
-- **Web Search**: Brave Search API for real-time information
-- **Weather**: Current weather data from OpenWeather API
-- **Calculator**: Built-in math expression evaluation
-- **Stock Prices**: Real-time stock data from Alpha Vantage
+### Other
+- `GET /api/health`: health check
+- `GET /api/blog-images/{file}`: images generated for blogs
 
 ## Development
 
-### Backend Development
 ```bash
-cd backend
+# Backend tests
+cd backend && python -m unittest discover -s tests
 
-# Install dependencies
-pip install -r requirements.txt
-
-# Run in development mode
-python main.py
-
-# API docs available at http://localhost:8000/docs
+# Frontend production build
+cd frontend && npm run build
 ```
 
-### Frontend Development
+Set `RELOAD=true` in `backend/.env` to auto-reload the backend on code changes.
+
+### Upgrading an existing database
+
+Chat history used to be stored with Python `pickle`. The app no longer loads pickled data, for security. Convert old data once:
+
 ```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Start dev server with hot reload
-npm run dev
-
-# Build for production
-npm run build
+cd backend && python -m scripts.migrate_checkpoints
 ```
+
+The backend logs a reminder at startup if old data is still present.
 
 ## Troubleshooting
 
-### Backend Issues
-- **Import Errors**: Ensure all dependencies are installed with `pip install -r requirements.txt`
-- **API Key Errors**: Check `.env` file has all required API keys
-- **Database Errors**: Delete `chatbot.db` and restart to reset database
-
-### Frontend Issues
-- **CORS Errors**: Backend must allow `http://localhost:3000` origin
-- **Connection Refused**: Ensure backend is running on port 8000
-- **Build Errors**: Delete `node_modules` and run `npm install` again
-
-### Common Solutions
-1. Check that all API keys are valid in `.env`
-2. Ensure ports 3000 and 8000 are not in use
-3. Verify Python 3.8+ and Node.js 18+ are installed
-4. Check firewall settings if connection issues persist
+- **Backend exits at startup with "Startup failed: ..."**: the message names the problem. Usually MySQL isn't running, the `MYSQL_*` settings are wrong, or `LLM_API_KEY` / `LLM_MODEL` are missing.
+- **Model errors (401/404)**: check `LLM_API_KEY`, `LLM_MODEL` and, for non-OpenAI hosts, `LLM_BASE_URL`. Also check that `LLM_PROVIDER` matches the API your provider speaks.
+- **Tools never used / tool errors**: choose a model that supports tool calling.
+- **"Too many requests"**: raise `RATE_LIMIT_PER_MINUTE` (or set it to 0) for local use.
+- **Frontend can't reach the backend**: make sure the backend is running on port 8000. If you set `API_TOKEN`, set the same value as `VITE_API_TOKEN` in `frontend/.env.local`.
+- **First document upload is slow**: the embedding model loads on first use (a few seconds, once).
 
 ## Contributing
 
@@ -323,7 +292,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Acknowledgments
 
 - LangGraph team for the agentic framework
-- Groq for fast LLM inference
+- Every provider that offers an OpenAI- or Anthropic-compatible API
 - FastAPI for the modern Python web framework
 - React and Vite for the frontend tooling
 

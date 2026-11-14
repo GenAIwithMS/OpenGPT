@@ -29,7 +29,7 @@ from app.error_handlers import log_error, public_error
 from app.rate_limit import rate_limit
 from app.services.run_lock import exclusive_run
 from app.services.chatbot import touch_temp_session, end_temp_session, get_thread_title_from_db
-from langchain_groq import ChatGroq
+from app.llm import chat_model, split_content
 from langsmith import tracing_context
 from dotenv import load_dotenv
 
@@ -293,6 +293,9 @@ def create_new_thread():
 def update_thread_title(thread_id: str, request: UpdateTitleRequest):
     try:
         thread_id = _require_thread_id(thread_id)
+        # Renaming must not create a thread that doesn't exist.
+        if get_thread_title_from_db(thread_id) is None:
+            raise NotFoundError("Thread not found")
         success = ChatService.update_thread_title(thread_id, request.title)
 
         if not success:
@@ -366,6 +369,8 @@ def upload_pdf(
 def delete_thread(thread_id: str):
     try:
         thread_id = _require_thread_id(thread_id)
+        if get_thread_title_from_db(thread_id) is None:
+            raise NotFoundError("Thread not found")
         success = ChatService.delete_thread(thread_id)
 
         if not success:
@@ -399,8 +404,7 @@ def query_document(request: DocumentQueryRequest):
 
         context_text = "\n\n".join(retrieval_result["context"])
 
-        api = os.getenv("GROQ_API_KEY")
-        llm = ChatGroq(model="openai/gpt-oss-120b", openai_api_key=api)
+        llm = chat_model()
         prompt = f"""Based on the following context from a document, answer the question.
 
 Context:
@@ -413,7 +417,7 @@ Provide a clear and concise answer based only on the information in the context.
 Answer:"""
 
         response = llm.invoke(prompt)
-        answer = response.content
+        answer, _ = split_content(response)
 
         return DocumentQueryResponse(
             answer=answer,

@@ -1,4 +1,5 @@
 import logging
+import functools
 import json
 import uuid
 import os
@@ -6,23 +7,34 @@ import threading
 import weakref
 from collections import OrderedDict
 from typing import Dict, Any, Optional, Tuple
-from langchain_community.document_loaders import PyPDFLoader, TextLoader
-from langchain_community.vectorstores import FAISS
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
 from langsmith import traceable
+
+# The document libraries (loaders, text splitter, FAISS, embeddings) pull in
+# PyTorch and take tens of seconds to import, so they are imported inside the
+# functions that use them. The server starts fast; the first document upload
+# or question pays the cost once.
 
 logger = logging.getLogger(__name__)
 
 # Document types supported for upload (RAG context).
 SUPPORTED_EXTENSIONS = (".pdf", ".md", ".txt")
 
-# Initialize HuggingFace embeddings
-try:
-    _DEFAULT_EMBEDDINGS = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-except Exception as e:
-    logger.warning(f"⚠ HuggingFaceEmbeddings initialization failed: {e}")
-    _DEFAULT_EMBEDDINGS = None
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+
+
+@functools.lru_cache(maxsize=1)
+def _default_embeddings():
+    """The local embedding model, loaded on first use.
+
+    Loading it takes several seconds, so it isn't done at import time: the
+    server starts quickly and only pays the cost when a document is used.
+    """
+    try:
+        from langchain_huggingface import HuggingFaceEmbeddings
+        return HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+    except Exception as e:
+        logger.warning(f"HuggingFaceEmbeddings initialization failed: {e}")
+        return None
 
 
 class _LRUCache(OrderedDict):
@@ -152,6 +164,8 @@ def _existing_files(metadata: Optional[dict]) -> list:
 
 def _load_document(doc_path: str, ext: str):
     """Load a document into LangChain Documents based on its extension."""
+    from langchain_community.document_loaders import PyPDFLoader, TextLoader
+
     if ext == ".pdf":
         loader = PyPDFLoader(doc_path)
     else:
@@ -165,12 +179,19 @@ def _chunk_file(doc_path: str, ext: str, filename: str) -> Tuple[list, int]:
     docs = _load_document(doc_path, ext)
     for doc in docs:
         doc.metadata["filename"] = filename
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
         chunk_overlap=200,
         separators=["\n\n", "\n", " ", ""]
     )
     return splitter.split_documents(docs), len(docs)
+
+
+def _faiss():
+    from langchain_community.vectorstores import FAISS
+    return FAISS
 
 
 def _retriever_for(vector_store):
@@ -190,7 +211,7 @@ def _get_retriever(thread_id: Optional[str]):
     if not files:
         logger.debug(f"Retriever not found for thread {thread_id}")
         return None
-    if _DEFAULT_EMBEDDINGS is None:
+    if _default_embeddings() is None:
         logger.warning("Embeddings not available to rebuild retriever")
         return None
     try:
@@ -198,7 +219,7 @@ def _get_retriever(thread_id: Optional[str]):
         for entry in files:
             file_chunks, _ = _chunk_file(_stored_path(entry["stored_name"]), entry["ext"], entry.get("filename"))
             chunks.extend(file_chunks)
-        retriever = _retriever_for(FAISS.from_documents(chunks, _DEFAULT_EMBEDDINGS))
+        retriever = _retriever_for(_faiss().from_documents(chunks, _default_embeddings()))
         _THREAD_RETRIEVERS[thread_key] = retriever
         return retriever
     except Exception as exc:
@@ -216,7 +237,7 @@ def ingest_document(file_bytes: bytes, thread_id: str, filename: Optional[str] =
     Returns a summary of this upload for the UI.
     """
     if embeddings is None:
-        embeddings = _DEFAULT_EMBEDDINGS
+        embeddings = _default_embeddings()
 
     if embeddings is None:
         raise ValueError(
@@ -241,7 +262,7 @@ def ingest_document(file_bytes: bytes, thread_id: str, filename: Optional[str] =
             if retriever is not None:
                 retriever.vectorstore.add_documents(chunks)
             else:
-                retriever = _retriever_for(FAISS.from_documents(chunks, embeddings))
+                retriever = _retriever_for(_faiss().from_documents(chunks, embeddings))
         except Exception:
             os.remove(doc_path)  # don't leave a file the index doesn't know about
             raise
@@ -263,10 +284,6 @@ def ingest_document(file_bytes: bytes, thread_id: str, filename: Optional[str] =
         "documents": docs_count,
         "chunks": len(chunks),
     }
-
-
-# Backwards-compatible alias for the old PDF-only API.
-ingest_pdf = ingest_document
 
 
 @traceable(name="rag.retrieve_from_document")

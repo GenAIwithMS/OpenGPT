@@ -1,26 +1,34 @@
-langchain-core
-langchain
-python-dotenv
-langchain-groq
-langgraph
-ddgs
-aiohttp
-langchain_community
-newsdataapi
-langchain-openai
-langchain-huggingface
-langchain_unstructured
-sentence-transformers
-faiss-cpu
+# Web server
 fastapi
 uvicorn[standard]
-langsmith
 python-multipart
 pydantic
-requests
+python-dotenv
+
+# LangChain / LangGraph
+langchain
+langchain-core
+langgraph
+langsmith
+
+# Model providers: any OpenAI- or Anthropic-compatible endpoint (see app/llm.py)
+langchain-openai
+langchain-anthropic
+
+# Documents (RAG): loaders, embeddings and vector store
+langchain_community
+langchain-huggingface
+sentence-transformers
+faiss-cpu
 pypdf
+
+# Database
 sqlalchemy
 pymysql
-tavily-python
+
+# Tools: web search, deep research, blog images
+requests
 parallel-web
+tavily-python
+ddgs
 google-genai

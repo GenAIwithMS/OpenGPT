@@ -17,6 +17,7 @@ from app.services.thread import generate_thread_id, generate_id_name
 from app.services.rag import has_document
 from app.services.citations import extract_sources, link_citations, renumber_sources
 from app.error_handlers import log_error, public_error
+from app.llm import split_content
 
 logger = logging.getLogger(__name__)
 
@@ -220,62 +221,61 @@ class ChatService:
                 touch_thread(thread_id)
                 return {"response": blog, "thread_id": thread_id, "tool_used": "blogs"}
 
-            # Chatbot path: drop the trailing assistant turn, then re-run
+            # Chatbot path: drop the whole last answer, including its tool calls
+            # and results, so tools (e.g. Search) run again for the new answer.
             current = chatbot.get_state(config)
             messages = list(current.values["messages"]) if current and current.values else []
 
-            last_ai_idx = None
-            for i in reversed(range(len(messages))):
-                if isinstance(messages[i], AIMessage):
-                    last_ai_idx = i
-                    break
-
-            if last_ai_idx is None:
+            last_human = next(
+                (i for i in range(len(messages) - 1, -1, -1) if isinstance(messages[i], HumanMessage)),
+                None,
+            )
+            if last_human is None or last_human == len(messages) - 1:
                 raise Exception("No AI response found to regenerate")
 
-            # Remove the assistant turn (and any tool results that follow it)
-            removals = [
-                RemoveMessage(id=m.id)
-                for m in messages[last_ai_idx:]
-                if getattr(m, "id", None)
-            ]
-            if removals:
-                chatbot.update_state(current.config, {"messages": removals})
-
-            doc_exists = has_document(thread_id)
+            removals = [RemoveMessage(id=m.id) for m in messages[last_human + 1:] if getattr(m, "id", None)]
+            chatbot.update_state(current.config, {"messages": removals})
 
             final_state = chatbot.invoke(
                 {
                     "messages": [],
-                    "has_document": doc_exists,
+                    "has_document": has_document(thread_id),
                     "thread_id": thread_id,
                 },
                 config=config,
             )
-
-            out_messages = final_state["messages"]
             touch_thread(thread_id)
 
-            ai_response = None
-            has_tool_calls = False
-            for msg in reversed(out_messages):
-                if isinstance(msg, ToolMessage):
-                    has_tool_calls = True
-                if isinstance(msg, AIMessage) and not ai_response:
-                    ai_response = msg.content
-                    break
+            # The new turn: everything after the prompt
+            out = list(final_state["messages"])
+            prompt_at = max(i for i, m in enumerate(out) if isinstance(m, HumanMessage))
+            turn = out[prompt_at + 1:]
+            tool_outputs = [m.content for m in turn if isinstance(m, ToolMessage) and isinstance(m.content, str)]
+            final_ai = next((m for m in reversed(turn) if isinstance(m, AIMessage)), None)
+            answer = split_content(final_ai)[0] if final_ai else ""
+
+            # Turn citation markers into links, as the streaming path does, and
+            # save that version.
+            sources = {}
+            for output in renumber_sources(tool_outputs):
+                sources.update(extract_sources(output))
+            linked = link_citations(answer, sources)
+            if final_ai is not None and linked != answer:
+                chatbot.update_state(
+                    config, {"messages": [AIMessage(id=final_ai.id, content=linked)]}, as_node="chat_node"
+                )
 
             return {
-                "response": ai_response or "No response generated",
+                "response": linked or "No response generated",
                 "thread_id": thread_id,
-                "has_tool_calls": has_tool_calls,
+                "has_tool_calls": bool(tool_outputs),
             }
         except Exception as e:
             logger.warning(f"Error regenerating message: {e}")
             raise Exception(f"Failed to regenerate message: {str(e)}")
 
     @staticmethod
-    def _stream_chatbot(graph, config, doc_exists: bool, human_message, temporary: bool = False):
+    def _stream_chatbot(graph, config, doc_exists: bool, human_message, temporary: bool = False, tools=None):
         """Yield live-thinking/ai chunks while running the chatbot graph.
 
         When ``human_message`` is provided it is sent as a new turn; when it is
@@ -293,9 +293,8 @@ class ChatService:
             [HumanMessage(content=human_message)] if human_message is not None else []
         )
 
-        # Streamed text can arrive either in ``content`` (the final answer) or,
-        # for reasoning models like gpt-oss, in ``additional_kwargs.reasoning_content``
-        # (the chain-of-thought). Keep the answer in the response bubble and the
+        # Streamed text holds the final answer and, for reasoning models, the
+        # chain-of-thought (see app.llm.split_content). Keep the answer in the response bubble and the
         # reasoning in the thinking bar so the saved response stays clean.
         answer_parts = []
         reasoning_parts = []
@@ -309,6 +308,7 @@ class ChatService:
                 "messages": input_messages,
                 "has_document": doc_exists,
                 "thread_id": config["configurable"]["thread_id"],
+                "tools": list(tools or []),
             },
             config=config,
             stream_mode="messages",
@@ -398,10 +398,10 @@ class ChatService:
                             "message_type": "thinking",
                         }
 
-                content = message_chunk.content
-                reasoning = message_chunk.additional_kwargs.get("reasoning_content", "")
-                # The actual answer arrives in ``content`` -> response bubble.
-                if isinstance(content, str) and content:
+                # Answer text vs. reasoning; providers format these differently.
+                content, reasoning = split_content(message_chunk)
+                # The actual answer -> response bubble.
+                if content:
                     answer_parts.append(content)
                     yield {"content": content, "message_type": "ai"}
                 # The model's chain-of-thought arrives in ``reasoning_content``
@@ -526,7 +526,6 @@ class ChatService:
         ][-DEEP_RESEARCH_HISTORY_MESSAGES:]
 
         deep_input = {"messages": history + [HumanMessage(content=message)]}
-        # Same run limits as the DeepResearch chatbot tool
         deep_config = {
             "configurable": {
                 "allow_clarification": False,
@@ -627,7 +626,7 @@ class ChatService:
             doc_exists = False if temporary else has_document(thread_id)
 
             # Stream tokens from the chatbot graph (live thinking + AI output)
-            yield from ChatService._stream_chatbot(graph, config, doc_exists, message, temporary)
+            yield from ChatService._stream_chatbot(graph, config, doc_exists, message, temporary, tools)
         except Exception as e:
             logger.warning(f"Error streaming message: {e}")
             raise Exception(f"Failed to stream message: {str(e)}")
@@ -685,7 +684,7 @@ class ChatService:
                 touch_thread(thread_id)
                 return
 
-            yield from ChatService._stream_chatbot(chatbot, config, doc_exists, None)
+            yield from ChatService._stream_chatbot(chatbot, config, doc_exists, None, tools=tools)
             touch_thread(thread_id)
         except Exception as e:
             logger.warning(f"Error editing message: {e}")
@@ -731,7 +730,7 @@ class ChatService:
     @staticmethod
     def delete_thread(thread_id: str) -> bool:
         """Delete a thread and all its associated data"""
-        from app.database import DatabaseConfig, ThreadMetadata, DocumentMetadata
+        from app.database import DatabaseConfig, ThreadMetadata
         from app.services.chatbot import check_pointer
         from app.services.rag import delete_documents
         
@@ -741,9 +740,6 @@ class ChatService:
             
             # Delete checkpoints and checkpoint writes
             check_pointer.delete_thread(thread_id)
-            
-            # Delete document metadata (this should cascade from thread_metadata but let's be explicit)
-            session.query(DocumentMetadata).filter_by(thread_id=thread_id).delete()
             
             # Delete thread metadata
             session.query(ThreadMetadata).filter_by(thread_id=thread_id).delete()

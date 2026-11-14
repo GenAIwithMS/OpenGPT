@@ -4,7 +4,7 @@ from typing import List, Optional, TypedDict
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from .llm import llm
-from .schemas import EvidenceItem, EvidencePack
+from .schemas import EvidencePack
 
 
 def _tavily_search(query: str, max_results: int = 5) -> List[dict]:

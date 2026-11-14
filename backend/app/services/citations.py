@@ -1,6 +1,6 @@
 """Turn the model's ``【n†source】`` citation markers into markdown links.
 
-gpt-oss cites search results with opaque markers such as ``【1†source】`` or
+Some models cite search results with opaque markers such as ``【1†source】`` or
 ``【Source 2†https://...】``. The chat UI cannot render those, so once an answer
 is complete the markers are resolved against the search results the model saw
 and rewritten as ``[Site](url "Page title (YYYY-MM-DD)")``. The link *title*
@@ -77,15 +77,39 @@ def _link(source: dict) -> str:
     return f"[{label}]({url} \"{title}\")"
 
 
+_FENCE_RE = re.compile(r"^\s*(```|~~~)")
+
+
+def _code_lines(lines):
+    """Indexes of lines inside fenced code blocks (``` or ~~~), fences included."""
+    inside, fence, result = False, "", set()
+    for i, line in enumerate(lines):
+        match = _FENCE_RE.match(line)
+        if match and (not inside or match.group(1) == fence):
+            inside, fence = not inside, match.group(1)
+            result.add(i)
+        elif inside:
+            result.add(i)
+    return result
+
+
 def _table_rows(lines):
-    """Indexes of lines that belong to a GFM table (header, delimiter, body)."""
+    """Indexes of lines that belong to a GFM table (header, delimiter, body).
+
+    Lines inside fenced code blocks are never table rows, so code containing
+    "|" (shell pipes, ASCII tables) keeps its URLs.
+    """
+    code = _code_lines(lines)
     rows = set()
     i = 0
     while i < len(lines):
-        if _TABLE_DELIM_RE.match(lines[i]) and i > 0 and "|" in lines[i - 1]:
+        if i in code:
+            i += 1
+            continue
+        if _TABLE_DELIM_RE.match(lines[i]) and i > 0 and "|" in lines[i - 1] and i - 1 not in code:
             rows.update({i - 1, i})
             j = i + 1
-            while j < len(lines) and lines[j].strip() and "|" in lines[j]:
+            while j < len(lines) and j not in code and lines[j].strip() and "|" in lines[j]:
                 rows.add(j)
                 j += 1
             i = j

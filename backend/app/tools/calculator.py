@@ -11,11 +11,25 @@ _OPS = {
     "**": operator.pow,
 }
 
+# Models often name the operation instead of using the symbol.
+_ALIASES = {
+    "add": "+", "plus": "+", "sum": "+", "addition": "+",
+    "subtract": "-", "minus": "-", "sub": "-", "subtraction": "-",
+    "multiply": "*", "times": "*", "mul": "*", "x": "*", "×": "*", "multiplication": "*",
+    "divide": "/", "div": "/", "÷": "/", "division": "/",
+    "mod": "%", "modulo": "%", "remainder": "%",
+    "pow": "**", "power": "**", "^": "**", "exponent": "**",
+}
+
 
 @tool
-def Calculator(first_num, second_num, evaluator):
-    """Performe basic arthematic opration between two numbers"""
-    op = _OPS.get(str(evaluator).strip())
+def Calculator(first_num: float, second_num: float, evaluator: str):
+    """Do one arithmetic operation on two numbers.
+
+    evaluator is the operator: "+", "-", "*", "/", "%" (remainder) or "**" (power).
+    """
+    symbol = str(evaluator).strip().lower()
+    op = _OPS.get(_ALIASES.get(symbol, symbol))
     if op is None:
         raise ValueError(f"Unsupported operator: {evaluator!r}")
     try:

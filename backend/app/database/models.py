@@ -1,8 +1,7 @@
 """
 SQLAlchemy ORM Models for Chatbot Database
 """
-from datetime import datetime
-from sqlalchemy import Column, String, Integer, TIMESTAMP, Text, LargeBinary, ForeignKeyConstraint, Index
+from sqlalchemy import Column, String, Integer, TIMESTAMP, LargeBinary, Index
 from sqlalchemy.dialects.mysql import LONGBLOB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
@@ -26,27 +25,6 @@ class ThreadMetadata(Base):
     __table_args__ = (
         Index("idx_created_at", "created_at"),
         Index("idx_updated_at", "updated_at"),
-    )
-
-
-class DocumentMetadata(Base):
-    """Document metadata table - stores uploaded document information"""
-    __tablename__ = "document_metadata"
-    
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    thread_id = Column(String(191), nullable=False)
-    filename = Column(String(500), nullable=False)
-    documents_count = Column(Integer, nullable=False, default=0)
-    chunks_count = Column(Integer, nullable=False, default=0)
-    uploaded_at = Column(TIMESTAMP, default=func.current_timestamp())
-    
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ["thread_id"],
-            ["thread_metadata.thread_id"],
-            ondelete="CASCADE"
-        ),
-        Index("idx_thread_id", "thread_id"),
     )
 
 

@@ -3,25 +3,17 @@
 import asyncio
 import logging
 import os
-import warnings
-from datetime import datetime, timedelta, timezone
-from typing import Annotated, Any, List, Literal, Optional
+from datetime import datetime
+from typing import Annotated, List, Literal
 
-import aiohttp
-from langchain.chat_models import init_chat_model
+from app.llm import chat_model, model_name, structured
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import (
-    AIMessage,
     HumanMessage,
-    MessageLikeRepresentation,
-    filter_messages,
 )
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import (
-    BaseTool,
     InjectedToolArg,
-    StructuredTool,
-    ToolException,
     tool,
 )
 from tavily import AsyncTavilyClient
@@ -60,14 +52,14 @@ async def tavily_search(
 
     configurable = Configuration.from_runnable_config(config)
     max_char_to_include = configurable.max_content_length
-    model_api_key = get_api_key_for_model(configurable.summarization_model, config)
-    summarization_model = init_chat_model(
-        model=configurable.summarization_model,
-        max_tokens=configurable.summarization_model_max_tokens,
-        api_key=model_api_key,
-        tags=["langsmith:nostream"]
-    ).with_structured_output(Summary).with_retry(
-        stop_after_attempt=configurable.max_structured_output_retries
+    summarization_model = structured(
+        chat_model(
+            configurable.summarization_model or model_name("small_model"),
+            max_tokens=configurable.summarization_model_max_tokens,
+            tags=["langsmith:nostream"],
+        ),
+        Summary,
+        stop_after_attempt=configurable.max_structured_output_retries,
     )
 
     async def noop():
@@ -189,63 +181,9 @@ def think_tool(reflection: str) -> str:
     return f"Reflection recorded: {reflection}"
 
 
-def anthropic_websearch_called(response):
-    """Detect if Anthropic's native web search was used in the response."""
-    try:
-        usage = response.response_metadata.get("usage")
-        if not usage:
-            return False
-        server_tool_use = usage.get("server_tool_use")
-        if not server_tool_use:
-            return False
-        web_search_requests = server_tool_use.get("web_search_requests")
-        if web_search_requests is None:
-            return False
-        return web_search_requests > 0
-    except (AttributeError, TypeError):
-        return False
-
-
-def openai_websearch_called(response):
-    """Detect if OpenAI's web search functionality was used in the response."""
-    tool_outputs = response.additional_kwargs.get("tool_outputs")
-    if not tool_outputs:
-        return False
-    for tool_output in tool_outputs:
-        if tool_output.get("type") == "web_search_call":
-            return True
-    return False
-
-
 ################################################################################
 # Token-limit helpers
 ################################################################################
-
-def is_token_limit_exceeded(exception: Exception, model_name: str = None) -> bool:
-    """Determine if an exception indicates a token/context limit was exceeded."""
-    error_str = str(exception).lower()
-    provider = None
-    if model_name:
-        model_str = str(model_name).lower()
-        if model_str.startswith('openai:'):
-            provider = 'openai'
-        elif model_str.startswith('anthropic:'):
-            provider = 'anthropic'
-        elif model_str.startswith('gemini:') or model_str.startswith('google:'):
-            provider = 'gemini'
-
-    if provider == 'openai':
-        return _check_openai_token_limit(exception, error_str)
-    elif provider == 'anthropic':
-        return _check_anthropic_token_limit(exception, error_str)
-    elif provider == 'gemini':
-        return _check_gemini_token_limit(exception, error_str)
-
-    return (
-        _check_openai_token_limit(exception, error_str) or
-        _check_anthropic_token_limit(exception, error_str) or
-        _check_gemini_token_limit(exception, error_str)
-    )
 
 
 def _check_openai_token_limit(exception, error_str):
@@ -267,34 +205,6 @@ def _check_gemini_token_limit(exception, error_str):
     if "rate_limit_error" in type(exception).__name__:
         return "token" in error_str or "tpm" in error_str
     return "maximum context length" in error_str
-
-
-################################################################################
-# Model / token-limit look-up table
-################################################################################
-
-MODEL_TOKEN_LIMITS = {
-    "gpt-4.1": 1000000,
-    "gpt-4.1-mini": 1000000,
-    "gpt-4o": 128000,
-    "gpt-4o-mini": 128000,
-    "claude-sonnet-4": 200000,
-    "claude-sonnet-4-20250514": 200000,
-    "claude-3.5-sonnet": 200000,
-    "claude-3.5-sonnet-20241022": 200000,
-    "claude-3-haiku": 200000,
-    "gemini-2.5-pro": 1000000,
-    "gemini-2.0-flash": 1000000,
-    "gpt-oss-120b": 128000,
-}
-
-
-def get_model_token_limit(model_string):
-    """Look up the token limit for a specific model."""
-    for model_key, token_limit in MODEL_TOKEN_LIMITS.items():
-        if model_key in model_string:
-            return token_limit
-    return None
 
 
 ################################################################################
@@ -371,11 +281,6 @@ async def get_all_tools(config: RunnableConfig):
     return tools
 
 
-def get_notes_from_tool_calls(messages: list[MessageLikeRepresentation]):
-    """Extract notes from tool call messages."""
-    return [tool_msg.content for tool_msg in filter_messages(messages, include_types="tool")]
-
-
 ################################################################################
 # Utils for summary, date, API keys, etc.
 ################################################################################
@@ -389,33 +294,6 @@ def get_today_str() -> str:
     """Get current date formatted for display in prompts and outputs."""
     now = datetime.now()
     return f"{now:%a} {now:%b} {now.day}, {now:%Y}"
-
-
-def get_api_key_for_model(model_name: str, config: RunnableConfig):
-    """Get API key for a specific model from environment or config."""
-    should_get_from_config = os.getenv("GET_API_KEYS_FROM_CONFIG", "false")
-    model_name = model_name.lower()
-    if should_get_from_config.lower() == "true":
-        api_keys = config.get("configurable", {}).get("apiKeys", {})
-        if not api_keys:
-            return None
-        if model_name.startswith("openai:"):
-            return api_keys.get("OPENAI_API_KEY")
-        elif model_name.startswith("anthropic:"):
-            return api_keys.get("ANTHROPIC_API_KEY")
-        elif model_name.startswith("google"):
-            return api_keys.get("GOOGLE_API_KEY")
-        return None
-    else:
-        if model_name.startswith("openai:"):
-            return os.getenv("OPENAI_API_KEY")
-        elif model_name.startswith("anthropic:"):
-            return os.getenv("ANTHROPIC_API_KEY")
-        elif model_name.startswith("google"):
-            return os.getenv("GOOGLE_API_KEY")
-        elif model_name.startswith("groq:"):
-            return os.getenv("GROQ_API_KEY")
-        return None
 
 
 def get_tavily_api_key(config: RunnableConfig):

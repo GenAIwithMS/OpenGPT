@@ -1,10 +1,11 @@
 import uuid
-import os
 import re
 from pathlib import Path
 from typing import TypedDict
 from langchain_core.messages import SystemMessage, HumanMessage
 from langgraph.graph import StateGraph, START, END
+
+from app.llm import env
 
 from .llm import llm
 from .schemas import GlobalImagePlan
@@ -67,7 +68,7 @@ def _gemini_generate_image_bytes(prompt: str) -> bytes:
     from google import genai
     from google.genai import types
 
-    api_key = os.environ.get("GOOGLE_API_KEY")
+    api_key = env("GOOGLE_API_KEY")
     if not api_key:
         raise RuntimeError("GOOGLE_API_KEY is not set.")
 
@@ -123,7 +124,7 @@ BLOG_IMAGE_URL = "/api/blog-images"
 
 def image_generation_available() -> bool:
     """Gemini image generation needs the google-genai package and GOOGLE_API_KEY."""
-    if not os.environ.get("GOOGLE_API_KEY"):
+    if not env("GOOGLE_API_KEY"):  # ignores placeholders from .env.example
         return False
     try:
         import google.genai  # noqa: F401

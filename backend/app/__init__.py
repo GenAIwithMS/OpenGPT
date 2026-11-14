@@ -13,6 +13,7 @@ from app.router.chat import chat_router
 from app.router.health import health_router
 from app.database.init_db import DatabaseInitError, init_database
 from app.error_handlers import register_error_handlers
+from app import llm
 from app.security import is_local_host, require_api_token
 from app.tools.blogs.reducer import BLOG_IMAGE_DIR, BLOG_IMAGE_URL
 
@@ -62,6 +63,11 @@ def create_app():
         allow_headers=["Content-Type", "Authorization"],
     )
     
+
+    try:
+        llm.validate()
+    except llm.LLMConfigError as e:
+        raise SystemExit(f"Startup failed: {e}") from e
 
     try:
         init_database()
