@@ -1,0 +1,158 @@
+import { describe, expect } from "bun:test"
+import { Effect } from "effect"
+import { Credential } from "@opencode/core/credential"
+import { Plugin } from "@opencode/core/plugin"
+import { PluginHost } from "@opencode/core/plugin/host"
+import { CloudflareWorkersAIPlugin } from "@opencode/core/plugin/provider/cloudflare-workers-ai"
+import { Provider } from "@opencode/core/provider"
+import { Integration } from "@opencode/core/integration"
+import { withEnv } from "../fixture/env"
+import { drain } from "../lib/clock"
+import { testEffect } from "../lib/effect"
+import { PluginTestLayer } from "./fixture"
+
+const it = testEffect(PluginTestLayer)
+const providerID = Provider.ID.make("cloudflare-workers-ai")
+
+const addPlugin = Effect.fn(function* () {
+  const plugin = yield* Plugin.Service
+  const host = yield* PluginHost.make(plugin, "test")
+  yield* CloudflareWorkersAIPlugin.effect(host)
+})
+
+function required<T>(value: T | undefined): T {
+  if (value === undefined) throw new Error("Expected value")
+  return value
+}
+
+const seed = Effect.fn(function* (fn: (provider: Provider.MutableInfo) => void) {
+  const catalog = yield* Provider.Service
+  yield* catalog.transform((catalog) => catalog.update(providerID, fn))
+  return catalog
+})
+
+describe("CloudflareWorkersAIPlugin", () => {
+  it.effect("registers an account form when the environment does not provide one", () =>
+    withEnv({ CLOUDFLARE_ACCOUNT_ID: undefined }, () =>
+      Effect.gen(function* () {
+        yield* addPlugin()
+        const integrations = yield* Integration.Service
+        expect((yield* integrations.get(Integration.ID.make("cloudflare-workers-ai")))?.methods).toContainEqual({
+          type: "key",
+          label: "API key",
+          form: [
+            {
+              type: "string",
+              key: "accountId",
+              title: "Enter your Cloudflare Account ID",
+              placeholder: "e.g. 1234567890abcdef1234567890abcdef",
+              required: true,
+            },
+          ],
+        })
+      }),
+    ),
+  )
+
+  it.effect("routes the OpenAI-compatible package to the native Workers AI package", () =>
+    withEnv({ CLOUDFLARE_ACCOUNT_ID: "acct", CLOUDFLARE_API_KEY: "key" }, () =>
+      Effect.gen(function* () {
+        const catalog = yield* seed((provider) => {
+          provider.package = "@opencode/ai/providers/cloudflare-workers-ai"
+        })
+        yield* addPlugin()
+        const integrations = yield* Integration.Service
+        expect((yield* integrations.get(Integration.ID.make("cloudflare-workers-ai")))?.methods).toContainEqual({
+          type: "key",
+          label: "API key",
+        })
+        expect(required(yield* catalog.get(providerID)).package).toBe("@opencode/ai/providers/cloudflare-workers-ai")
+      }),
+    ),
+  )
+
+  it.effect("gives the native Workers AI package its account ID", () =>
+    withEnv({ CLOUDFLARE_ACCOUNT_ID: "acct" }, () =>
+      Effect.gen(function* () {
+        const catalog = yield* seed((provider) => {
+          provider.package = "@opencode/ai/providers/cloudflare-workers-ai"
+        })
+        yield* addPlugin()
+        expect(required(yield* catalog.get(providerID)).settings).toEqual({ accountId: "acct" })
+      }),
+    ),
+  )
+
+  it.effect("gives the native Workers AI package the account ID of a stored form login", () =>
+    withEnv({ CLOUDFLARE_ACCOUNT_ID: undefined }, () =>
+      Effect.gen(function* () {
+        const catalog = yield* seed((provider) => {
+          provider.package = "@opencode/ai/providers/cloudflare-workers-ai"
+        })
+        const credentials = yield* Credential.Service
+        yield* credentials.create({
+          integrationID: Integration.ID.make("cloudflare-workers-ai"),
+          value: Credential.Key.make({ type: "key", key: "secret", metadata: { accountId: "form-acct" } }),
+        })
+        yield* addPlugin()
+        expect(required(yield* catalog.get(providerID)).settings).toEqual({ accountId: "form-acct" })
+      }),
+    ),
+  )
+
+  it.effect("follows the account ID when another form login becomes active", () =>
+    withEnv({ CLOUDFLARE_ACCOUNT_ID: undefined }, () =>
+      Effect.gen(function* () {
+        const catalog = yield* seed((provider) => {
+          provider.package = "@opencode/ai/providers/cloudflare-workers-ai"
+        })
+        const credentials = yield* Credential.Service
+        const first = yield* credentials.create({
+          integrationID: Integration.ID.make("cloudflare-workers-ai"),
+          value: Credential.Key.make({ type: "key", key: "secret", metadata: { accountId: "first-acct" } }),
+        })
+        yield* credentials.create({
+          integrationID: Integration.ID.make("cloudflare-workers-ai"),
+          value: Credential.Key.make({ type: "key", key: "secret", metadata: { accountId: "second-acct" } }),
+        })
+        yield* addPlugin()
+        expect(required(yield* catalog.get(providerID)).settings).toEqual({ accountId: "second-acct" })
+        yield* credentials.activate(first.id)
+        yield* drain
+        expect(required(yield* catalog.get(providerID)).settings).toEqual({ accountId: "first-acct" })
+      }),
+    ),
+  )
+
+  it.effect("preserves a configured endpoint URL instead of deriving one from account ID", () =>
+    withEnv({ CLOUDFLARE_ACCOUNT_ID: "acct" }, () =>
+      Effect.gen(function* () {
+        const catalog = yield* seed((provider) => {
+          provider.package = Provider.aisdk("test-provider")
+          provider.settings = { ...provider.settings, baseURL: "https://proxy.example/v1" }
+        })
+        yield* addPlugin()
+        expect(required(yield* catalog.get(providerID))).toMatchObject({
+          package: "aisdk:test-provider",
+          settings: { baseURL: "https://proxy.example/v1" },
+        })
+      }),
+    ),
+  )
+
+  it.effect("uses configured account ID over env account ID", () =>
+    withEnv({ CLOUDFLARE_ACCOUNT_ID: "env-acct" }, () =>
+      Effect.gen(function* () {
+        const catalog = yield* seed((provider) => {
+          provider.package = Provider.aisdk("test-provider")
+          provider.settings = { ...provider.settings, accountId: "configured-acct" }
+        })
+        yield* addPlugin()
+        expect(required(yield* catalog.get(providerID))).toMatchObject({
+          package: "aisdk:test-provider",
+          settings: { baseURL: "https://api.cloudflare.com/client/v4/accounts/configured-acct/ai/v1" },
+        })
+      }),
+    ),
+  )
+})
