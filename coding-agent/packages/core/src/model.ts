@@ -97,7 +97,6 @@ const layer = Layer.effect(
     const providers = yield* Provider.Service
     const bus = yield* Bus.Service
     const location = yield* Location.Service
-    const disableFree = ["1", "true"].includes(process.env.OPENGPT_DISABLE_FREE_MODELS?.toLowerCase() ?? "")
     let input: Provider.Snapshot | undefined
     const state: State.Interface<Data, Editor> = State.create<Data, Editor>({
       name: "model",
@@ -228,7 +227,7 @@ const layer = Layer.effect(
             ]
           }),
         )
-        if (disableFree)
+        if (freeModelsDisabled())
           for (const providerID of [Provider.ID.opencode, Provider.ID.make("opencode-go")])
             byProvider.get(providerID)?.forEach((model, id, models) => {
               if (!model.cost.some((cost) => cost.input > 0)) models.delete(id)
@@ -340,6 +339,11 @@ function preferFree(models: Info[]) {
   if (!freeOnly) return models
   const picks = PREFERRED_FREE.flatMap((id) => models.find((model) => model.id === id) ?? [])
   return [...picks, ...models.filter((model) => !picks.includes(model))]
+}
+
+/** Hosted free models are off unless OPENGPT_DISABLE_FREE_MODELS is "0" or "false". */
+export function freeModelsDisabled() {
+  return !["0", "false"].includes(process.env.OPENGPT_DISABLE_FREE_MODELS?.toLowerCase() ?? "")
 }
 
 export function supportsText(model: Pick<Info, "capabilities">) {

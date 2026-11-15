@@ -56,7 +56,7 @@ for (const flag of [undefined, "0", "1", "true"]) {
             editor.models.update(other, local, () => {})
           })
           yield* models.transform((editor) => editor.default.set(providerID, free))
-          const disabled = flag === "1" || flag === "true"
+          const disabled = flag !== "0"
           expect((yield* models.all()).map((model) => model.id)).toEqual(disabled ? [paid, local] : [free, paid, local])
           expect(yield* models.available()).toEqual(yield* models.all())
           expect((yield* models.default())?.id).toBe(disabled ? paid : free)

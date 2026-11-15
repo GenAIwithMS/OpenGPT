@@ -11,6 +11,7 @@ import { AppProcess } from "@opencode/util/process"
 import { Npm } from "@opencode/util/npm"
 import { EffectFlock } from "@opencode/util/effect-flock"
 import { ServerProcess } from "./server-process"
+import { configFromLlmEnv } from "./llm-config"
 import { OPENGPT_ARTIFACT, OPENGPT_CHANNEL, OPENGPT_VERSION } from "./version"
 
 const noProxy = [
@@ -22,6 +23,15 @@ const noProxy = [
 ].join(",")
 process.env.NO_PROXY = noProxy
 process.env.no_proxy = noProxy
+
+// Default model: OpenGPT's LLM_* settings, unless a config was passed in.
+if (!process.env.OPENGPT_CONFIG_CONTENT) {
+  const config = configFromLlmEnv(process.env)
+  if (config) process.env.OPENGPT_CONFIG_CONTENT = config
+}
+// Keep the model key out of the environment that shell commands inherit
+// (the config is removed after it is read; see server-process.ts).
+delete process.env.LLM_API_KEY
 
 ensurePluginRuntime()
 
