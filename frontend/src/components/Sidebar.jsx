@@ -10,6 +10,7 @@ import {
   Search as SearchIcon,
   PanelLeftClose,
   PanelLeftOpen,
+  Code2,
 } from 'lucide-react';
 
 const SquarePenIcon = (props) => (
@@ -42,6 +43,8 @@ const Sidebar = ({
   toggleSidebar,
   isCollapsed,
   onToggleCollapse,
+  isCodeActive = false,
+  onOpenCode,
 }) => {
   const [editingThreadId, setEditingThreadId] = useState(null);
   const [editTitle, setEditTitle] = useState('');
@@ -208,6 +211,17 @@ const Sidebar = ({
             >
               <SearchIcon size={18} />
             </button>
+
+            <button
+              onClick={onOpenCode}
+              title="Code"
+              aria-current={isCodeActive ? 'page' : undefined}
+              className={`flex items-center justify-center w-10 h-10 rounded-xl transition-colors mt-1 ${
+                isCodeActive ? 'bg-gray-700/90' : 'hover:bg-gray-700'
+              }`}
+            >
+              <Code2 size={18} />
+            </button>
           </div>
         ) : (
           /* Expanded sidebar */
@@ -274,6 +288,24 @@ const Sidebar = ({
                   </button>
                 )}
               </div>
+            </div>
+
+            {/* Code — coding agent */}
+            <div className="px-2">
+              <button
+                onClick={onOpenCode}
+                aria-current={isCodeActive ? 'page' : undefined}
+                className={`
+                  flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl transition-colors text-left
+                  ${isCodeActive ? 'bg-gray-700/90' : 'hover:bg-gray-700/80'}
+                `}
+                title="Code"
+              >
+                <span className="flex items-center justify-center w-5 h-5 shrink-0">
+                  <Code2 size={18} />
+                </span>
+                <span className="text-sm font-medium whitespace-nowrap">Code</span>
+              </button>
             </div>
 
             {/* Scrollable middle: Recents header + chat history.
