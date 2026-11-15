@@ -66,6 +66,7 @@ OpenGPT is an open-source, ChatGPT-style assistant built with LangGraph. It has 
 - **Chat with documents (RAG)**: attach PDF, Markdown or text files; several files per chat, searched together
 - **Persistent threads** in MySQL, plus **temporary chats** that are never saved
 - **Safe defaults**: local-only server, optional API token, rate limits, size limits, sanitized rendering
+- **Coding agent** (in progress): a separate service that reads and edits code, runs commands and asks before risky actions, based on the opencode agent harness ([coding-agent/](coding-agent/README.md))
 
 ## Technology Stack
 
@@ -210,6 +211,7 @@ Tools without a key are simply unavailable. For example, without `GOOGLE_API_KEY
 │   │   ├── services/api.js        # API client
 │   │   └── App.jsx
 │   └── vite.config.js             # Dev server; proxies /api to the backend
+├── coding-agent/                  # Coding agent service (Bun/TypeScript), based on opencode
 ├── start.sh / start.bat           # Start backend + frontend
 └── README.md
 ```
@@ -297,6 +299,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Every provider that offers an OpenAI- or Anthropic-compatible API
 - FastAPI for the modern Python web framework
 - React and Vite for the frontend tooling
+- [opencode](https://github.com/anomalyco/opencode): the coding agent is based on the opencode agent harness (MIT License, see [coding-agent/LICENSE](coding-agent/LICENSE))
 
 ## Related Resources
 

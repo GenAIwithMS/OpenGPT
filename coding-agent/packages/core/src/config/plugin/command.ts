@@ -1,0 +1,226 @@
+export * as ConfigCommandPlugin from "./command.js"
+
+import { define } from "@opencode/plugin/effect/plugin"
+import type { Entry } from "@opencode/schema/config"
+import { ConfigCommand } from "@opencode/schema/config/command"
+import { AppProcess } from "@opencode/util/process"
+import path from "path"
+import { Effect, Result, SchemaIssue, SchemaParser } from "effect"
+import { ChildProcess } from "effect/process"
+import { Agent } from "../../agent.js"
+import { Config } from "../../config.js"
+import { Location } from "../../location.js"
+import { Session } from "../../session.js"
+import { SubagentJob } from "../../session/subagent-job.js"
+import { ShellSelect } from "../../shell/select.js"
+import { FSUtil } from "@opencode/util/fs-util"
+import { ConfigMarkdown } from "../markdown.js"
+import { ConfigEntryObserver } from "./entry-observer.js"
+
+const decodeCommand = SchemaParser.decodeUnknownResult(ConfigCommand.Info)
+const formatIssue = SchemaIssue.makeFormatterDefault()
+
+export const Plugin = define({
+  id: "opencode.config.command",
+  effect: Effect.fn(function* (ctx) {
+    const config = yield* Config.Service
+    const fs = yield* FSUtil.Service
+    const loadEntry = Effect.fnUntraced(function* (entry: Entry) {
+      if (entry.type === "document") return [{ commands: entry.info.commands }]
+      if (entry.type !== "directory") return []
+      const commands = yield* loadDirectory(fs, entry.path)
+      return [{ commands: Object.fromEntries(commands.map((command) => [command.name, command.info])) }]
+    })
+    const location = yield* Location.Service
+    const processes = yield* AppProcess.Service
+    const shell = yield* ShellSelect.Service
+    const sessions = yield* Session.Service
+    const agents = yield* Agent.Service
+    const subagents = yield* SubagentJob.Service
+    const load = Effect.fn("ConfigCommandPlugin.load")(function* () {
+      return yield* Effect.forEach(yield* config.entries(), loadEntry).pipe(Effect.map((documents) => documents.flat()))
+    })
+    const loaded = yield* ConfigEntryObserver.observeSources({
+      config,
+      event: ctx.event,
+      directories: sourceDirectories,
+      load,
+      reload: ctx.command.reload(),
+    })
+    yield* ctx.command.transform((editor) => {
+      for (const document of loaded.documents) {
+        for (const [name, command] of Object.entries(document.commands ?? {})) {
+          const subagent = command.subagent ?? command.subtask
+          editor.add({
+            name,
+            description: command.description,
+            execute: (input) =>
+              Effect.gen(function* () {
+                const agent = command.agent === undefined ? undefined : Agent.ID.make(command.agent)
+                const commandAgent = agent === undefined ? undefined : (yield* ctx.agent.get({ agentID: agent })).data
+                const model =
+                  command.model === undefined
+                    ? commandAgent?.model
+                    : {
+                        id: command.model.model,
+                        providerID: command.model.providerID,
+                        ...(command.model.variant === undefined ? {} : { variant: command.model.variant }),
+                      }
+                const text = yield* evaluateTemplate(command.template, input.prompt.text, {
+                  location,
+                  processes,
+                  shell,
+                })
+                if (subagent ?? commandAgent?.mode === "subagent") {
+                  const parent = yield* sessions.get(input.sessionID)
+                  const selected = yield* agents.select(agent ?? parent.agent)
+                  const child = yield* sessions.create({
+                    parentID: parent.id,
+                    title: command.description ?? name,
+                    agent: selected.id,
+                    model: model ?? selected.info?.model ?? parent.model,
+                  })
+                  yield* sessions.prompt({
+                    ...input.prompt,
+                    sessionID: child.id,
+                    text: ["You are a subagent spawned by another session.", text].join("\n"),
+                    resume: false,
+                  })
+                  const recovery = {
+                    kind: "subagent" as const,
+                    parentSessionID: parent.id,
+                    childSessionID: child.id,
+                    agent: selected.id,
+                    description: command.description ?? name,
+                  }
+                  yield* subagents.start(recovery)
+                  return
+                }
+                if (agent !== undefined) {
+                  const session = yield* ctx.session.get({ sessionID: input.sessionID })
+                  if (session.agent !== agent) yield* ctx.session.switchAgent({ sessionID: input.sessionID, agent })
+                }
+                if (model !== undefined) yield* ctx.session.switchModel({ sessionID: input.sessionID, model })
+                yield* ctx.session.prompt({
+                  ...input.prompt,
+                  sessionID: input.sessionID,
+                  text,
+                  delivery: input.delivery,
+                })
+              }).pipe(Effect.asVoid),
+          })
+        }
+      }
+    })
+  }),
+})
+
+// Keep in sync with the loadDirectory scan pattern and the name-strip regex in decode.
+const sourceDirectories = ["command", "commands"] as const
+
+function loadDirectory(fs: FSUtil.Interface, directory: string) {
+  return Effect.gen(function* () {
+    const files = yield* fs
+      .scan("{command,commands}/**/*.md", { cwd: directory, absolute: true, dot: true, symlink: true })
+      .pipe(Effect.orElseSucceed(() => [] as string[]))
+    return yield* Effect.forEach(files.toSorted(), (filepath) =>
+      fs.readFileStringSafe(filepath).pipe(
+        Effect.flatMap((content) => (content === undefined ? Effect.undefined : decode(directory, filepath, content))),
+        Effect.orElseSucceed(() => undefined),
+      ),
+    ).pipe(
+      Effect.map((commands) =>
+        commands.filter((command): command is { name: string; info: ConfigCommand.Info } => command !== undefined),
+      ),
+    )
+  })
+}
+
+const decode = Effect.fnUntraced(function* (directory: string, filepath: string, content: string) {
+  const markdown = ConfigMarkdown.parseOption(content)
+  if (!markdown) {
+    yield* Effect.logWarning("command file skipped", { filepath, reason: "markdown" })
+    return
+  }
+  const info = decodeCommand({ ...markdown.data, template: markdown.content.trim() })
+  if (Result.isFailure(info)) {
+    yield* Effect.logWarning("command file skipped", {
+      filepath,
+      reason: "frontmatter",
+      issue: formatIssue(info.failure),
+    })
+    return
+  }
+  return {
+    name: path
+      .relative(directory, filepath)
+      .replaceAll("\\", "/")
+      .replace(/^(command|commands)\//, "")
+      .replace(/\.md$/, ""),
+    info: info.success,
+  }
+})
+
+function evaluateTemplate(
+  template: string,
+  input: string,
+  services: {
+    readonly location: Location.Info
+    readonly processes: AppProcess.Interface
+    readonly shell: ShellSelect.Interface
+  },
+) {
+  return Effect.gen(function* () {
+    const args = parseArguments(input)
+    const placeholders = template.match(placeholderRegex) ?? []
+    const last = Math.max(0, ...placeholders.map((item) => Number(item.slice(1))))
+    const withArguments = template.replaceAll(argumentRegex, (match, index) => {
+      if (match === "$ARGUMENTS") return input
+      const position = Number(index)
+      const argIndex = position - 1
+      if (argIndex >= args.length) return ""
+      if (position === last) return args.slice(argIndex).join(" ")
+      return args[argIndex]
+    })
+    const text =
+      placeholders.length === 0 && !template.includes("$ARGUMENTS") && input.trim()
+        ? `${withArguments}\n\n${input}`.trim()
+        : withArguments.trim()
+    const matches = Array.from(text.matchAll(shellRegex))
+    if (matches.length === 0) return text
+    const shell = yield* services.shell.resolve({ priority: "config" })
+    const outputs = yield* Effect.forEach(
+      matches,
+      (match) => {
+        const source = match[1] ?? ""
+        return services.processes
+          .run(
+            ChildProcess.make(shell, ShellSelect.args(shell, source), {
+              cwd: services.location.directory,
+              stdin: "ignore",
+            }),
+            { combineOutput: true },
+          )
+          .pipe(
+            Effect.map((result) => (result.output ?? Buffer.concat([result.stdout, result.stderr])).toString("utf8")),
+            Effect.mapError(
+              (error) => new Error(`Shell interpolation failed for ${JSON.stringify(source)}: ${error.message}`),
+            ),
+          )
+      },
+      { concurrency: 2 },
+    )
+    const iterator = outputs[Symbol.iterator]()
+    return text.replace(shellRegex, () => iterator.next().value ?? "")
+  })
+}
+
+function parseArguments(input: string) {
+  return (input.match(argsRegex) ?? []).map((arg) => arg.replace(quoteTrimRegex, ""))
+}
+
+const argsRegex = /(?:\[Image\s+\d+\]|"[^"]*"|'[^']*'|[^\s"']+)/gi
+const placeholderRegex = /\$([1-9]\d*)/g
+const argumentRegex = /\$(?:ARGUMENTS|([1-9]\d*))/g
+const quoteTrimRegex = /^["']|["']$/g
+const shellRegex = /!`([^`]+)`/g
