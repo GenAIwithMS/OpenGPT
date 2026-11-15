@@ -29,6 +29,9 @@ pypdf==6.14.2
 sqlalchemy==2.0.51
 pymysql==1.2.0
 
+# Coding agent client (talks to the coding-agent service)
+httpx==0.27.2
+
 # Tools: web search, deep research, blog images
 requests==2.34.2
 parallel-web==1.3.7

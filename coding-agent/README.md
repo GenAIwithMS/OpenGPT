@@ -34,6 +34,19 @@ Options:
 
 The agent works on the folder the server is started from.
 
+Normally you don't start it yourself: the OpenGPT backend starts and stops it.
+
+## Model
+
+The default model is OpenGPT's own model, from the same settings as the chat (`LLM_PROVIDER`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL` in `backend/.env`). The backend passes them in; when starting the agent by hand, load that file:
+
+```bash
+cd coding-agent/packages/cli
+OPENGPT_PASSWORD=change-me bun --env-file=../../../backend/.env run src/serve-main.ts --port 4096
+```
+
+No hosted models are used unless you configure them.
+
 ## Authentication
 
 Every request needs HTTP Basic auth with user `opengpt` and the password from `OPENGPT_PASSWORD`:
@@ -57,6 +70,7 @@ Always set a password, and keep the server on `127.0.0.1` unless it is behind yo
 | `OPENGPT_CONFIG` | Path to a config file |
 | `OPENGPT_CONFIG_CONTENT` | Config as inline JSON |
 | `OPENGPT_LOG_LEVEL` | Log level, e.g. `DEBUG` |
+| `LLM_PROVIDER`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL` | Default model (see [Model](#model)) |
 
 Config is read from, lowest to highest priority:
 

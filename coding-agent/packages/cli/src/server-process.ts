@@ -83,8 +83,8 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
         yield* RetainedImage.retain(global.cache, "service")
       const { start } = yield* Effect.promise(() => import("@opencode/server/process"))
       const environmentPassword = yield* Env.password
-      // Keep the lease credential out of the environment inherited by tools.
-      if (options.mode === "stdio") {
+      // Keep the credential out of the environment inherited by tools (shell commands).
+      if (options.mode !== "service") {
         delete process.env.OPENGPT_PASSWORD
         delete process.env.OPENGPT_SERVER_PASSWORD
       }
@@ -161,6 +161,9 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
         transform,
         () => remote.urls,
       )
+      // The config (it can hold a model API key) was read above; keep it out of
+      // the environment that shell commands inherit.
+      delete process.env.OPENGPT_CONFIG_CONTENT
       const server = yield* launch.pipe(
         Effect.catch((error) => {
           if (findIncumbent === undefined || !addressInUse(error)) return Effect.fail(error)

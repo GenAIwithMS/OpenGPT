@@ -8,6 +8,8 @@ os.environ.setdefault("LLM_MODEL", "test-model")
 os.environ["LANGSMITH_TRACING"] = "false"
 os.environ["LANGCHAIN_TRACING_V2"] = "false"
 os.environ.setdefault("RATE_LIMIT_PER_MINUTE", "0")
+# Tests never start the real coding agent.
+os.environ["CODING_AGENT_ENABLED"] = "false"
 
 
 def use_sqlite():

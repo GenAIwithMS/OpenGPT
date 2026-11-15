@@ -9,7 +9,7 @@ export function server(value: Credential.Value) {
   const server = typeof value.metadata?.server === "string" ? value.metadata.server : defaultServer
   // Credentials saved before August 2026 store the retired console.opencode.ai host, which maps path-for-path onto
   // the default server; rewriting it lets that host be shut down without forcing those users to reconnect.
-  return server.replace(/^https:\/\/console\.opengpt\.ai(?=\/|$)/, defaultServer)
+  return server.replace(/^https:\/\/console\.opencode\.ai(?=\/|$)/, defaultServer)
 }
 
 /** Authenticates a Console request as the credential's member, in the workspace the sign-in chose. */

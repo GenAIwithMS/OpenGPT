@@ -5,12 +5,15 @@ from app.observability import configure_langsmith
 configure_langsmith()
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.router.chat import chat_router
 from app.router.health import health_router
+from app.router.code import code_router
+from app.services.coding_agent.process import agent as coding_agent
 from app.database.init_db import DatabaseInitError, init_database
 from app.error_handlers import register_error_handlers
 from app import llm
@@ -24,6 +27,16 @@ def _docs_enabled() -> bool:
     if flag is not None:
         return flag.strip().lower() in {"1", "true", "yes", "on"}
     return is_local_host(os.getenv("HOST", "127.0.0.1"))
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    # The coding agent starts in the background; the chat doesn't wait for it.
+    coding_agent.start()
+    try:
+        yield
+    finally:
+        coding_agent.stop()
 
 
 def create_app():
@@ -40,6 +53,7 @@ def create_app():
         docs_url="/docs" if docs else None,
         redoc_url="/redoc" if docs else None,
         openapi_url="/openapi.json" if docs else None,
+        lifespan=_lifespan,
     )
 
     register_error_handlers(app)
@@ -79,6 +93,9 @@ def create_app():
     # Every chat route needs the API token when API_TOKEN is set.
     app.include_router(
         chat_router, prefix="/api", tags=["chat"], dependencies=[Depends(require_api_token)]
+    )
+    app.include_router(
+        code_router, prefix="/api", tags=["code"], dependencies=[Depends(require_api_token)]
     )
     app.include_router(health_router, prefix="/api", tags=["health"])
 

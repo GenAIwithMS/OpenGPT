@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import MessageList from './components/MessageList';
 import MessageInput from './components/MessageInput';
 import ConfirmationModal from './components/ConfirmationModal';
+import CodeView from './components/CodeView';
 import { useThreads } from './hooks/useThreads';
 import { useChat } from './hooks/useChat';
 import { chatService } from './services/api';
@@ -32,6 +33,9 @@ function threadIdFromPath(pathname) {
     return null;
   }
 }
+
+// /code and /code/... show the coding agent screen instead of the chat.
+const isCodePath = (pathname) => /^\/code(\/|$)/.test(pathname);
 
 const TempChatIcon = (props) => (
   <svg
@@ -108,6 +112,7 @@ function App() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const urlThreadId = threadIdFromPath(location.pathname);
+  const isCodeView = isCodePath(location.pathname);
   // Temporary mode is driven by the `?temporary-chat=true` URL query param, so
   // it survives refreshes and is shareable. A temp chat is never persisted.
   const tempFromUrl = searchParams.get('temporary-chat') === 'true';
@@ -250,6 +255,12 @@ function App() {
     setResearchPanel(null);
     // Reflect temp mode in the URL so it survives refresh and is shareable.
     navigate(next ? '/chat?temporary-chat=true' : '/chat');
+  };
+
+  const handleOpenCode = () => {
+    setIsSidebarOpen(false);
+    setResearchPanel(null);
+    navigate('/code');
   };
 
   const handleThreadSelect = (threadId) => {
@@ -404,9 +415,14 @@ function App() {
         toggleSidebar={toggleSidebar}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={toggleSidebarCollapse}
+        isCodeActive={isCodeView}
+        onOpenCode={handleOpenCode}
       />
 
-      {/* Main Chat Area */}
+      {isCodeView ? (
+        <CodeView />
+      ) : (
+      /* Main Chat Area */
       <div className="flex-1 min-w-0 flex flex-col h-screen relative">
           {/* Header — spans the full width, above both the chat and the research panel */}
           <div className="flex-shrink-0 px-4 py-3 bg-chat-bg">
@@ -539,6 +555,7 @@ function App() {
         )}
         </div>
       </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       <ConfirmationModal

@@ -22,6 +22,7 @@ import { ConsoleAccess } from "../../console-access.js"
 import { Credential } from "../../credential.js"
 import { Flag } from "../../flag.js"
 import { InstructionDiscovery } from "../../instruction-discovery.js"
+import { freeModelsDisabled } from "../../model.js"
 import { Integration } from "../../integration.js"
 import { IntegrationConnection } from "../../integration/connection.js"
 import { Provider } from "../../provider.js"
@@ -190,7 +191,6 @@ export const OpencodePlugin = define<
 >({
   id: "opencode.provider.opencode",
   effect: Effect.fn(function* (ctx) {
-    const disableFree = ["1", "true"].includes(process.env.OPENGPT_DISABLE_FREE_MODELS?.toLowerCase() ?? "")
     const client = yield* HttpClient.HttpClient
     // Every request here goes to the Console, which reads the User-Agent to tell which OpenCode a member runs
     // and whether it evaluates the policies it is being sent.
@@ -480,7 +480,7 @@ export const OpencodePlugin = define<
       if (!item) return
       const hasKey = Boolean(process.env.OPENCODE_API_KEY || snapshot.connection || item.provider.settings?.apiKey)
       providers.update(item.provider.id, (provider) => {
-        if (!hasKey && !disableFree) {
+        if (!hasKey && !freeModelsDisabled()) {
           provider.activation = "enabled"
           provider.settings = { ...provider.settings, apiKey: "public" }
         }
