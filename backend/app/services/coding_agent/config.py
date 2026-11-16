@@ -14,6 +14,10 @@ Settings (backend/.env):
     CODING_AGENT_DIR       the coding-agent folder (default: <repo>/coding-agent)
     BUN_PATH               the bun executable (default: found on PATH)
     CODING_AGENT_START_TIMEOUT  seconds to wait for the agent to start (default 90)
+    CODING_AGENT_MODEL     model for the coding agent (default: LLM_MODEL). The
+                           agent sends large requests (~9k tokens of
+                           instructions and tools), so it may need a model or
+                           plan with higher limits than chat.
 """
 import json
 import os
@@ -83,11 +87,16 @@ def start_timeout() -> float:
         return 90.0
 
 
+def model_id() -> str:
+    """The model the coding agent uses."""
+    return llm.env("CODING_AGENT_MODEL") or llm.settings()["model"]
+
+
 def model_config() -> dict:
     """The agent's config: one provider built from LLM_*, used as the default model."""
     cfg = llm.settings()
     provider = cfg["provider"]
-    model = cfg["model"]
+    model = model_id()
     settings = {"baseURL": cfg["base_url"] or _DEFAULT_BASE_URLS[provider]}
     # "not-needed" is app/llm.py's stand-in for a server that takes no key.
     if cfg["api_key"] and cfg["api_key"] != "not-needed":

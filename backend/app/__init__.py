@@ -14,6 +14,7 @@ from app.router.chat import chat_router
 from app.router.health import health_router
 from app.router.code import code_router
 from app.services.coding_agent.process import agent as coding_agent
+from app.services.coding_agent import client as coding_agent_client
 from app.database.init_db import DatabaseInitError, init_database
 from app.error_handlers import register_error_handlers
 from app import llm
@@ -36,6 +37,7 @@ async def _lifespan(app: FastAPI):
     try:
         yield
     finally:
+        await coding_agent_client.close()
         coding_agent.stop()
 
 

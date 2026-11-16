@@ -18,6 +18,12 @@ describe("configFromLlmEnv", () => {
     })
   })
 
+  test("CODING_AGENT_MODEL overrides the model", () => {
+    const config = parse({ LLM_API_KEY: "k", LLM_MODEL: "chat", CODING_AGENT_MODEL: "coder" })
+    expect(config.model).toBe("opengpt/coder")
+    expect(Object.keys(config.providers.opengpt.models)).toEqual(["coder"])
+  })
+
   test("anthropic uses its own API by default", () => {
     const config = parse({ LLM_PROVIDER: "anthropic", LLM_API_KEY: "k", LLM_MODEL: "m" })
     expect(config.providers.opengpt.package).toBe("@opencode/ai/providers/anthropic-compatible")

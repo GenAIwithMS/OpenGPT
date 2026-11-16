@@ -158,3 +158,16 @@ class ProjectListResponse(BaseModel):
     """Project folders, most recently changed first"""
 
     projects: List[ProjectResponse] = Field(..., description="Project folders")
+
+
+class CodeSessionCreateRequest(BaseModel):
+    """Start a coding session in a project"""
+
+    project: str = Field(..., min_length=1, max_length=64, description="Project folder name")
+    title: Optional[str] = Field(None, max_length=100, description="Session title; the agent names it if omitted")
+
+
+class CodeSessionTitleRequest(BaseModel):
+    """Rename a coding session"""
+
+    title: str = Field(..., min_length=1, max_length=100, description="New title")

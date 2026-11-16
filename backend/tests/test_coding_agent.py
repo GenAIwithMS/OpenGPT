@@ -41,6 +41,11 @@ class ModelConfigTests(unittest.TestCase):
         self.assertEqual(provider["package"], "@opencode/ai/providers/anthropic-compatible")
         self.assertEqual(provider["settings"]["baseURL"], "https://api.anthropic.com/v1")
 
+    def test_coding_agent_model_override(self):
+        cfg = self.build(LLM_API_KEY="k", LLM_MODEL="chat", CODING_AGENT_MODEL="coder")
+        self.assertEqual(cfg["model"], "opengpt/coder")
+        self.assertEqual(list(cfg["providers"]["opengpt"]["models"]), ["coder"])
+
     def test_self_hosted_without_key(self):
         cfg = self.build(LLM_BASE_URL="http://localhost:11434/v1", LLM_MODEL="m")
         self.assertNotIn("apiKey", cfg["providers"]["opengpt"]["settings"])
