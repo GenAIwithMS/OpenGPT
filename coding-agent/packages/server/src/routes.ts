@@ -142,6 +142,7 @@ function makeRoutes<AuthError, AuthServices>(
       Config.configured({
         project: options.config?.project,
         claude: options.config?.claude,
+        agents: options.config?.agents,
         file: options.config?.file,
         content: options.config?.content,
       }),

@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Braces, Check, ChevronDown, Globe, Info, Loader2, Plus, Search, TerminalSquare, Trash2, X,
+  Braces, Check, ChevronDown, Globe, Info, Loader2, Plus, Search, TerminalSquare, Trash2,
 } from 'lucide-react';
-import { PageHeader, Toggle } from './controls';
+import { Modal, PageHeader, Toggle, inputClass } from './controls';
 import ConnectorLogo from './ConnectorLogo';
 import { connectorsService } from '../../services/api';
 
@@ -38,33 +38,6 @@ async function signInWindow(target) {
     window.addEventListener('message', onMessage);
   });
 }
-
-const inputClass =
-  'w-full rounded-lg border border-gray-600 bg-[#26272e] px-3 py-2 text-sm text-gray-100 placeholder-gray-500 outline-none focus:border-gray-400';
-
-const Modal = ({ title, onClose, children, wide = false }) => {
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
-    document.addEventListener('keydown', onKey, true);
-    return () => document.removeEventListener('keydown', onKey, true);
-  }, [onClose]);
-  return (
-    <div className="animate-backdrop-in fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div role="dialog" aria-label={title} onClick={(e) => e.stopPropagation()}
-        className={`animate-dialog-in flex w-full flex-col rounded-2xl border border-gray-700 bg-[#26272e] shadow-2xl ${
-          wide ? 'h-[85vh] max-w-3xl' : 'max-h-[85vh] max-w-lg'
-        }`}>
-        <div className="flex items-center border-b border-gray-700/70 px-5 py-3.5">
-          <h2 className="text-base font-semibold text-gray-100">{title}</h2>
-          <button type="button" onClick={onClose} aria-label="Close" className="ml-auto rounded-lg p-1 text-gray-400 hover:bg-white/5">
-            <X size={17} />
-          </button>
-        </div>
-        <div className="thin-scroll min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
-      </div>
-    </div>
-  );
-};
 
 // "KEY=value" lines <-> object
 const parsePairs = (text, sep) => Object.fromEntries(

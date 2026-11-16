@@ -409,6 +409,8 @@ class ChatService:
                         seen_tool_calls.add(tc_id)
                         if name == "Knowledge":
                             label = "Searching your knowledge base..."
+                        elif name == "Skill":
+                            label = "Using a skill..."
                         elif "__" in name:  # connector tool: server__tool
                             server, tool = name.split("__", 1)
                             label = f"Using {tool} ({server})..."

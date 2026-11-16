@@ -158,11 +158,14 @@ export const discover = Effect.fn("ConfigDiscovery.discover")(function* (options
               ...visible.filter((item) => path.basename(item) === ".claude").toReversed(),
             ]),
           ],
-    agents: [
-      ...new Set([
-        ...(globalEnabled ? [globalAgentsDirectory] : []),
-        ...visible.filter((item) => path.basename(item) === ".agents").toReversed(),
-      ]),
-    ],
+    agents:
+      options?.agents === false
+        ? []
+        : [
+            ...new Set([
+              ...(globalEnabled ? [globalAgentsDirectory] : []),
+              ...visible.filter((item) => path.basename(item) === ".agents").toReversed(),
+            ]),
+          ],
   } satisfies Sources
 })

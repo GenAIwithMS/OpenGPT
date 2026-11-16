@@ -129,6 +129,8 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
               truthy(process.env.OPENGPT_DISABLE_CLAUDE_CODE) ||
               truthy(process.env.OPENGPT_DISABLE_CLAUDE_CODE_SKILLS)
             ),
+            // .agents is likewise only read for skills.
+            agents: !truthy(process.env.OPENGPT_DISABLE_AGENTS_SKILLS),
             file: process.env.OPENGPT_CONFIG,
             content: process.env.OPENGPT_CONFIG_CONTENT,
           },

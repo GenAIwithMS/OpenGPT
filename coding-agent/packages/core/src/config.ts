@@ -65,6 +65,8 @@ export const Options = Schema.Struct({
   system: Schema.optional(Schema.Union([Schema.Boolean, Schema.String])),
   // false skips ~/.claude and project .claude dirs.
   claude: Schema.optional(Schema.Boolean),
+  // false skips ~/.agents and project .agents dirs (their skills).
+  agents: Schema.optional(Schema.Boolean),
   file: Schema.optional(Schema.String),
   content: Schema.optional(Schema.String),
 })

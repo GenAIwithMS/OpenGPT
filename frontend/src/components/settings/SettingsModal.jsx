@@ -1,13 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Blocks, Code2, Keyboard, Plug, Search, SlidersHorizontal, Sparkles, User, UserCog, X,
+  Code2, Keyboard, Plug, Search, SlidersHorizontal, Sparkles, User, UserCog, X,
 } from 'lucide-react';
-import { Avatar, PageHeader } from './controls';
+import { Avatar } from './controls';
 import AccountPage from './AccountPage';
 import GeneralPage from './GeneralPage';
 import ShortcutsPage from './ShortcutsPage';
 import PersonalizationPage from './PersonalizationPage';
 import ConnectorsPage from './ConnectorsPage';
+import SkillsPage from './SkillsPage';
+import DeveloperPage from './DeveloperPage';
 
 // Settings popup: navigation on the left, the chosen page on the right.
 export const SECTIONS = [
@@ -21,47 +23,12 @@ export const SECTIONS = [
   { group: 'Capabilities', items: [
     { id: 'personalization', label: 'Personalization', icon: UserCog, keywords: 'nickname instructions knowledge memory' },
     { id: 'connectors', label: 'Connectors', icon: Plug, keywords: 'mcp tools integrations' },
-    { id: 'skills', label: 'Skills', icon: Sparkles, keywords: 'skill instructions' },
+    { id: 'skills', label: 'Skills', icon: Sparkles, keywords: 'skill instructions explore upload github' },
   ] },
   { group: 'Developer', items: [
-    { id: 'developer', label: 'Developer', icon: Code2, keywords: 'provider api key model endpoint' },
+    { id: 'developer', label: 'Developer', icon: Code2, keywords: 'provider providers api key model models endpoint openai anthropic ollama' },
   ] },
 ];
-
-const COMING = {
-  personalization: {
-    icon: UserCog,
-    text: 'Your nickname, a little about you and custom instructions for chat and the coding agent, plus a knowledge base of documents every chat can use.',
-  },
-  connectors: {
-    icon: Plug,
-    text: 'Connect tools through MCP servers: pick from a catalog, add your own, import a JSON config or add one by URL. Available in chat and the coding agent.',
-  },
-  skills: {
-    icon: Blocks,
-    text: 'Reusable instructions the assistant loads when they fit the task: turn skills on or off, create your own, upload one or import from GitHub.',
-  },
-  developer: {
-    icon: Code2,
-    text: 'Model providers: add OpenAI- or Anthropic-compatible endpoints, store their keys encrypted, test them and choose which models chat and the coding agent use.',
-  },
-};
-
-const ComingSoon = ({ id, label }) => {
-  const { icon: Icon, text } = COMING[id];
-  return (
-    <div>
-      <PageHeader title={label} />
-      <div className="flex flex-col items-center py-12 text-center">
-        <span className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-gray-700/60 text-gray-300">
-          <Icon size={20} />
-        </span>
-        <p className="text-sm font-medium text-gray-200">Coming next</p>
-        <p className="mt-1 max-w-md text-sm text-gray-400">{text}</p>
-      </div>
-    </div>
-  );
-};
 
 const SettingsModal = ({ section, onSectionChange, onClose, settings, save, displayName, error }) => {
   const [query, setQuery] = useState('');
@@ -95,8 +62,10 @@ const SettingsModal = ({ section, onSectionChange, onClose, settings, save, disp
     page = <PersonalizationPage settings={settings} save={save} />;
   } else if (current.id === 'connectors') {
     page = <ConnectorsPage />;
+  } else if (current.id === 'skills') {
+    page = <SkillsPage />;
   } else {
-    page = <ComingSoon id={current.id} label={current.label} />;
+    page = <DeveloperPage />;
   }
 
   return (

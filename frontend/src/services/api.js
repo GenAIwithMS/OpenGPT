@@ -249,6 +249,39 @@ export const connectorsService = {
   pollDeviceSignIn: async (flowId) => (await api.post(`/connectors/oauth/device/${enc(flowId)}`)).data,
 };
 
+// Skills. See backend/app/router/skills.py. Ids look like "builtin/name",
+// "personal/name" or "local/claude/name" (sent as a path, so not encoded).
+const skillPath = (id) => id.split('/').map(enc).join('/');
+export const skillsService = {
+  list: async () => (await api.get('/skills')).data.skills,
+  get: async (id) => (await api.get(`/skills/item/${skillPath(id)}`)).data,
+  setEnabled: async (id, enabled) => (await api.put(`/skills/item/${skillPath(id)}`, { enabled })).data,
+  saveContent: async (id, skillMd) => (await api.put(`/skills/content/${skillPath(id)}`, { skill_md: skillMd })).data,
+  remove: async (id) => { await api.delete(`/skills/item/${skillPath(id)}`); },
+  create: async (body) => (await api.post('/skills', body)).data,
+  upload: async (file, replace = false) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('replace', replace ? 'true' : 'false');
+    return (await api.post('/skills/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } })).data.skills;
+  },
+  importGithub: async (url, replace = false) => (await api.post('/skills/import', { url, replace })).data.skills,
+  catalog: async () => (await api.get('/skills/catalog')).data.catalog,
+  install: async (id) => (await api.post(`/skills/catalog/${enc(id)}`)).data,
+};
+
+// Model providers (Settings > Developer). See backend/app/router/providers.py.
+export const providersService = {
+  // {env, providers, active, roles, presets}
+  overview: async () => (await api.get('/providers')).data,
+  create: async (body) => (await api.post('/providers', body)).data,
+  update: async (id, changes) => (await api.put(`/providers/${enc(id)}`, changes)).data,
+  remove: async (id) => { await api.delete(`/providers/${enc(id)}`); },
+  // {provider_id} for a saved one ('env' for backend/.env), or {preset, kind, base_url, api_key}
+  test: async (body) => (await api.post('/providers/test', body)).data.models,
+  setActive: async (active, roles) => (await api.put('/providers/active', { active, roles })).data,
+};
+
 // Coding agent (the Code page). See backend/app/router/code.py.
 export const codeService = {
   getStatus: async () => (await api.get('/code/status')).data,

@@ -13,7 +13,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.memory import MemorySaver
 from app.tools import Search, Weather, Calculator, Stock_price
 from app.services.rag import retrieve_from_document
-from app.services import knowledge, mcp_tools
+from app.services import knowledge, mcp_tools, skills
 from app.services.knowledge import Knowledge
 from app.services.personalization import profile_text
 from app.services.citations import renumber_sources
@@ -32,7 +32,7 @@ model = LazyChatModel("model")
 # starts when the user picks it from the tools menu (see ChatService).
 all_tools = [Search, Weather, Calculator, Stock_price]
 # The Knowledge tool is offered only while the knowledge base has documents.
-graph_tools = all_tools + [Knowledge]
+graph_tools = all_tools + [Knowledge, skills.Skill]
 
 # Without this, some models invent tools such as "Open_URL" after a search
 # returns links, which the API then rejects.
@@ -204,6 +204,12 @@ def chat_node(state: Chatstate):
             "When a question may relate to them, call the Knowledge tool and say which "
             "document the answer comes from."
         )
+
+    # Settings > Skills: enabled skills, read with the Skill tool.
+    skills_text = skills.prompt_text()
+    if skills_text:
+        tools.append(skills.Skill)
+        system_text += "\n\n" + skills_text
 
     # Settings > Connectors: tools from MCP servers that are on for chat.
     connector_tools = mcp_tools.chat_tools()

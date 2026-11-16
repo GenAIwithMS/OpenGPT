@@ -16,6 +16,8 @@ from app.router.chat import chat_router
 from app.router.health import health_router
 from app.router.code import code_router
 from app.router.settings import settings_router
+from app.router.skills import skills_router
+from app.router.providers import providers_router
 from app.router.connectors import connectors_callback_router, connectors_router
 from app.router.connectors import refresh_loop as connectors_refresh_loop
 from app.services.coding_agent.process import agent as coding_agent
@@ -94,14 +96,16 @@ def create_app():
     
 
     try:
-        llm.validate()
-    except llm.LLMConfigError as e:
-        raise SystemExit(f"Startup failed: {e}") from e
-
-    try:
         init_database()
     except DatabaseInitError as e:
         # Stop here with a clear message instead of serving 500s.
+        raise SystemExit(f"Startup failed: {e}") from e
+
+    # After the database: the active provider may be one saved in Settings > Developer.
+    try:
+        llm.reload()
+        llm.validate()
+    except llm.LLMConfigError as e:
         raise SystemExit(f"Startup failed: {e}") from e
             
     # Include routers
@@ -117,6 +121,12 @@ def create_app():
     )
     app.include_router(
         connectors_router, prefix="/api", tags=["connectors"], dependencies=[Depends(require_api_token)]
+    )
+    app.include_router(
+        skills_router, prefix="/api", tags=["skills"], dependencies=[Depends(require_api_token)]
+    )
+    app.include_router(
+        providers_router, prefix="/api", tags=["providers"], dependencies=[Depends(require_api_token)]
     )
     # Sign-in callback: a browser redirect from the provider, so no API token;
     # protected by the single-use OAuth state instead.
