@@ -7,6 +7,7 @@ import ConfirmationModal from './components/ConfirmationModal';
 import CodeView from './components/CodeView';
 import { useThreads } from './hooks/useThreads';
 import { useChat } from './hooks/useChat';
+import { useCodeWorkspace } from './hooks/useCodeWorkspace';
 import { chatService } from './services/api';
 import { buildAttachmentPreview, removeThreadAttachments } from './lib/attachmentPreview';
 import { X } from 'lucide-react';
@@ -36,6 +37,17 @@ function threadIdFromPath(pathname) {
 
 // /code and /code/... show the coding agent screen instead of the chat.
 const isCodePath = (pathname) => /^\/code(\/|$)/.test(pathname);
+
+// /code/<sessionId> -> that coding session; /code -> the Code landing page.
+function codeSessionIdFromPath(pathname) {
+  const m = pathname.replace(/\/+$/, '').match(/^\/code\/([^/]+)$/);
+  if (!m) return null;
+  try {
+    return decodeURIComponent(m[1]);
+  } catch {
+    return null;
+  }
+}
 
 const TempChatIcon = (props) => (
   <svg
@@ -113,6 +125,9 @@ function App() {
   const [searchParams] = useSearchParams();
   const urlThreadId = threadIdFromPath(location.pathname);
   const isCodeView = isCodePath(location.pathname);
+  const codeSessionId = isCodeView ? codeSessionIdFromPath(location.pathname) : null;
+  const code = useCodeWorkspace(isCodeView);
+  const [codeSessionToDelete, setCodeSessionToDelete] = useState(null);
   // Temporary mode is driven by the `?temporary-chat=true` URL query param, so
   // it survives refreshes and is shareable. A temp chat is never persisted.
   const tempFromUrl = searchParams.get('temporary-chat') === 'true';
@@ -404,13 +419,20 @@ function App() {
   return (
     <div className="flex h-screen bg-chat-bg text-white overflow-hidden">
       {/* Sidebar */}
+      {/* On the Code page the sidebar lists the project's coding sessions. */}
       <Sidebar
-        threads={threads}
-        currentThreadId={currentThreadId}
-        onThreadSelect={handleThreadSelect}
+        threads={isCodeView ? code.sessions.map((s) => ({ thread_id: s.id, title: s.title })) : threads}
+        currentThreadId={isCodeView ? codeSessionId : currentThreadId}
+        onThreadSelect={isCodeView
+          ? (id) => { setIsSidebarOpen(false); navigate(`/code/${encodeURIComponent(id)}`); }
+          : handleThreadSelect}
         onNewThread={handleNewThread}
-        onThreadRename={updateThreadTitle}
-        onThreadDelete={handleThreadDelete}
+        onThreadRename={isCodeView
+          ? (id, title) => code.renameSession(id, title).catch((e) => setAppError(e.message))
+          : updateThreadTitle}
+        onThreadDelete={isCodeView ? setCodeSessionToDelete : handleThreadDelete}
+        listLabel={isCodeView ? (code.project ? `Sessions · ${code.project}` : 'Sessions') : 'Recents'}
+        emptyText={isCodeView ? (code.project ? 'No sessions yet' : 'Choose a project') : 'No chats yet'}
         isSidebarOpen={isSidebarOpen}
         toggleSidebar={toggleSidebar}
         isCollapsed={isSidebarCollapsed}
@@ -420,7 +442,16 @@ function App() {
       />
 
       {isCodeView ? (
-        <CodeView />
+        <CodeView
+          sessionId={codeSessionId}
+          status={code.status}
+          projects={code.projects}
+          project={code.project}
+          onProjectChange={code.setProject}
+          onProjectCreated={(name) => { code.setProject(name); code.refreshProjects(); }}
+          onSessionCreated={(id) => { navigate(`/code/${encodeURIComponent(id)}`); code.refreshSessions(); }}
+          onSessionsChanged={code.refreshSessions}
+        />
       ) : (
       /* Main Chat Area */
       <div className="flex-1 min-w-0 flex flex-col h-screen relative">
@@ -520,24 +551,6 @@ function App() {
             </div>
           </div>
 
-          {/* Error Display */}
-          {toastError && (
-            <div
-              role="alert"
-              className="fixed bottom-20 right-4 z-50 flex max-w-sm items-start gap-2 bg-red-600 text-white pl-4 pr-2 py-2 rounded-lg shadow-lg"
-            >
-              <span className="flex-1 text-sm break-words">{toastError}</span>
-              <button
-                type="button"
-                onClick={dismissError}
-                aria-label="Dismiss error"
-                title="Dismiss"
-                className="shrink-0 p-0.5 rounded hover:bg-white/20 transition-colors"
-              >
-                <X size={16} />
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Deep research side panel (report review + activity) */}
@@ -556,6 +569,46 @@ function App() {
         </div>
       </div>
       )}
+
+      {/* Error toast (chat and Code page) */}
+          {toastError && (
+            <div
+              role="alert"
+              className="fixed bottom-20 right-4 z-50 flex max-w-sm items-start gap-2 bg-red-600 text-white pl-4 pr-2 py-2 rounded-lg shadow-lg"
+            >
+              <span className="flex-1 text-sm break-words">{toastError}</span>
+              <button
+                type="button"
+                onClick={dismissError}
+                aria-label="Dismiss error"
+                title="Dismiss"
+                className="shrink-0 p-0.5 rounded hover:bg-white/20 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
+
+      {/* Delete a coding session */}
+      <ConfirmationModal
+        isOpen={Boolean(codeSessionToDelete)}
+        onClose={() => setCodeSessionToDelete(null)}
+        onConfirm={async () => {
+          const id = codeSessionToDelete;
+          setCodeSessionToDelete(null);
+          try {
+            await code.deleteSession(id);
+            if (id === codeSessionId) navigate('/code');
+          } catch (e) {
+            setAppError(e.message || 'Could not delete the session.');
+          }
+        }}
+        title="Delete Session"
+        message="Delete this coding session and its history? Files the agent changed in the project stay as they are."
+        confirmText="Delete"
+        cancelText="Cancel"
+        danger={true}
+      />
 
       {/* Delete Confirmation Modal */}
       <ConfirmationModal
