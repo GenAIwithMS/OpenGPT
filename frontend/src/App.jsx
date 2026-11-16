@@ -511,9 +511,17 @@ function App() {
               -> bottom; empty chats -> centered). */}
           <div
             ref={inputBlockRef}
-            className="absolute inset-x-0 bottom-0 z-20 px-4 pb-4 transition-transform duration-300 ease-out"
+            className={`absolute inset-x-0 bottom-0 z-20 px-4 pb-4 transition-transform duration-300 ease-out ${
+              centered ? '' : 'bg-chat-bg'
+            }`}
             style={{ transform: centered ? `translateY(-${slideUp}px)` : 'translateY(0)' }}
           >
+            {/* Messages scroll under the input: the full-width background hides
+                them, and this fade softens the top edge (no hard line or box). */}
+            {!centered && (
+              <div aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-chat-bg to-transparent" />
+            )}
             {/* Welcome heading — only above a centered, empty conversation */}
             <div
               className={`

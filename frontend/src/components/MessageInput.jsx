@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import {
-  Send,
+  ArrowUp,
   Square,
   Paperclip,
   Loader2,
@@ -217,7 +217,7 @@ const MessageInput = ({
   }, [activeIndex, showPlusMenu]);
 
   return (
-    <div className="border-t border-gray-700 bg-chat-bg">
+    <div>
       <PromptInput
         value={message}
         onValueChange={setMessage}
@@ -354,30 +354,18 @@ const MessageInput = ({
             })}
           </div>
 
-          {/* Send / Stop Button */}
+          {/* Send / Stop Button — same round button as the Code page */}
           <PromptInputAction tooltip={showStop ? "Stop generating" : "Send message"}>
-            {showStop ? (
-              <button
-                type="button"
-                onClick={handleStop}
-                className="p-2 text-red-400 hover:text-red-300 hover:bg-gray-700 rounded-lg transition-colors"
-                title="Stop generating"
-                aria-label="Stop generating"
-              >
-                <Square size={18} />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={!message.trim() || disabled}
-                title="Send message"
-                aria-label="Send message"
-                className="p-2 text-gray-400 hover:text-white disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
-              >
-                <Send size={18} />
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={showStop ? handleStop : handleSubmit}
+              disabled={!showStop && (!message.trim() || disabled)}
+              title={showStop ? "Stop generating" : "Send message"}
+              aria-label={showStop ? "Stop generating" : "Send message"}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-gray-900 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:bg-gray-500 disabled:text-gray-800"
+            >
+              {showStop ? <Square size={13} fill="currentColor" /> : <ArrowUp size={16} />}
+            </button>
           </PromptInputAction>
         </PromptInputActions>
 
