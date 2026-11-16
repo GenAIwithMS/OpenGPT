@@ -5,6 +5,11 @@ import MessageList from './components/MessageList';
 import MessageInput from './components/MessageInput';
 import ConfirmationModal from './components/ConfirmationModal';
 import CodeView from './components/CodeView';
+import SettingsModal from './components/settings/SettingsModal';
+import { useSettings } from './hooks/useSettings';
+import { getPreferences } from './lib/preferences';
+import { FOCUS_SEARCH_EVENT, useShortcuts } from './lib/shortcuts';
+import { notifyFinished } from './lib/notify';
 import { useThreads } from './hooks/useThreads';
 import { useChat } from './hooks/useChat';
 import { useCodeWorkspace } from './hooks/useCodeWorkspace';
@@ -127,6 +132,9 @@ function App() {
   const isCodeView = isCodePath(location.pathname);
   const codeSessionId = isCodeView ? codeSessionIdFromPath(location.pathname) : null;
   const code = useCodeWorkspace(isCodeView);
+  const appSettings = useSettings();
+  // Which settings page is open (null: the popup is closed).
+  const [settingsSection, setSettingsSection] = useState(null);
   const [codeSessionToDelete, setCodeSessionToDelete] = useState(null);
   // Temporary mode is driven by the `?temporary-chat=true` URL query param, so
   // it survives refreshes and is shareable. A temp chat is never persisted.
@@ -251,12 +259,20 @@ function App() {
     // Also stops a first reply that is still streaming in a new chat.
     resetChat();
     setCurrentThreadId(null);
-    setIsTempChat(false);
+    const temporary = getPreferences().temporary_by_default; // General setting
+    setIsTempChat(temporary);
     setIsSidebarOpen(false);
     setPendingAttachments([]);
     setResearchPanel(null);
-    navigate('/chat');
+    navigate(temporary ? '/chat?temporary-chat=true' : '/chat');
   };
+
+  // A reply finished while OpenGPT was in another tab: notify (General settings).
+  const wasLoadingRef = useRef(false);
+  useEffect(() => {
+    if (wasLoadingRef.current && !chatLoading) notifyFinished('OpenGPT', 'Your reply is ready.');
+    wasLoadingRef.current = chatLoading;
+  }, [chatLoading]);
 
   // Toggle temporary (session-only) chat mode. When On, the conversation is
   // never persisted to the sidebar history; when Off, chats are saved normally.
@@ -398,6 +414,37 @@ function App() {
     setIsSidebarCollapsed((c) => !c);
   };
 
+  // Keyboard shortcuts (listed in Settings > Shortcuts; see lib/shortcuts.js).
+  const isDesktop = () => window.innerWidth >= 1024;
+  useShortcuts({
+    newChat: () => { setSettingsSection(null); handleNewThread(); },
+    temporaryChat: () => {
+      setSettingsSection(null);
+      resetChat();
+      setCurrentThreadId(null);
+      setIsTempChat(true);
+      setIsSidebarOpen(false);
+      setPendingAttachments([]);
+      setResearchPanel(null);
+      navigate('/chat?temporary-chat=true');
+    },
+    openCode: () => { setSettingsSection(null); handleOpenCode(); },
+    searchChats: () => {
+      setSettingsSection(null);
+      if (!isDesktop()) setIsSidebarOpen(true);
+      window.dispatchEvent(new Event(FOCUS_SEARCH_EVENT));
+    },
+    toggleSidebar: () => (isDesktop() ? toggleSidebarCollapse() : setIsSidebarOpen((open) => !open)),
+    focusInput: () => {
+      setSettingsSection(null);
+      // The chat or Code page message box (the last enabled one on the page).
+      const boxes = [...document.querySelectorAll('textarea')].filter((t) => !t.disabled && t.offsetParent);
+      boxes[boxes.length - 1]?.focus();
+    },
+    openSettings: () => setSettingsSection((open) => (open ? null : 'general')),
+    showShortcuts: () => setSettingsSection('shortcuts'),
+  });
+
   // One error toast; it closes by itself after a few seconds.
   const toastError = appError || chatError || threadsError;
   const dismissError = () => {
@@ -439,7 +486,21 @@ function App() {
         onToggleCollapse={toggleSidebarCollapse}
         isCodeActive={isCodeView}
         onOpenCode={handleOpenCode}
+        displayName={appSettings.displayName}
+        onOpenSettings={(section) => { setIsSidebarOpen(false); setSettingsSection(section); }}
       />
+
+      {settingsSection && (
+        <SettingsModal
+          section={settingsSection}
+          onSectionChange={setSettingsSection}
+          onClose={() => setSettingsSection(null)}
+          settings={appSettings.settings}
+          save={appSettings.save}
+          displayName={appSettings.displayName}
+          error={appSettings.error}
+        />
+      )}
 
       {isCodeView ? (
         <CodeView

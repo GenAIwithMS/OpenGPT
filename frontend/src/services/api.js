@@ -210,6 +210,14 @@ export const chatService = {
   },
 };
 
+// App settings (the Settings popup). See backend/app/services/settings.py.
+export const settingsService = {
+  // {profile, general, display_name}
+  get: async () => (await api.get('/settings')).data,
+  // Partial update, e.g. {general: {sound_on_finish: true}}; returns all settings.
+  update: async (changes) => (await api.put('/settings', changes)).data,
+};
+
 // Coding agent (the Code page). See backend/app/router/code.py.
 export const codeService = {
   getStatus: async () => (await api.get('/code/status')).data,

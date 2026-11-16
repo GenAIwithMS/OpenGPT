@@ -12,6 +12,8 @@ import {
   PanelLeftOpen,
   Code2,
 } from 'lucide-react';
+import UserMenu from './settings/UserMenu';
+import { FOCUS_SEARCH_EVENT } from '../lib/shortcuts';
 
 const SquarePenIcon = (props) => (
   <svg
@@ -47,6 +49,8 @@ const Sidebar = ({
   onOpenCode,
   listLabel = 'Recents',
   emptyText = 'No chats yet',
+  displayName = 'Muhammad',
+  onOpenSettings = () => {},
 }) => {
   const [editingThreadId, setEditingThreadId] = useState(null);
   const [editTitle, setEditTitle] = useState('');
@@ -147,6 +151,15 @@ const Sidebar = ({
     setTimeout(() => searchInputRef.current?.focus(), 60);
   };
 
+  // Ctrl/Cmd+K (see lib/shortcuts.js) focuses the search box.
+  const expandThenSearchRef = useRef(expandThenSearch);
+  expandThenSearchRef.current = expandThenSearch;
+  useEffect(() => {
+    const onFocusSearch = () => expandThenSearchRef.current();
+    window.addEventListener(FOCUS_SEARCH_EVENT, onFocusSearch);
+    return () => window.removeEventListener(FOCUS_SEARCH_EVENT, onFocusSearch);
+  }, []);
+
   return (
     <>
       {/* Mobile open button — fades out while the drawer is open */}
@@ -184,7 +197,7 @@ const Sidebar = ({
 
         {isCollapsed ? (
           /* Collapsed rail (desktop) */
-          <div className="flex flex-col items-center py-3 px-2">
+          <div className="flex flex-1 flex-col items-center py-3 px-2">
             {/* Brand — click the "O" to expand; hovering reveals the expand icon */}
             <button
               onClick={() => onToggleCollapse?.()}
@@ -224,6 +237,10 @@ const Sidebar = ({
             >
               <Code2 size={18} />
             </button>
+
+            <div className="mt-auto">
+              <UserMenu displayName={displayName} onOpenSettings={onOpenSettings} collapsed />
+            </div>
           </div>
         ) : (
           /* Expanded sidebar */
@@ -450,11 +467,9 @@ const Sidebar = ({
             </div>
             </div>
 
-            {/* Footer */}
-            <div className="px-3 py-3 border-t border-gray-700/60 shrink-0">
-              <div className="text-xs text-gray-500 text-center">
-                OpenGPT
-              </div>
+            {/* Footer: you, and the menu for Account / Settings */}
+            <div className="px-2 py-2 border-t border-gray-700/60 shrink-0">
+              <UserMenu displayName={displayName} onOpenSettings={onOpenSettings} />
             </div>
           </>
         )}

@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.router.chat import chat_router
 from app.router.health import health_router
 from app.router.code import code_router
+from app.router.settings import settings_router
 from app.services.coding_agent.process import agent as coding_agent
 from app.services.coding_agent import client as coding_agent_client
 from app.database.init_db import DatabaseInitError, init_database
@@ -98,6 +99,9 @@ def create_app():
     )
     app.include_router(
         code_router, prefix="/api", tags=["code"], dependencies=[Depends(require_api_token)]
+    )
+    app.include_router(
+        settings_router, prefix="/api", tags=["settings"], dependencies=[Depends(require_api_token)]
     )
     app.include_router(health_router, prefix="/api", tags=["health"])
 

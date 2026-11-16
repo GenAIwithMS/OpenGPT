@@ -62,6 +62,15 @@ class CheckpointWrite(Base):
     # force it to invent placeholder checkpoints.
 
 
+class AppSetting(Base):
+    """App settings, one JSON value per section (profile, general, ...)."""
+    __tablename__ = "app_settings"
+
+    key = Column(String(64), primary_key=True)
+    value = Column(Text, nullable=False)
+    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp())
+
+
 class CodeProject(Base):
     """Folders opened on the Code page (the coding agent works in one of them)."""
     __tablename__ = "code_projects"

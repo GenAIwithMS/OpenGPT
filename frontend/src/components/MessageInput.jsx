@@ -12,6 +12,7 @@ import {
   Check,
 } from "lucide-react";
 import AttachmentCard from "./AttachmentCard";
+import { SEND_HINT } from "../lib/preferences";
 import { PromptInput, PromptInputTextarea, PromptInputActions, PromptInputAction } from "./ui/prompt-input";
 
 const MessageInput = ({
@@ -387,7 +388,7 @@ const MessageInput = ({
           <span className="text-blue-400">Drop your document here</span>
         ) : (
           <span>
-            Press Enter to send, Shift+Enter for new line • Drag & drop documents (PDF, MD, TXT) to upload
+            {SEND_HINT} • Drag & drop documents (PDF, MD, TXT) to upload
           </span>
         )}
       </div>
