@@ -7,6 +7,7 @@ import AccountPage from './AccountPage';
 import GeneralPage from './GeneralPage';
 import ShortcutsPage from './ShortcutsPage';
 import PersonalizationPage from './PersonalizationPage';
+import ConnectorsPage from './ConnectorsPage';
 
 // Settings popup: navigation on the left, the chosen page on the right.
 export const SECTIONS = [
@@ -92,6 +93,8 @@ const SettingsModal = ({ section, onSectionChange, onClose, settings, save, disp
     page = <ShortcutsPage />;
   } else if (current.id === 'personalization') {
     page = <PersonalizationPage settings={settings} save={save} />;
+  } else if (current.id === 'connectors') {
+    page = <ConnectorsPage />;
   } else {
     page = <ComingSoon id={current.id} label={current.label} />;
   }

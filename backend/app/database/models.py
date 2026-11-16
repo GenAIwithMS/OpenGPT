@@ -1,7 +1,7 @@
 """
 SQLAlchemy ORM Models for Chatbot Database
 """
-from sqlalchemy import Column, String, Integer, TIMESTAMP, LargeBinary, Index, Text
+from sqlalchemy import Boolean, Column, String, Integer, TIMESTAMP, LargeBinary, Index, Text
 from sqlalchemy.dialects.mysql import LONGBLOB
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.sql import func
@@ -69,6 +69,23 @@ class AppSetting(Base):
     key = Column(String(64), primary_key=True)
     value = Column(Text, nullable=False)
     updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp())
+
+
+class Connector(Base):
+    """MCP servers added in Settings > Connectors."""
+    __tablename__ = "connectors"
+
+    id = Column(String(36), primary_key=True)
+    name = Column(String(64), nullable=False, unique=True)
+    kind = Column(String(16), nullable=False)          # "local" (command) or "remote" (URL)
+    command = Column(Text, nullable=True)              # JSON list of strings (local)
+    url = Column(Text, nullable=True)                  # remote
+    secrets = Column(Text, nullable=True)              # encrypted {"env": {...}, "headers": {...}}
+    catalog_id = Column(String(64), nullable=True)
+    enabled = Column(Boolean, nullable=False, default=True)
+    use_in_chat = Column(Boolean, nullable=False, default=True)
+    use_in_code = Column(Boolean, nullable=False, default=True)
+    created_at = Column(TIMESTAMP, default=func.current_timestamp())
 
 
 class CodeProject(Base):

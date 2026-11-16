@@ -20,6 +20,7 @@ Settings (backend/.env):
                            plan with higher limits than chat.
 """
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Optional
@@ -37,6 +38,8 @@ _DEFAULT_BASE_URLS = {
     llm.OPENAI: "https://api.openai.com/v1",
     llm.ANTHROPIC: "https://api.anthropic.com/v1",
 }
+logger = logging.getLogger(__name__)
+
 PROVIDER_ID = "opengpt"
 AGENT_USER = "opengpt"
 
@@ -114,7 +117,19 @@ def model_config() -> dict:
         # No session sharing links and no self-updates.
         "share": "disabled",
         "update": "disable",
+        **_mcp(),
     }
+
+
+def _mcp() -> dict:
+    """Connectors (Settings > Connectors) the coding agent may use."""
+    try:
+        from app.services import connectors
+        mcp = connectors.agent_mcp_config()
+    except Exception as e:  # never keep the agent from starting
+        logger.warning("Could not load connectors for the coding agent: %s", e)
+        return {}
+    return {"mcp": mcp} if mcp else {}
 
 
 def model_config_json() -> str:

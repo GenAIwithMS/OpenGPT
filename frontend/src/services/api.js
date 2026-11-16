@@ -227,6 +227,20 @@ export const settingsService = {
   removeKnowledge: async (id) => { await api.delete(`/settings/knowledge/${enc(id)}`); },
 };
 
+// Connectors (MCP servers). See backend/app/router/connectors.py.
+export const connectorsService = {
+  list: async () => (await api.get('/connectors')).data.connectors,
+  catalog: async () => (await api.get('/connectors/catalog')).data.catalog,
+  // {name, kind: 'local'|'remote', command?, url?, env?, headers?}
+  create: async (body) => (await api.post('/connectors', body)).data,
+  addFromCatalog: async (id, values = {}) => (await api.post(`/connectors/catalog/${enc(id)}`, { values })).data,
+  importJson: async (json) => (await api.post('/connectors/import', { json })).data.connectors,
+  update: async (id, changes) => (await api.put(`/connectors/${enc(id)}`, changes)).data,
+  remove: async (id) => { await api.delete(`/connectors/${enc(id)}`); },
+  // Sign in with OAuth: {catalog_id} | {name, url} | {connector_id}; returns the provider URL to open.
+  startSignIn: async (target) => (await api.post('/connectors/oauth/start', target)).data.authorize_url,
+};
+
 // Coding agent (the Code page). See backend/app/router/code.py.
 export const codeService = {
   getStatus: async () => (await api.get('/code/status')).data,

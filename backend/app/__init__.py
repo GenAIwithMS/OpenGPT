@@ -5,6 +5,7 @@ from app.observability import configure_langsmith
 configure_langsmith()
 
 import logging
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
@@ -14,6 +15,8 @@ from app.router.chat import chat_router
 from app.router.health import health_router
 from app.router.code import code_router
 from app.router.settings import settings_router
+from app.router.connectors import connectors_callback_router, connectors_router
+from app.router.connectors import refresh_loop as connectors_refresh_loop
 from app.services.coding_agent.process import agent as coding_agent
 from app.services.coding_agent import client as coding_agent_client
 from app.database.init_db import DatabaseInitError, init_database
@@ -35,9 +38,13 @@ def _docs_enabled() -> bool:
 async def _lifespan(app: FastAPI):
     # The coding agent starts in the background; the chat doesn't wait for it.
     coding_agent.start()
+    # Keeps connector sign-ins (OAuth tokens) fresh.
+    stop_refresh = threading.Event()
+    threading.Thread(target=connectors_refresh_loop, args=(stop_refresh,), daemon=True).start()
     try:
         yield
     finally:
+        stop_refresh.set()
         await coding_agent_client.close()
         coding_agent.stop()
 
@@ -103,6 +110,12 @@ def create_app():
     app.include_router(
         settings_router, prefix="/api", tags=["settings"], dependencies=[Depends(require_api_token)]
     )
+    app.include_router(
+        connectors_router, prefix="/api", tags=["connectors"], dependencies=[Depends(require_api_token)]
+    )
+    # Sign-in callback: a browser redirect from the provider, so no API token;
+    # protected by the single-use OAuth state instead.
+    app.include_router(connectors_callback_router, prefix="/api", tags=["connectors"])
     app.include_router(health_router, prefix="/api", tags=["health"])
 
     # Blog images (random file names) so the chat can show them. Served

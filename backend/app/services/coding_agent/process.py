@@ -214,6 +214,20 @@ class CodingAgent:
         logger.info("Starting the coding agent on %s (log: %s)", url, LOG_DIR / "agent.log")
         threading.Thread(target=self._wait_ready, args=(url, process), daemon=True).start()
 
+    def restart(self) -> bool:
+        """Restart the agent the backend started, so it reads its config again
+        (e.g. after connectors change). An agent started by hand is left alone."""
+        if config.external_url() or not config.enabled():
+            return False
+        with self._lock:
+            managed = self._process is not None or self._status.state in (RUNNING, STARTING)
+        if not managed:
+            return False
+        logger.info("Restarting the coding agent to apply new settings")
+        self.stop()
+        self.start()
+        return True
+
     def stop(self) -> None:
         with self._lock:
             process, self._process = self._process, None
