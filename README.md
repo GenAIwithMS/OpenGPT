@@ -66,7 +66,7 @@ OpenGPT is an open-source, ChatGPT-style assistant built with LangGraph. It has 
 - **Chat with documents (RAG)**: attach PDF, Markdown or text files; several files per chat, searched together
 - **Persistent threads** in MySQL, plus **temporary chats** that are never saved
 - **Safe defaults**: local-only server, optional API token, rate limits, size limits, sanitized rendering
-- **Coding agent** (in progress): a separate service that reads and edits code, runs commands and asks before risky actions, based on the opencode agent harness ([coding-agent/](coding-agent/README.md))
+- **Coding agent** (the Code page): works in a project folder, reads and edits code and runs commands, with live progress. It asks before editing files or running commands and shows the diff first ([Coding agent](#coding-agent))
 
 ## Technology Stack
 
@@ -84,6 +84,10 @@ OpenGPT is an open-source, ChatGPT-style assistant built with LangGraph. It has 
 - **Code highlighting**: Shiki
 - **Icons**: Lucide React
 
+### Coding agent
+- **Runtime**: Bun + TypeScript service in `coding-agent/`, based on the opencode agent harness
+- **Started by the backend** on 127.0.0.1 with a random password; the browser only talks to the backend
+
 ## Prerequisites
 
 - Python 3.11+
@@ -91,6 +95,7 @@ OpenGPT is an open-source, ChatGPT-style assistant built with LangGraph. It has 
 - MySQL 5.7+ or 8.0+
 - An API key for a model provider (or a local model server)
 - Optional: API keys for the tools you want (search, weather, stocks, images)
+- Optional: [Bun](https://bun.sh) for the Code page (coding agent); chat works without it
 
 ## Quick Start
 
@@ -128,11 +133,14 @@ pip install -r backend/requirements.txt
 
 # Frontend
 cd frontend && npm install
+
+# Coding agent (optional, for the Code page; needs Bun)
+cd coding-agent && bun install
 ```
 
 ### 3. Start
 
-**Start scripts:** `./start.sh` (Linux/macOS) or `start.bat` (Windows). They start the backend on port 8000 and the frontend on port 3000, using `.venv` if present.
+**Start scripts:** `./start.sh` (Linux/macOS) or `start.bat` (Windows). They start the backend on port 8000 and the frontend on port 3000, using `.venv` if present. When Bun is installed they also install the coding agent's dependencies on the first run; the backend then starts the coding agent itself.
 
 **Or manually:**
 ```bash
@@ -159,6 +167,19 @@ Then set `LLM_API_KEY` and `LLM_MODEL` (the model name your endpoint uses).
 - Use a model that supports **tool calling**: chat tools, deep research and the blog writer depend on it.
 - Optional per-task models, each defaulting to `LLM_MODEL`: `LLM_SMALL_MODEL` (titles, summaries), `BLOG_MODEL`, `RESEARCH_MODEL`. `LLM_MAX_TOKENS` sets the output limit (default 8192).
 
+## Coding agent
+
+The **Code** page in the sidebar runs a coding agent on your machine. Pick or create a project, describe a task, and watch it work: its reply, its thinking, and a card for each command it runs or file it reads or edits.
+
+- **Projects** are folders directly inside `CODE_PROJECTS_ROOT` (default `backend/app/storage/code/`). Point it at e.g. `~/projects` to work on your own repositories. The agent only works inside the project folder; anything outside it is refused.
+- **Approvals**: the agent asks before editing files, running commands, going online or reading `.env` files. Each request shows the command or the diff, with **Allow once**, **Always allow** (saved for the project; it says exactly what it covers, e.g. "commands starting with `git`") and **Deny** (optionally with a reason for the agent). Saved approvals can be reviewed and revoked from the project menu.
+- **Model**: it uses `LLM_*` like the chat. Its requests are large (about 6–9k tokens of instructions and tool descriptions each), so set `CODING_AGENT_MODEL` to a model or plan with higher limits if requests fail with a "larger than the model allows" or rate-limit message.
+- **Stop** ends the current task. If you close the page, the agent keeps working; reopen the session to see the result.
+
+> ⚠️ **The coding agent runs commands and changes files on this computer.** Read approval requests before allowing them, and keep the API local (the default). When `HOST` exposes the API, the coding agent is off unless you set `CODING_AGENT_ENABLED=true`, and `API_TOKEN` is required.
+
+How it is protected: the agent listens only on 127.0.0.1 with a password made for each run that never reaches the browser; it gets no backend secrets in its environment; only the configured model is available; a project folder can't change the agent's settings or permissions; and error details from the model are logged, not shown.
+
 ## Configuration
 
 All settings live in `backend/.env`. [`backend/.env.example`](backend/.env.example) lists every option with comments. The main groups:
@@ -172,6 +193,7 @@ All settings live in `backend/.env`. [`backend/.env.example`](backend/.env.examp
 | Security | `API_TOKEN` (required when `HOST` is not local; set `VITE_API_TOKEN` in `frontend/.env.local` to match) |
 | Limits | `RATE_LIMIT_PER_MINUTE`, `MAX_MESSAGE_CHARS`, `MAX_UPLOAD_MB`, `MAX_BLOG_SECTIONS`, `MAX_CHECKPOINTS_PER_THREAD`, ... |
 | Tracing | `LANGSMITH_TRACING` (off by default), `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT` |
+| Coding agent | `CODING_AGENT_ENABLED`, `CODING_AGENT_MODEL`, `CODE_PROJECTS_ROOT`, `BUN_PATH`, `CODING_AGENT_PORT`, or `CODING_AGENT_URL` + `CODING_AGENT_PASSWORD` for an agent you start yourself |
 | Frontend (`frontend/.env.local`) | `VITE_API_URL` (default `/api`: the Vite dev server forwards it to the backend; set the backend URL for other setups), `VITE_API_TOKEN` (when `API_TOKEN` is set) |
 
 Tools without a key are simply unavailable. For example, without `GOOGLE_API_KEY` blogs show image captions instead of images.
@@ -188,7 +210,7 @@ Tools without a key are simply unavailable. For example, without `GOOGLE_API_KEY
 │   │   ├── security.py            # Optional API token, network exposure check
 │   │   ├── rate_limit.py          # Per-client rate limiting
 │   │   ├── error_handlers.py      # Error responses (generic messages + ref codes)
-│   │   ├── router/                # HTTP routes (chat, threads, documents, health)
+│   │   ├── router/                # HTTP routes (chat, threads, documents, code, health)
 │   │   ├── schema/models.py       # Request/response models
 │   │   ├── services/
 │   │   │   ├── chatbot.py         # LangGraph chat graph and thread metadata
@@ -196,22 +218,24 @@ Tools without a key are simply unavailable. For example, without `GOOGLE_API_KEY
 │   │   │   ├── rag.py             # Document upload and retrieval
 │   │   │   ├── citations.py       # Search citations -> links
 │   │   │   ├── run_lock.py        # One reply at a time per thread
-│   │   │   └── thread.py          # Thread ids and titles
+│   │   │   ├── thread.py          # Thread ids and titles
+│   │   │   └── coding_agent/      # Starts the coding agent; projects, sessions,
+│   │   │                          # live turns and approvals
 │   │   ├── database/              # MySQL config, models, checkpoint saver
 │   │   ├── tools/                 # Search, weather, stocks, calculator,
 │   │   │                          # blogs/ and deep_research/
-│   │   └── storage/               # Uploaded documents, blogs, images (git-ignored)
+│   │   └── storage/               # Uploaded documents, blogs, images, code projects (git-ignored)
 │   ├── scripts/                   # One-off maintenance scripts
 │   ├── evals/                     # LangSmith evaluations
 │   └── tests/
 ├── frontend/
 │   ├── src/
-│   │   ├── components/            # Chat UI
-│   │   ├── hooks/                 # useChat, useThreads
+│   │   ├── components/            # Chat UI; code/ for the Code page
+│   │   ├── hooks/                 # useChat, useThreads, useCodeSession, useCodeWorkspace
 │   │   ├── services/api.js        # API client
 │   │   └── App.jsx
 │   └── vite.config.js             # Dev server; proxies /api to the backend
-├── coding-agent/                  # Coding agent service (Bun/TypeScript), based on opencode
+├── coding-agent/                  # Coding agent service (Bun/TypeScript), started by the backend
 ├── start.sh / start.bat           # Start backend + frontend
 └── README.md
 ```
@@ -240,6 +264,16 @@ All routes are under `/api`. When `API_TOKEN` is set, send `Authorization: Beare
 - `POST /api/query-document`: ask a question about a thread's documents
 - `GET /api/threads/{id}/document`: a thread's documents
 
+### Code (coding agent)
+- `GET /api/code/status`: whether the coding agent is ready, and its model
+- `GET /api/code/projects`, `POST /api/code/projects`: list or create project folders
+- `GET /api/code/sessions?project=...`, `POST /api/code/sessions`: list or start coding sessions
+- `GET /api/code/sessions/{id}`, `PUT /api/code/sessions/{id}/title`, `DELETE /api/code/sessions/{id}`
+- `GET /api/code/sessions/{id}/messages`: a session's history
+- `POST /api/code/sessions/{id}/stream`: send a task and stream the agent's work (Server-Sent Events); `POST /api/code/sessions/{id}/stop` stops it
+- `GET /api/code/sessions/{id}/approvals`, `POST /api/code/sessions/{id}/approvals/{approval_id}`: pending approvals; answer `once`, `always` or `reject`
+- `GET /api/code/projects/{name}/approvals`, `DELETE /api/code/projects/{name}/approvals/{id}`: saved "always" approvals
+
 ### Other
 - `GET /api/health`: health check
 - `GET /api/blog-images/{file}`: images generated for blogs
@@ -253,6 +287,10 @@ cd backend && python -m unittest discover -s tests -t .
 
 # Frontend production build
 cd frontend && npm run build
+
+# Coding agent: typecheck, and tests per package
+cd coding-agent && bun run typecheck:tsc
+cd coding-agent/packages/core && bun test
 ```
 
 Set `RELOAD=true` in `backend/.env` to auto-reload the backend on code changes.
@@ -275,6 +313,8 @@ The backend logs a reminder at startup if old data is still present.
 - **"Too many requests"**: raise `RATE_LIMIT_PER_MINUTE` (or set it to 0) for local use.
 - **Frontend can't reach the backend**: make sure the backend is running on port 8000. If you set `API_TOKEN`, set the same value as `VITE_API_TOKEN` in `frontend/.env.local`.
 - **First document upload is slow**: the embedding model loads on first use (a few seconds, once).
+- **Code page says the coding agent is unavailable**: the notice gives the reason. Usually Bun isn't installed (install it, or set `BUN_PATH`), `bun install` wasn't run in `coding-agent/`, or the API is exposed without `CODING_AGENT_ENABLED=true`. Details are in `backend/app/storage/coding-agent/agent.log`.
+- **Coding tasks fail with "larger than the model allows" or a rate limit**: the agent's requests are bigger than chat's. Use a model or plan with higher limits via `CODING_AGENT_MODEL`.
 
 ## Contributing
 

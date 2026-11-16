@@ -4,7 +4,7 @@ The coding agent gives OpenGPT the ability to work on code: read and edit files,
 
 The coding agent is based on the [opencode](https://github.com/anomalyco/opencode) agent harness (MIT licensed), trimmed to its server and core packages. See [Credits](#credits).
 
-> **Status:** the server runs on its own. Wiring it into the OpenGPT chat (sessions, streaming, approvals, model settings) is in progress.
+The OpenGPT backend starts it, gives it the model from `LLM_*`, and serves the Code page through `/api/code/...` (see the main [README](../README.md#coding-agent)).
 
 ## Requirements
 
@@ -32,7 +32,7 @@ Options:
 | `--hostname H` | Address to bind (local only by default) |
 | `--cors ORIGIN` | Allow browser requests from this origin (repeatable) |
 
-The agent works on the folder the server is started from.
+The agent works on the folder the server is started from, or the folder a session is created in. File access stops at that folder (`OPENGPT_STRICT_LOCATION`, on by default), not the whole git repository around it.
 
 Normally you don't start it yourself: the OpenGPT backend starts and stops it.
 
@@ -70,6 +70,8 @@ Always set a password, and keep the server on `127.0.0.1` unless it is behind yo
 | `OPENGPT_CONFIG` | Path to a config file |
 | `OPENGPT_CONFIG_CONTENT` | Config as inline JSON |
 | `OPENGPT_LOG_LEVEL` | Log level, e.g. `DEBUG` |
+| `OPENGPT_STRICT_LOCATION` | `1` (default): files outside the session folder count as outside, even inside the same repository |
+| `OPENGPT_DISABLE_FREE_MODELS` | Hosted free models are off; `0` turns them on |
 | `LLM_PROVIDER`, `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL` | Default model (see [Model](#model)) |
 
 Config is read from, lowest to highest priority:
