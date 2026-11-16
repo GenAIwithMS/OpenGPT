@@ -137,3 +137,24 @@ class DocumentInfoResponse(BaseModel):
     documents: Optional[int] = Field(None, description="Number of document pages")
     chunks: Optional[int] = Field(None, description="Number of text chunks")
     thread_id: str = Field(..., description="Thread ID")
+
+
+# ----- Coding agent -----
+
+class ProjectCreateRequest(BaseModel):
+    """Create a project folder for the coding agent"""
+
+    name: str = Field(..., min_length=1, max_length=64, description="Folder name inside CODE_PROJECTS_ROOT")
+
+
+class ProjectResponse(BaseModel):
+    """A project folder"""
+
+    name: str = Field(..., description="Folder name")
+    modified: str = Field(..., description="Last change (ISO 8601, UTC)")
+
+
+class ProjectListResponse(BaseModel):
+    """Project folders, most recently changed first"""
+
+    projects: List[ProjectResponse] = Field(..., description="Project folders")
