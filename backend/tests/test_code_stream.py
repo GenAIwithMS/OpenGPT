@@ -9,7 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from unittest import mock
 
-from tests import _helpers  # noqa: F401
+from tests import _helpers
 from app.services.coding_agent import client, process, projects, stream
 
 SID = "ses_streamstreamstream"
@@ -91,8 +91,9 @@ class StreamTests(unittest.TestCase):
         env = mock.patch.dict(os.environ, {"CODE_PROJECTS_ROOT": str(Path(tmp.name) / "projects")})
         env.start()
         self.addCleanup(env.stop)
-        projects.create_project("app")
-        self.agent = FakeAgent(projects.project_path("app"))
+        _helpers.use_sqlite()
+        self.project = projects.create_project("app")
+        self.agent = FakeAgent(projects.project_path(self.project["id"]))
 
         server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(self.agent))
         server.daemon_threads = True

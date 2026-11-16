@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest import mock
 from urllib.parse import parse_qs, unquote, urlparse
 
-from tests import _helpers  # noqa: F401
+from tests import _helpers
 from app.services.coding_agent import client, process, projects, sessions
 
 SID = "ses_abcdefghijklmnop"
@@ -93,8 +93,9 @@ class SessionRouteTests(unittest.TestCase):
                                            "CODING_AGENT_MODEL": "coder-model"})
         env.start()
         self.addCleanup(env.stop)
-        projects.create_project("app")
-        self.project_dir = projects.project_path("app")
+        _helpers.use_sqlite()
+        self.project = projects.create_project("app")
+        self.project_dir = projects.project_path(self.project["id"])
 
         self.state = FakeAgentState()
         server = HTTPServer(("127.0.0.1", 0), make_handler(self.state))
@@ -124,9 +125,9 @@ class SessionRouteTests(unittest.TestCase):
         self.addCleanup(lambda: self.client.portal.call(client.close))
 
     def test_create_sends_folder_model_and_rules(self):
-        r = self.client.post("/api/code/sessions", json={"project": "app", "title": "Fix tests"})
+        r = self.client.post("/api/code/sessions", json={"project": self.project["id"], "title": "Fix tests"})
         self.assertEqual(r.status_code, 201)
-        self.assertEqual(r.json()["project"], "app")
+        self.assertEqual(r.json()["project"], {"id": self.project["id"], "name": "app"})
         sent = self.state.requests[-1]
         self.assertEqual(sent["body"]["location"]["directory"], str(self.project_dir))
         self.assertEqual(sent["body"]["model"], {"providerID": "opengpt", "id": "coder-model"})
@@ -135,13 +136,14 @@ class SessionRouteTests(unittest.TestCase):
         self.assertTrue(sent["auth"].startswith("Basic "))
 
     def test_unknown_project(self):
-        r = self.client.post("/api/code/sessions", json={"project": "nope"})
+        import uuid
+        r = self.client.post("/api/code/sessions", json={"project": str(uuid.uuid4())})
         self.assertEqual(r.status_code, 404)
         self.assertEqual(self.client.post("/api/code/sessions", json={"project": "../x"}).status_code, 422)
 
     def test_list_rename_delete_and_messages(self):
-        self.client.post("/api/code/sessions", json={"project": "app"})
-        listed = self.client.get("/api/code/sessions", params={"project": "app"}).json()["sessions"]
+        self.client.post("/api/code/sessions", json={"project": self.project["id"]})
+        listed = self.client.get("/api/code/sessions", params={"project": self.project["id"]}).json()["sessions"]
         self.assertEqual([s["id"] for s in listed], [SID])
         self.assertEqual(listed[0]["title"], "New session")
 
@@ -185,7 +187,7 @@ class SessionRouteTests(unittest.TestCase):
     def test_agent_not_running(self):
         stopped = process.CodingAgent()
         with mock.patch.object(client, "agent", stopped):
-            r = self.client.get("/api/code/sessions", params={"project": "app"})
+            r = self.client.get("/api/code/sessions", params={"project": self.project["id"]})
         self.assertEqual(r.status_code, 503)
 
 

@@ -8,7 +8,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from unittest import mock
 
-from tests import _helpers  # noqa: F401
+from tests import _helpers
 from app.services.coding_agent import approvals, client, process, projects
 
 SID = "ses_approvalapproval"
@@ -90,8 +90,9 @@ class ApprovalRouteTests(unittest.TestCase):
         env = mock.patch.dict(os.environ, {"CODE_PROJECTS_ROOT": str(Path(tmp.name) / "projects")})
         env.start()
         self.addCleanup(env.stop)
-        projects.create_project("app")
-        self.agent = FakeAgent(projects.project_path("app"))
+        _helpers.use_sqlite()
+        self.project = projects.create_project("app")
+        self.agent = FakeAgent(projects.project_path(self.project["id"]))
 
         server = HTTPServer(("127.0.0.1", 0), make_handler(self.agent))
         threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -137,18 +138,18 @@ class ApprovalRouteTests(unittest.TestCase):
         self.assertEqual(self.agent.replies[0][1], {"decision": "always"})
 
     def test_saved_list_and_revoke(self):
-        saved = self.client.get("/api/code/projects/app/approvals").json()["approvals"]
+        saved = self.client.get(f"/api/code/projects/{self.project['id']}/approvals").json()["approvals"]
         self.assertEqual([s["id"] for s in saved], [SAVED])  # other projects' approvals are hidden
         self.assertEqual(saved[0]["allows"], "commands starting with `git`")
-        self.assertEqual(self.client.delete(f"/api/code/projects/app/approvals/{SAVED}").status_code, 204)
+        self.assertEqual(self.client.delete(f"/api/code/projects/{self.project['id']}/approvals/{SAVED}").status_code, 204)
         self.assertEqual(self.agent.deleted, [f"/api/permission/saved/{SAVED}"])
 
     def test_revoke_checks(self):
-        base = "/api/code/projects/app/approvals"
+        base = f"/api/code/projects/{self.project['id']}/approvals"
         self.assertEqual(self.client.delete(f"{base}/psv_otherotherother").status_code, 404)  # another project's
         self.assertEqual(self.client.delete(f"{base}/../x").status_code, 404)
         self.assertEqual(self.client.delete(f"{base}/bad").status_code, 422)
-        self.assertEqual(self.client.get("/api/code/projects/nope/approvals").status_code, 404)
+        self.assertEqual(self.client.get("/api/code/projects/00000000-0000-0000-0000-000000000000/approvals").status_code, 404)
         self.assertEqual(self.agent.deleted, [])
 
 

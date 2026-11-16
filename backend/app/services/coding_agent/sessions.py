@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from app.error_handlers import log_error
-from app.exceptions import NotFoundError, ValidationError
+from app.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.services.coding_agent import client, config, projects
 
 logger = logging.getLogger(__name__)
@@ -64,15 +64,8 @@ def validate_session_id(session_id: str) -> str:
     return session_id
 
 
-def _project_of(directory: Optional[str]) -> Optional[str]:
-    """The project name for an agent session folder, or None if it isn't a project."""
-    if not directory:
-        return None
-    try:
-        name = Path(directory).name
-        return name if projects.project_path(name) == Path(directory).resolve(strict=True) else None
-    except (NotFoundError, ValidationError, OSError, RuntimeError):
-        return None
+def _project_ref(project: dict) -> dict:
+    return {"id": project["id"], "name": project["name"]}
 
 
 # ----- conversions -----
@@ -82,12 +75,12 @@ def _clip(text: Any, limit: int = MAX_TEXT_CHARS) -> str:
     return text if len(text) <= limit else text[:limit] + f"\n… ({len(text) - limit} more characters)"
 
 
-def _session_info(raw: dict, project: str) -> dict:
+def _session_info(raw: dict, project: dict) -> dict:
     time = raw.get("time") or {}
     busy, idle = time.get("busy"), time.get("idle")
     return {
         "id": raw["id"],
-        "project": project,
+        "project": _project_ref(project),
         "title": raw.get("title") or "New session",
         "created": time.get("created"),
         "updated": time.get("updated"),
@@ -199,15 +192,18 @@ def convert_messages(raw: list) -> list:
 
 # ----- operations -----
 
-async def _get_raw(session_id: str) -> tuple[dict, str, Path]:
-    """The agent's session, its project name and folder; NotFoundError if not a project session."""
+async def _get_raw(session_id: str) -> tuple[dict, dict, Path]:
+    """The agent's session, its project and folder; NotFoundError unless its folder is a listed project."""
     validate_session_id(session_id)
     raw = (await client.call("GET", f"/api/session/{session_id}")).get("data") or {}
-    directory = (raw.get("location") or {}).get("directory")
-    project = _project_of(directory)
+    project = projects.project_for_directory((raw.get("location") or {}).get("directory"))
     if not project:
         raise NotFoundError("Session not found")
-    return raw, project, projects.project_path(project)
+    try:
+        directory = projects.project_path(project["id"])
+    except (NotFoundError, ValidationError, ForbiddenError):
+        raise NotFoundError("Session not found") from None
+    return raw, project, directory
 
 
 async def get_session(session_id: str) -> dict:
@@ -215,21 +211,22 @@ async def get_session(session_id: str) -> dict:
     return _session_info(raw, project)
 
 
-async def list_sessions(project: str) -> list[dict]:
-    directory = projects.project_path(project)
+async def list_sessions(project_id: str) -> list[dict]:
+    directory = projects.project_path(project_id)
+    project = projects.get_project(project_id)
     body = await client.call(
         "GET", "/api/session", directory=directory,
         params={"directory": str(directory), "order": "desc", "limit": MAX_SESSIONS_LISTED, "parentID": "null"},
     )
-    name = directory.name
     return [
-        _session_info(s, name) for s in (body or {}).get("data") or []
+        _session_info(s, project) for s in (body or {}).get("data") or []
         if (s.get("location") or {}).get("directory") == str(directory)
     ]
 
 
-async def create_session(project: str, title: Optional[str] = None) -> dict:
-    directory = projects.project_path(project)
+async def create_session(project_id: str, title: Optional[str] = None) -> dict:
+    directory = projects.project_path(project_id)
+    project = projects.get_project(project_id)
     payload = {
         "location": {"directory": str(directory)},
         "model": {"providerID": config.PROVIDER_ID, "id": config.model_id()},
@@ -238,7 +235,8 @@ async def create_session(project: str, title: Optional[str] = None) -> dict:
     if title and title.strip():
         payload["title"] = title.strip()[:MAX_TITLE_CHARS]
     raw = (await client.call("POST", "/api/session", directory=directory, json=payload)).get("data") or {}
-    return _session_info(raw, directory.name)
+    projects.touch(project_id)
+    return _session_info(raw, project)
 
 
 async def rename_session(session_id: str, title: str) -> dict:

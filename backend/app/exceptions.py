@@ -50,3 +50,8 @@ class UpstreamError(AppError):
 
     status_code = 502
     code = "UPSTREAM_ERROR"
+
+
+class ForbiddenError(AppError):
+    status_code = 403
+    code = "FORBIDDEN"

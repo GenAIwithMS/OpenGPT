@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { codeService } from '../services/api';
 
-const PROJECT_KEY = 'opengpt.code.project';
+const PROJECT_KEY = 'opengpt.code.projectId';
 
 const readProject = () => {
   try {
@@ -11,19 +11,21 @@ const readProject = () => {
   }
 };
 
-// Code page state shared with the sidebar: agent status, projects, the chosen
-// project and its sessions. Only active while the Code page is open.
+// Code page state shared with the sidebar: agent status, project folders, the
+// chosen project (by id) and its sessions. Only active while the Code page is open.
 export function useCodeWorkspace(active) {
   const [status, setStatus] = useState(null);
   const [projects, setProjects] = useState([]);
-  const [project, setProjectState] = useState(readProject);
+  const [projectsRoot, setProjectsRoot] = useState('');
+  const [canBrowse, setCanBrowse] = useState(false);
+  const [projectId, setProjectIdState] = useState(readProject);
   const [sessions, setSessions] = useState([]);
   const [error, setError] = useState(null);
 
-  const setProject = useCallback((name) => {
-    setProjectState(name);
+  const setProject = useCallback((id) => {
+    setProjectIdState(id);
     try {
-      if (name) localStorage.setItem(PROJECT_KEY, name);
+      if (id) localStorage.setItem(PROJECT_KEY, id);
       else localStorage.removeItem(PROJECT_KEY);
     } catch { /* storage unavailable */ }
   }, []);
@@ -49,29 +51,46 @@ export function useCodeWorkspace(active) {
 
   const refreshProjects = useCallback(async () => {
     try {
-      const list = await codeService.getProjects();
-      setProjects(list);
-      // Forget a remembered project that no longer exists.
-      setProjectState((current) => (current && !list.some((p) => p.name === current) ? null : current));
+      const data = await codeService.getProjects();
+      setProjects(data.projects);
+      setProjectsRoot(data.projects_root);
+      setCanBrowse(data.can_browse);
+      // Forget a remembered project that is no longer in the list.
+      setProjectIdState((current) => (current && !data.projects.some((p) => p.id === current) ? null : current));
     } catch (e) {
       setError(e.message);
     }
   }, []);
 
+  const project = projects.find((p) => p.id === projectId) || null;
+
   const refreshSessions = useCallback(async () => {
-    if (!project || !status?.available) {
+    if (!projectId || !status?.available) {
       setSessions([]);
       return;
     }
     try {
-      setSessions(await codeService.getSessions(project));
+      setSessions(await codeService.getSessions(projectId));
     } catch (e) {
+      setSessions([]);
       setError(e.message);
     }
-  }, [project, status?.available]);
+  }, [projectId, status?.available]);
 
   useEffect(() => { if (active) refreshProjects(); }, [active, refreshProjects]);
   useEffect(() => { if (active) refreshSessions(); }, [active, refreshSessions]);
+
+  // A project was opened or created: select it and refresh the list.
+  const addProject = useCallback(async (info) => {
+    setProject(info.id);
+    await refreshProjects();
+  }, [setProject, refreshProjects]);
+
+  const removeProject = useCallback(async (id) => {
+    await codeService.removeProject(id);
+    if (id === projectId) setProject(null);
+    await refreshProjects();
+  }, [projectId, setProject, refreshProjects]);
 
   const renameSession = useCallback(async (id, title) => {
     await codeService.renameSession(id, title);
@@ -84,7 +103,7 @@ export function useCodeWorkspace(active) {
   }, []);
 
   return {
-    status, projects, project, setProject, sessions, error, setError,
-    refreshProjects, refreshSessions, renameSession, deleteSession,
+    status, projects, projectsRoot, canBrowse, projectId, project, setProject, addProject, removeProject,
+    sessions, error, setError, refreshProjects, refreshSessions, renameSession, deleteSession,
   };
 }

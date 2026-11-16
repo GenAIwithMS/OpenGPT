@@ -37,13 +37,12 @@ const Composer = ({ onSend, onStop, working, disabled, placeholder }) => {
 const CodeView = ({
   sessionId,
   status,
-  projects,
-  project,
-  onProjectChange,
-  onProjectCreated,
+  workspace,
   onSessionCreated,
-  onSessionsChanged,
 }) => {
+  const { projects, project, projectId } = workspace;
+  const onProjectChange = workspace.setProject;
+  const onSessionsChanged = workspace.refreshSessions;
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState(null);
   const code = useCodeSession(sessionId, {
@@ -56,8 +55,8 @@ const CodeView = ({
   // Opening a session (e.g. from a link) selects its project, so the sidebar
   // lists that project's sessions.
   useEffect(() => {
-    if (sessionProject && sessionProject !== project) onProjectChange(sessionProject);
-  }, [sessionProject, project, onProjectChange]);
+    if (sessionProject?.id && sessionProject.id !== projectId) onProjectChange(sessionProject.id);
+  }, [sessionProject?.id, projectId, onProjectChange]);
 
   const available = Boolean(status?.available);
   const working = code.streaming || code.busy;
@@ -65,13 +64,13 @@ const CodeView = ({
   // First message on the landing page: start a session, then send.
   const start = async (text) => {
     if (!project) {
-      setStartError('Choose or create a project first.');
+      setStartError('Open a folder or create a project first.');
       return;
     }
     setStarting(true);
     setStartError(null);
     try {
-      const session = await codeService.createSession(project);
+      const session = await codeService.createSession(project.id);
       code.send(session.id, text);
       onSessionCreated(session.id);
     } catch (e) {
@@ -98,10 +97,18 @@ const CodeView = ({
           <span className="text-base font-semibold tracking-tight text-white select-none">OpenGPT</span>
           <span className="px-2 py-0.5 rounded-lg bg-gray-700/70 text-xs font-medium text-gray-300">Code</span>
           {sessionId ? (
-            sessionProject && <span className="ml-1 truncate text-sm text-gray-400">{sessionProject} · {code.session?.title}</span>
+            sessionProject && <span className="ml-1 truncate text-sm text-gray-400">{sessionProject.name} · {code.session?.title}</span>
           ) : (
-            <ProjectPicker projects={projects} value={project} onChange={onProjectChange}
-              onCreated={onProjectCreated} disabled={!available} />
+            <ProjectPicker
+              projects={projects}
+              project={project}
+              onChange={onProjectChange}
+              onAdded={workspace.addProject}
+              onRemove={(id) => workspace.removeProject(id).catch((e) => setStartError(e.message))}
+              canBrowse={workspace.canBrowse}
+              projectsRoot={workspace.projectsRoot}
+              disabled={!available}
+            />
           )}
           {status?.model && available && (
             <span className="ml-auto hidden truncate text-xs text-gray-500 sm:block" title="Model">{status.model}</span>
@@ -124,7 +131,8 @@ const CodeView = ({
               </p>
             </div>
             <Composer onSend={start} working={starting} disabled={!available || starting}
-              placeholder={project ? `Describe a coding task for ${project}` : 'Choose a project, then describe a task'} />
+              placeholder={project ? `Describe a coding task for ${project.name}` : 'Open a folder, then describe a task'} />
+            {project && <p className="mt-2 truncate text-center text-xs text-gray-500" title={project.path}>Working in {project.path}</p>}
             {error && <p role="alert" className="mt-3 text-center text-sm text-red-300">{error}</p>}
           </div>
         </div>

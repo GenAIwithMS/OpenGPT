@@ -431,8 +431,8 @@ function App() {
           ? (id, title) => code.renameSession(id, title).catch((e) => setAppError(e.message))
           : updateThreadTitle}
         onThreadDelete={isCodeView ? setCodeSessionToDelete : handleThreadDelete}
-        listLabel={isCodeView ? (code.project ? `Sessions · ${code.project}` : 'Sessions') : 'Recents'}
-        emptyText={isCodeView ? (code.project ? 'No sessions yet' : 'Choose a project') : 'No chats yet'}
+        listLabel={isCodeView ? (code.project ? `Sessions · ${code.project.name}` : 'Sessions') : 'Recents'}
+        emptyText={isCodeView ? (code.project ? 'No sessions yet' : 'Open a folder to start') : 'No chats yet'}
         isSidebarOpen={isSidebarOpen}
         toggleSidebar={toggleSidebar}
         isCollapsed={isSidebarCollapsed}
@@ -445,12 +445,8 @@ function App() {
         <CodeView
           sessionId={codeSessionId}
           status={code.status}
-          projects={code.projects}
-          project={code.project}
-          onProjectChange={code.setProject}
-          onProjectCreated={(name) => { code.setProject(name); code.refreshProjects(); }}
+          workspace={code}
           onSessionCreated={(id) => { navigate(`/code/${encodeURIComponent(id)}`); code.refreshSessions(); }}
-          onSessionsChanged={code.refreshSessions}
         />
       ) : (
       /* Main Chat Area */

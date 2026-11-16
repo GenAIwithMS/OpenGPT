@@ -1,4 +1,6 @@
 """Coding agent routes (/api/code/...)."""
+from typing import Optional
+
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
@@ -10,6 +12,7 @@ from app.schema.models import (
     CodeSessionTitleRequest,
     ProjectCreateRequest,
     ProjectListResponse,
+    ProjectOpenRequest,
     ProjectResponse,
 )
 from app.services.coding_agent import approvals, projects, sessions, stream
@@ -24,19 +27,41 @@ def code_status():
     return agent.status.public()
 
 
-# ----- projects -----
+# ----- projects (folders on this computer) -----
 
 @code_router.get("/projects", response_model=ProjectListResponse)
 def list_projects():
-    """Project folders the coding agent can work in."""
-    return {"projects": projects.list_projects()}
+    """Opened and created project folders, most recently used first."""
+    return {
+        "projects": projects.list_projects(),
+        "projects_root": str(projects.projects_root()),
+        "can_browse": projects.browsing_enabled(),
+    }
 
 
 @code_router.post("/projects", response_model=ProjectResponse, status_code=201,
                   dependencies=[Depends(rate_limit)])
 def create_project(request: ProjectCreateRequest):
-    """Create an empty project folder."""
+    """Create an empty project folder in CODE_PROJECTS_ROOT."""
     return projects.create_project(request.name)
+
+
+@code_router.post("/projects/open", response_model=ProjectResponse, dependencies=[Depends(rate_limit)])
+def open_project(request: ProjectOpenRequest):
+    """Open an existing folder on this computer as a project (local API only)."""
+    return projects.open_folder(request.path)
+
+
+@code_router.delete("/projects/{project_id}", status_code=204)
+def remove_project(project_id: str):
+    """Remove a project from the list. Its folder and files are not touched."""
+    projects.remove_project(project_id)
+
+
+@code_router.get("/folders")
+def browse_folders(path: Optional[str] = Query(None, max_length=4096)):
+    """Subfolders of a folder, for the folder browser (local API only)."""
+    return projects.browse(path)
 
 
 # ----- sessions -----

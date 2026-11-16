@@ -1,7 +1,7 @@
 """
 SQLAlchemy ORM Models for Chatbot Database
 """
-from sqlalchemy import Column, String, Integer, TIMESTAMP, LargeBinary, Index
+from sqlalchemy import Column, String, Integer, TIMESTAMP, LargeBinary, Index, Text
 from sqlalchemy.dialects.mysql import LONGBLOB
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.sql import func
@@ -60,3 +60,18 @@ class CheckpointWrite(Base):
     # No foreign key to checkpoints (like LangGraph's own savers): the saver
     # deletes writes together with their checkpoint, and a foreign key would
     # force it to invent placeholder checkpoints.
+
+
+class CodeProject(Base):
+    """Folders opened on the Code page (the coding agent works in one of them)."""
+    __tablename__ = "code_projects"
+
+    id = Column(String(36), primary_key=True)
+    # Real, absolute folder path. Paths can be long, so uniqueness is on a hash.
+    path = Column(Text, nullable=False)
+    path_hash = Column(String(64), nullable=False, unique=True)
+    name = Column(String(255), nullable=False)
+    created_at = Column(TIMESTAMP, default=func.current_timestamp())
+    last_opened_at = Column(TIMESTAMP, default=func.current_timestamp())
+
+    __table_args__ = (Index("idx_code_projects_last_opened", "last_opened_at"),)

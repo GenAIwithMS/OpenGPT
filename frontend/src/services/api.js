@@ -214,8 +214,13 @@ export const chatService = {
 export const codeService = {
   getStatus: async () => (await api.get('/code/status')).data,
 
-  getProjects: async () => (await api.get('/code/projects')).data.projects,
+  // {projects, projects_root, can_browse}
+  getProjects: async () => (await api.get('/code/projects')).data,
   createProject: async (name) => (await api.post('/code/projects', { name })).data,
+  openProject: async (path) => (await api.post('/code/projects/open', { path })).data,
+  removeProject: async (id) => { await api.delete(`/code/projects/${enc(id)}`); },
+  // A folder's subfolders: {path, name, parent, roots, can_open, entries: [{name, path}]}
+  browseFolders: async (path) => (await api.get('/code/folders', { params: path ? { path } : {} })).data,
 
   getSessions: async (project) => (await api.get('/code/sessions', { params: { project } })).data.sessions,
   createSession: async (project, title) => (await api.post('/code/sessions', { project, title })).data,

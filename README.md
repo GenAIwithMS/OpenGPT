@@ -171,7 +171,8 @@ Then set `LLM_API_KEY` and `LLM_MODEL` (the model name your endpoint uses).
 
 The **Code** page in the sidebar runs a coding agent on your machine. Pick or create a project, describe a task, and watch it work: its reply, its thinking, and a card for each command it runs or file it reads or edits.
 
-- **Projects** are folders directly inside `CODE_PROJECTS_ROOT` (default `backend/app/storage/code/`). Point it at e.g. `~/projects` to work on your own repositories. The agent only works inside the project folder; anything outside it is refused.
+- **Projects are folders on your computer.** Use **Open folder…** in the project menu to browse and pick one (or paste its path), or **New project** to create an empty one in `~/OpenGPT Projects` (`CODE_PROJECTS_ROOT`). Opened folders are remembered in the project menu; removing one from the list never deletes its files. The agent only works inside the chosen folder; anything outside it is refused.
+- **Which folders can be opened**: folders inside your home folder by default (`CODE_ALLOWED_ROOTS` to change), never hidden folders such as `~/.ssh`, and never the home folder itself. Browsing and opening folders only work while the API is local (the default).
 - **Approvals**: the agent asks before editing files, running commands, going online or reading `.env` files. Each request shows the command or the diff, with **Allow once**, **Always allow** (saved for the project; it says exactly what it covers, e.g. "commands starting with `git`") and **Deny** (optionally with a reason for the agent). Saved approvals can be reviewed and revoked from the project menu.
 - **Model**: it uses `LLM_*` like the chat. Its requests are large (about 6–9k tokens of instructions and tool descriptions each), so set `CODING_AGENT_MODEL` to a model or plan with higher limits if requests fail with a "larger than the model allows" or rate-limit message.
 - **Stop** ends the current task. If you close the page, the agent keeps working; reopen the session to see the result.
@@ -193,7 +194,7 @@ All settings live in `backend/.env`. [`backend/.env.example`](backend/.env.examp
 | Security | `API_TOKEN` (required when `HOST` is not local; set `VITE_API_TOKEN` in `frontend/.env.local` to match) |
 | Limits | `RATE_LIMIT_PER_MINUTE`, `MAX_MESSAGE_CHARS`, `MAX_UPLOAD_MB`, `MAX_BLOG_SECTIONS`, `MAX_CHECKPOINTS_PER_THREAD`, ... |
 | Tracing | `LANGSMITH_TRACING` (off by default), `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT` |
-| Coding agent | `CODING_AGENT_ENABLED`, `CODING_AGENT_MODEL`, `CODE_PROJECTS_ROOT`, `BUN_PATH`, `CODING_AGENT_PORT`, or `CODING_AGENT_URL` + `CODING_AGENT_PASSWORD` for an agent you start yourself |
+| Coding agent | `CODING_AGENT_ENABLED`, `CODING_AGENT_MODEL`, `CODE_ALLOWED_ROOTS`, `CODE_PROJECTS_ROOT`, `BUN_PATH`, `CODING_AGENT_PORT`, or `CODING_AGENT_URL` + `CODING_AGENT_PASSWORD` for an agent you start yourself |
 | Frontend (`frontend/.env.local`) | `VITE_API_URL` (default `/api`: the Vite dev server forwards it to the backend; set the backend URL for other setups), `VITE_API_TOKEN` (when `API_TOKEN` is set) |
 
 Tools without a key are simply unavailable. For example, without `GOOGLE_API_KEY` blogs show image captions instead of images.
@@ -224,7 +225,7 @@ Tools without a key are simply unavailable. For example, without `GOOGLE_API_KEY
 │   │   ├── database/              # MySQL config, models, checkpoint saver
 │   │   ├── tools/                 # Search, weather, stocks, calculator,
 │   │   │                          # blogs/ and deep_research/
-│   │   └── storage/               # Uploaded documents, blogs, images, code projects (git-ignored)
+│   │   └── storage/               # Uploaded documents, blogs, images (git-ignored)
 │   ├── scripts/                   # One-off maintenance scripts
 │   ├── evals/                     # LangSmith evaluations
 │   └── tests/
@@ -266,7 +267,9 @@ All routes are under `/api`. When `API_TOKEN` is set, send `Authorization: Beare
 
 ### Code (coding agent)
 - `GET /api/code/status`: whether the coding agent is ready, and its model
-- `GET /api/code/projects`, `POST /api/code/projects`: list or create project folders
+- `GET /api/code/projects`: opened and created project folders; `POST /api/code/projects`: create one in `CODE_PROJECTS_ROOT`
+- `GET /api/code/folders?path=...`: browse folders; `POST /api/code/projects/open`: open a folder as a project (local API only)
+- `DELETE /api/code/projects/{id}`: remove a project from the list (its files are kept)
 - `GET /api/code/sessions?project=...`, `POST /api/code/sessions`: list or start coding sessions
 - `GET /api/code/sessions/{id}`, `PUT /api/code/sessions/{id}/title`, `DELETE /api/code/sessions/{id}`
 - `GET /api/code/sessions/{id}/messages`: a session's history
