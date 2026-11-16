@@ -15,6 +15,7 @@ the Code page. Data is stored in MySQL.
 | `backend/app/services/coding_agent/` | Starts and talks to the coding agent | [its AGENTS.md](backend/app/services/coding_agent/AGENTS.md) |
 | `frontend/` | React + Vite + Tailwind UI | [frontend/AGENTS.md](frontend/AGENTS.md) |
 | `coding-agent/` | The coding agent service (TypeScript, Bun), a trimmed fork | [coding-agent/AGENTS.md](coding-agent/AGENTS.md) |
+| `docs/` | Developer docs: architecture, configuration, one page per service, guides, decisions | [docs/README.md](docs/README.md) |
 | `README.md` | What OpenGPT is, quick start, configuration | |
 
 More specific `AGENTS.md` files override this one for their folder.
@@ -57,8 +58,10 @@ finish. Add or update tests with every behaviour change.
   `CODING_AGENT_PLAN.md`, `SETTINGS_PLAN.md` (private plans),
   `instructions-to-add-settings.txt`, `personal-notes.txt`, `settings/` and
   reference screenshots in the repo root.
-- **Docs.** When you change behaviour, settings or a convention, update the
-  matching `AGENTS.md`, the README or `.env.example` in the same change.
+- **Docs.** When you change behaviour, settings or a convention, update in
+  the same change: the service's page in `docs/services/`, new settings in
+  `.env.example` and `docs/configuration.md`, and the matching `AGENTS.md`.
+  Record significant design choices in `docs/decisions/`.
 
 ## Git
 

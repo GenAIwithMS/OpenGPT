@@ -77,6 +77,24 @@ class ConnectorTests(Base):
         with mock.patch.object(connectors, "MAX_CONNECTORS", 1), self.assertRaises(ValidationError):
             connectors.create(name="two", kind="local", command="y")
 
+    def test_every_catalog_entry_is_valid(self):
+        ids = [e["id"] for e in connectors.CATALOG]
+        self.assertEqual(len(ids), len(set(ids)), "catalog ids must be unique")
+        for e in connectors.CATALOG:
+            with self.subTest(e["id"]):
+                self.assertRegex(e["id"], connectors._NAME_RE)
+                for field in ("name", "description", "category", "homepage"):
+                    self.assertTrue(e.get(field), f"missing {field}")
+                self.assertTrue(e["homepage"].startswith("https://"))
+                self.assertIn(e["kind"], ("local", "remote"))
+                self.assertIn(e.get("auth", "none"), ("oauth", "key", "none"))
+                if e["kind"] == "remote":
+                    self.assertTrue(e["url"].startswith("https://"))
+                else:
+                    self.assertTrue(e["command"] and all(isinstance(p, str) and p for p in e["command"]))
+                for spec in (e.get("env") or []) + (e.get("headers") or []):
+                    self.assertTrue(spec.get("name") and spec.get("label"))
+
     def test_catalog_add(self):
         with self.assertRaises(ValidationError):
             connectors.add_from_catalog("github", {})  # token required
