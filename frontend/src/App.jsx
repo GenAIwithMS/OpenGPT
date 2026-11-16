@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useLayoutEffect, lazy, Suspense } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
+import SearchPalette, { searchActionIcons } from './components/SearchPalette';
 import MessageList from './components/MessageList';
 import MessageInput from './components/MessageInput';
 import ConfirmationModal from './components/ConfirmationModal';
@@ -8,7 +9,7 @@ import CodeView from './components/CodeView';
 import SettingsModal from './components/settings/SettingsModal';
 import { useSettings } from './hooks/useSettings';
 import { getPreferences } from './lib/preferences';
-import { FOCUS_SEARCH_EVENT, useShortcuts } from './lib/shortcuts';
+import { useShortcuts } from './lib/shortcuts';
 import { notifyFinished } from './lib/notify';
 import { useThreads } from './hooks/useThreads';
 import { useChat } from './hooks/useChat';
@@ -135,6 +136,7 @@ function App() {
   const appSettings = useSettings();
   // Which settings page is open (null: the popup is closed).
   const [settingsSection, setSettingsSection] = useState(null);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [codeSessionToDelete, setCodeSessionToDelete] = useState(null);
   // Temporary mode is driven by the `?temporary-chat=true` URL query param, so
   // it survives refreshes and is shareable. A temp chat is never persisted.
@@ -414,25 +416,27 @@ function App() {
     setIsSidebarCollapsed((c) => !c);
   };
 
+  // A new temporary (session-only) chat: Ctrl/Cmd+Shift+U or the search window.
+  const startTemporaryChat = () => {
+    setSettingsSection(null);
+    resetChat();
+    setCurrentThreadId(null);
+    setIsTempChat(true);
+    setIsSidebarOpen(false);
+    setPendingAttachments([]);
+    setResearchPanel(null);
+    navigate('/chat?temporary-chat=true');
+  };
+
   // Keyboard shortcuts (listed in Settings > Shortcuts; see lib/shortcuts.js).
   const isDesktop = () => window.innerWidth >= 1024;
   useShortcuts({
     newChat: () => { setSettingsSection(null); handleNewThread(); },
-    temporaryChat: () => {
-      setSettingsSection(null);
-      resetChat();
-      setCurrentThreadId(null);
-      setIsTempChat(true);
-      setIsSidebarOpen(false);
-      setPendingAttachments([]);
-      setResearchPanel(null);
-      navigate('/chat?temporary-chat=true');
-    },
+    temporaryChat: startTemporaryChat,
     openCode: () => { setSettingsSection(null); handleOpenCode(); },
     searchChats: () => {
       setSettingsSection(null);
-      if (!isDesktop()) setIsSidebarOpen(true);
-      window.dispatchEvent(new Event(FOCUS_SEARCH_EVENT));
+      setSearchOpen((open) => !open);
     },
     toggleSidebar: () => (isDesktop() ? toggleSidebarCollapse() : setIsSidebarOpen((open) => !open)),
     focusInput: () => {
@@ -488,7 +492,25 @@ function App() {
         onOpenCode={handleOpenCode}
         displayName={appSettings.displayName}
         onOpenSettings={(section) => { setIsSidebarOpen(false); setSettingsSection(section); }}
+        onOpenSearch={() => { setIsSidebarOpen(false); setSearchOpen(true); }}
       />
+
+      {searchOpen && (
+        <SearchPalette
+          threads={threads}
+          onClose={() => setSearchOpen(false)}
+          onOpenChat={handleThreadSelect}
+          onOpenProject={(id) => { code.setProject(id); navigate('/code'); }}
+          onOpenSession={(projectId, id) => { code.setProject(projectId); navigate(`/code/${encodeURIComponent(id)}`); }}
+          actions={[
+            { id: 'new', title: 'New chat', icon: searchActionIcons.MessageCirclePlus, run: handleNewThread },
+            { id: 'temporary', title: 'Temporary chat', icon: searchActionIcons.MessageCircleDashed,
+              run: startTemporaryChat },
+            { id: 'code', title: 'OpenGPT Code', icon: searchActionIcons.Code2, run: handleOpenCode },
+            { id: 'settings', title: 'Settings', icon: searchActionIcons.Settings, run: () => setSettingsSection('general') },
+          ]}
+        />
+      )}
 
       {settingsSection && (
         <SettingsModal

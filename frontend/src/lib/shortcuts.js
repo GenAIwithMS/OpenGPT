@@ -8,7 +8,7 @@ export const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(
 
 export const SHORTCUTS = [
   { id: 'newChat', label: 'New chat', keys: ['Mod', 'Shift', 'O'] },
-  { id: 'searchChats', label: 'Search chats', keys: ['Mod', 'K'] },
+  { id: 'searchChats', label: 'Search', keys: ['Mod', 'K'] },
   { id: 'openCode', label: 'Open the Code page', keys: ['Mod', 'Shift', 'L'] },
   { id: 'temporaryChat', label: 'New temporary chat', keys: ['Mod', 'Shift', 'U'] },
   { id: 'toggleSidebar', label: 'Show or hide the sidebar', keys: ['Mod', 'Shift', 'S'] },
@@ -61,5 +61,3 @@ export function useShortcuts(handlers) {
   }, []);
 }
 
-// The sidebar's search box listens for this (Mod+K).
-export const FOCUS_SEARCH_EVENT = 'opengpt:focus-search';
