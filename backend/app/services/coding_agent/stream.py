@@ -28,6 +28,7 @@ import httpx
 
 from app.error_handlers import log_error
 from app.exceptions import ConflictError
+from app.services import personalization
 from app.services.coding_agent import approvals, client, sessions
 
 logger = logging.getLogger(__name__)
@@ -161,6 +162,7 @@ async def _relay(session_id: str, text: str, info: dict, directory) -> AsyncIter
             for out in translator.translate(first):
                 yield sse(out)
 
+        await sync_profile(session_id, directory)
         await client.call("POST", f"/api/session/{session_id}/prompt", directory=directory,
                           json={"text": text})
 
@@ -187,6 +189,25 @@ async def _relay(session_id: str, text: str, info: dict, directory) -> AsyncIter
     finally:
         _running.discard(session_id)
         await events.aclose()
+
+
+PROFILE_ENTRY = "opengpt-profile"
+
+
+async def sync_profile(session_id: str, directory) -> None:
+    """Give the agent the current Personalization profile (or remove it when empty).
+
+    The agent shows it to the model as session context and tells the model
+    when it changed, so edits in Settings apply from the next message.
+    """
+    text = personalization.profile_text()
+    try:
+        await client.call(
+            "PUT", f"/api/experimental/session/{session_id}/instructions/entries/{PROFILE_ENTRY}",
+            directory=directory, json={"value": text or None},
+        )
+    except Exception as e:  # never block a turn on this
+        logger.warning("Could not send the profile to the coding agent: %s", getattr(e, "message", e))
 
 
 async def stop(session_id: str) -> dict:

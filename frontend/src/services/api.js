@@ -216,6 +216,15 @@ export const settingsService = {
   get: async () => (await api.get('/settings')).data,
   // Partial update, e.g. {general: {sound_on_finish: true}}; returns all settings.
   update: async (changes) => (await api.put('/settings', changes)).data,
+
+  // Knowledge base: {files: [{id, filename, chunks, pages}], max_files, max_mb}
+  listKnowledge: async () => (await api.get('/settings/knowledge')).data,
+  addKnowledge: async (file) => {
+    const form = new FormData();
+    form.append('file', file);
+    return (await api.post('/settings/knowledge', form, { headers: { 'Content-Type': 'multipart/form-data' } })).data;
+  },
+  removeKnowledge: async (id) => { await api.delete(`/settings/knowledge/${enc(id)}`); },
 };
 
 // Coding agent (the Code page). See backend/app/router/code.py.

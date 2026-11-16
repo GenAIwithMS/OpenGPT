@@ -13,6 +13,9 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.memory import MemorySaver
 from app.tools import Search, Weather, Calculator, Stock_price
 from app.services.rag import retrieve_from_document
+from app.services import knowledge
+from app.services.knowledge import Knowledge
+from app.services.personalization import profile_text
 from app.services.citations import renumber_sources
 from app.database import DatabaseConfig,MySQLCheckpointSaver,ThreadMetadata
 from sqlalchemy.sql import func
@@ -28,13 +31,15 @@ model = LazyChatModel("model")
 # among them: it runs for minutes and has its own streaming path, so it only
 # starts when the user picks it from the tools menu (see ChatService).
 all_tools = [Search, Weather, Calculator, Stock_price]
+# The Knowledge tool is offered only while the knowledge base has documents.
+graph_tools = all_tools + [Knowledge]
 
 # Without this, some models invent tools such as "Open_URL" after a search
 # returns links, which the API then rejects.
 SYSTEM_PROMPT = SystemMessage(
     content=(
         "You are OpenGPT, a helpful assistant. The only tools available are the ones "
-        "provided in this request (Search, Weather, Calculator, Stock_price); "
+        "provided in this request; "
         "you cannot open URLs or browse pages. When a Search result arrives, answer the "
         "user directly from it, citing sources inline as markdown links like "
         "[Site name](url); never use 【n†source】 style markers, and never put links or "
@@ -184,6 +189,22 @@ def chat_node(state: Chatstate):
                 "tool first, then answer from its results."
             )
 
+    # Settings > Personalization: who the user is and their instructions.
+    profile = profile_text()
+    if profile:
+        system_text += "\n\n" + profile
+
+    # Settings > Personalization > Knowledge: documents searchable from any chat.
+    tools = list(all_tools)
+    if knowledge.has_documents():
+        tools.append(Knowledge)
+        names = ", ".join(knowledge.titles())
+        system_text += (
+            "\n\nThe user has a knowledge base with these documents: " + names + ". "
+            "When a question may relate to them, call the Knowledge tool and say which "
+            "document the answer comes from."
+        )
+
     messages = [SystemMessage(content=system_text)] + messages
     messages = close_dangling_tool_calls(list(messages))
 
@@ -191,7 +212,7 @@ def chat_node(state: Chatstate):
     # single merged message: ``add_messages`` replaces a message that shares an
     # id, so yielding raw chunks would leave only the last (empty) chunk in the
     # state and drop the tool calls before the tool node ever ran.
-    model_with_tools = model.bind_tools(all_tools)
+    model_with_tools = model.bind_tools(tools)
     response = None
     for chunk in model_with_tools.stream(messages):
         response = chunk if response is None else response + chunk
@@ -208,7 +229,7 @@ def _tool_error(e: Exception) -> str:
     return f"Tool error ({type(e).__name__}): {e}. Check the arguments and try again, or answer without this tool."
 
 
-tool_node = ToolNode(all_tools, handle_tool_errors=_tool_error)
+tool_node = ToolNode(graph_tools, handle_tool_errors=_tool_error)
 
 # Build the state graph
 graph = StateGraph(Chatstate)

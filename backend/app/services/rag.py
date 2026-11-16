@@ -339,6 +339,34 @@ def get_document_info(thread_id: str) -> Optional[dict]:
     }
 
 
+def delete_file(thread_id: str, stored_name: str) -> bool:
+    """Delete one stored document. Returns False if it isn't there.
+
+    The search index is rebuilt from the remaining files on next use.
+    """
+    thread_key = _safe_thread_id(thread_id)
+    with _ingest_lock(thread_key):
+        metadata = _thread_metadata(thread_key)
+        files = (metadata or {}).get("files", [])
+        keep = [f for f in files if f.get("stored_name") != stored_name]
+        if len(keep) == len(files):
+            return False
+        path = _stored_path(stored_name)
+        if os.path.exists(path):
+            os.remove(path)
+        if keep:
+            metadata["files"] = keep
+            _write_metadata(thread_key, metadata)
+            _THREAD_METADATA[thread_key] = metadata
+        else:
+            _, meta_path = _thread_paths(thread_key)
+            if os.path.exists(meta_path):
+                os.remove(meta_path)
+            _THREAD_METADATA.pop(thread_key, None)
+        _THREAD_RETRIEVERS.pop(thread_key, None)
+    return True
+
+
 def delete_documents(thread_id: str) -> None:
     """Delete all of a thread's stored documents, its metadata and cached index."""
     thread_key = _safe_thread_id(thread_id)

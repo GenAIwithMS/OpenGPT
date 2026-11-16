@@ -393,8 +393,10 @@ class ChatService:
                     name = tc.get("name", "tool")
                     if tc_id and tc_id not in seen_tool_calls:
                         seen_tool_calls.add(tc_id)
+                        label = ("Searching your knowledge base..." if name == "Knowledge"
+                                 else f"Using {name}...")
                         yield {
-                            "content": f"Using {name}...",
+                            "content": label,
                             "message_type": "thinking",
                         }
 

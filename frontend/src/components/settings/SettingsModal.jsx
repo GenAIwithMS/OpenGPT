@@ -6,6 +6,7 @@ import { Avatar, PageHeader } from './controls';
 import AccountPage from './AccountPage';
 import GeneralPage from './GeneralPage';
 import ShortcutsPage from './ShortcutsPage';
+import PersonalizationPage from './PersonalizationPage';
 
 // Settings popup: navigation on the left, the chosen page on the right.
 export const SECTIONS = [
@@ -89,6 +90,8 @@ const SettingsModal = ({ section, onSectionChange, onClose, settings, save, disp
     page = <GeneralPage settings={settings} save={save} />;
   } else if (current.id === 'shortcuts') {
     page = <ShortcutsPage />;
+  } else if (current.id === 'personalization') {
+    page = <PersonalizationPage settings={settings} save={save} />;
   } else {
     page = <ComingSoon id={current.id} label={current.label} />;
   }

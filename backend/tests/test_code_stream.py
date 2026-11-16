@@ -25,9 +25,18 @@ class FakeAgent:
         self.directory = directory
         self.script = []          # events sent after a prompt
         self.prompts = []
+        self.entries = []          # instruction entries written (profile)
         self.interrupts = 0
         self.busy = False
-        self.events = queue.Queue()
+        # One queue per open event stream; events go to all of them, like the
+        # real agent (a finished turn's old stream must not swallow new events).
+        self.streams = []
+        self.lock = threading.Lock()
+
+    def publish(self, item):
+        with self.lock:
+            for q in list(self.streams):
+                q.put(item)
 
     def session(self):
         time = {"created": 1, "busy": 5, "idle": 1} if self.busy else {"created": 1, "busy": 1, "idle": 5}
@@ -55,17 +64,32 @@ def make_handler(agent):
                 self.send_header("Content-Type", "text/event-stream")
                 self.send_header("Connection", "close")
                 self.end_headers()
-                self.wfile.write(b'data: {"type":"server.connected","data":{}}\n\n: heartbeat\n\n')
-                self.wfile.flush()
-                while True:
-                    item = agent.events.get()
-                    if item is None:  # agent closes the stream
-                        return
-                    self.wfile.write(f"data: {json.dumps(item)}\n\n".encode())
+                mine = queue.Queue()
+                with agent.lock:
+                    agent.streams.append(mine)
+                try:
+                    self.wfile.write(b'data: {"type":"server.connected","data":{}}\n\n: heartbeat\n\n')
                     self.wfile.flush()
+                    while True:
+                        item = mine.get()
+                        if item is None:  # agent closes the stream
+                            return
+                        self.wfile.write(f"data: {json.dumps(item)}\n\n".encode())
+                        self.wfile.flush()
+                except OSError:
+                    return  # the client went away
+                finally:
+                    with agent.lock:
+                        agent.streams.remove(mine)
             if self.path == f"/api/session/{SID}":
                 return self._json(200, {"data": agent.session()})
             self._json(404, {})
+
+        def do_PUT(self):
+            length = int(self.headers.get("Content-Length") or 0)
+            body = json.loads(self.rfile.read(length) or b"null")
+            agent.entries.append((self.path, body))
+            self._json(200, {"data": None})
 
         def do_POST(self):
             length = int(self.headers.get("Content-Length") or 0)
@@ -74,7 +98,7 @@ def make_handler(agent):
                 agent.prompts.append(body)
                 self._json(200, {"data": {"id": "msg"}})
                 for item in agent.script:
-                    agent.events.put(item)
+                    agent.publish(item)
                 return
             if self.path == f"/api/session/{SID}/interrupt":
                 agent.interrupts += 1
@@ -100,7 +124,7 @@ class StreamTests(unittest.TestCase):
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.addCleanup(server.server_close)
         self.addCleanup(server.shutdown)
-        self.addCleanup(lambda: self.agent.events.put(None))
+        self.addCleanup(lambda: self.agent.publish(None))
 
         fake = process.CodingAgent()
         fake._password = "pw"
@@ -155,6 +179,20 @@ class StreamTests(unittest.TestCase):
         self.assertEqual(events[5]["resources"], ["ls"])
         self.assertEqual(events[-1], {"type": "done", "outcome": "succeeded"})
         self.assertNotIn(SID, stream._running)
+
+    def test_profile_is_sent_before_the_message(self):
+        from app.services import settings
+        settings.update({"profile": {"nickname": "Ali", "instructions": "Use tabs."}})
+        self.agent.script = [ev("session.execution.succeeded")]
+        self.turn()
+        path, body = self.agent.entries[-1]
+        self.assertEqual(path, f"/api/experimental/session/{SID}/instructions/entries/opengpt-profile")
+        self.assertIn("Name: Ali", body["value"])
+        self.assertIn("Use tabs.", body["value"])
+        # An empty profile removes the entry.
+        settings.update({"profile": {"nickname": "", "instructions": ""}})
+        self.turn()
+        self.assertIsNone(self.agent.entries[-1][1]["value"])
 
     def test_model_error_is_safe_and_reported_once(self):
         error = {"type": "provider.invalid-request", "status": 413, "message": "org_SECRET too large"}
