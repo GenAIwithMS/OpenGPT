@@ -321,7 +321,7 @@ The backend logs a reminder at startup if old data is still present.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, checks and commit conventions. AI coding agents read [AGENTS.md](AGENTS.md) and the `AGENTS.md` in each part of the project.
 
 ## Thanks to Contributors
 
