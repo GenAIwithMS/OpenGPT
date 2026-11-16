@@ -38,3 +38,20 @@ class ConflictError(AppError):
 class RateLimitError(AppError):
     status_code = 429
     code = "RATE_LIMIT"
+
+
+class ServiceUnavailableError(AppError):
+    status_code = 503
+    code = "SERVICE_UNAVAILABLE"
+
+
+class UpstreamError(AppError):
+    """A service the backend depends on (e.g. the coding agent) failed."""
+
+    status_code = 502
+    code = "UPSTREAM_ERROR"
+
+
+class ForbiddenError(AppError):
+    status_code = 403
+    code = "FORBIDDEN"

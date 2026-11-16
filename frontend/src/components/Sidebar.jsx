@@ -45,6 +45,8 @@ const Sidebar = ({
   onToggleCollapse,
   isCodeActive = false,
   onOpenCode,
+  listLabel = 'Recents',
+  emptyText = 'No chats yet',
 }) => {
   const [editingThreadId, setEditingThreadId] = useState(null);
   const [editTitle, setEditTitle] = useState('');
@@ -319,8 +321,8 @@ const Sidebar = ({
                 onClick={() => setRecentsOpen((o) => !o)}
                 className="group flex items-center gap-1 px-3 pt-3 pb-1 text-left shrink-0"
               >
-                <span className="text-sm font-medium text-gray-300 group-hover:text-gray-100 transition-colors">
-                  Recents
+                <span className="text-sm font-medium text-gray-300 group-hover:text-gray-100 transition-colors truncate">
+                  {listLabel}
                 </span>
                 <ChevronDown
                   size={16}
@@ -337,12 +339,14 @@ const Sidebar = ({
                 className={`
                   overflow-y-auto px-2 py-2 space-y-0.5 thin-scroll
                   transition-[max-height,opacity] duration-300 ease-out
-                  ${recentsOpen ? 'max-h-[60vh] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}
+                  ${recentsOpen
+                    ? 'flex-1 min-h-0 max-h-[100vh] opacity-100' /* fill down to the footer, scroll inside */
+                    : 'flex-none max-h-0 opacity-0 overflow-hidden'}
                 `}
               >
               {filteredThreads.length === 0 ? (
                 <div className="px-3 py-6 text-center text-xs text-gray-500">
-                  {query ? 'No chats found' : 'No chats yet'}
+                  {query ? 'Nothing found' : emptyText}
                 </div>
               ) : (
                 filteredThreads.map((thread, index) => {

@@ -7,6 +7,7 @@
 //   LLM_API_KEY    API key for the endpoint
 //   LLM_BASE_URL   endpoint URL (default: the provider's own API)
 //   LLM_MODEL      model name (required)
+//   CODING_AGENT_MODEL  model for the coding agent (default: LLM_MODEL)
 
 export const PROVIDER_ID = "opengpt"
 
@@ -31,7 +32,7 @@ function setting(env: NodeJS.ProcessEnv, name: string) {
 
 /** The config JSON for the LLM_* settings, or undefined when LLM_MODEL is not set. */
 export function configFromLlmEnv(env: NodeJS.ProcessEnv): string | undefined {
-  const model = setting(env, "LLM_MODEL")
+  const model = setting(env, "CODING_AGENT_MODEL") ?? setting(env, "LLM_MODEL")
   if (!model) return undefined
   const provider = (setting(env, "LLM_PROVIDER") ?? "openai").toLowerCase()
   if (provider !== "openai" && provider !== "anthropic") return undefined

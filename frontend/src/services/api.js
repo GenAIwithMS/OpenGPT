@@ -39,8 +39,10 @@ const enc = encodeURIComponent;
 
 // POST a JSON body and read the Server-Sent Events reply. Returns an object
 // with close(), which aborts the request (used by the Stop button).
-// A stream that ends without a `done` or `error` event is reported as an error.
-const postStream = (path, body, onMessage, onError) => {
+// A stream that ends without a final event (by default `done` or `error`) is
+// reported as an error.
+const isChatFinal = (event) => Boolean(event.done || event.error);
+const postStream = (path, body, onMessage, onError, isFinal = isChatFinal) => {
   const controller = new AbortController();
   let finished = false;
   const fail = (err) => {
@@ -88,7 +90,7 @@ const postStream = (path, body, onMessage, onError) => {
             console.error('Error parsing message:', error);
             continue;
           }
-          if (parsed.done || parsed.error) finished = true;
+          if (isFinal(parsed)) finished = true;
           onMessage(parsed);
         }
       }
@@ -205,5 +207,39 @@ export const chatService = {
       },
     });
     return response.data;
+  },
+};
+
+// Coding agent (the Code page). See backend/app/router/code.py.
+export const codeService = {
+  getStatus: async () => (await api.get('/code/status')).data,
+
+  // {projects, projects_root, can_browse}
+  getProjects: async () => (await api.get('/code/projects')).data,
+  createProject: async (name) => (await api.post('/code/projects', { name })).data,
+  openProject: async (path) => (await api.post('/code/projects/open', { path })).data,
+  removeProject: async (id) => { await api.delete(`/code/projects/${enc(id)}`); },
+  // A folder's subfolders: {path, name, parent, roots, can_open, entries: [{name, path}]}
+  browseFolders: async (path) => (await api.get('/code/folders', { params: path ? { path } : {} })).data,
+
+  getSessions: async (project) => (await api.get('/code/sessions', { params: { project } })).data.sessions,
+  createSession: async (project, title) => (await api.post('/code/sessions', { project, title })).data,
+  renameSession: async (id, title) => (await api.put(`/code/sessions/${enc(id)}/title`, { title })).data,
+  deleteSession: async (id) => { await api.delete(`/code/sessions/${enc(id)}`); },
+  getMessages: async (id) => (await api.get(`/code/sessions/${enc(id)}/messages`)).data,
+
+  // Send a message and stream the agent's work. Events: start, text,
+  // reasoning, tool, approval, approval_done, title, error, done.
+  streamTurn: (id, text, onEvent, onError) =>
+    postStream(`/code/sessions/${enc(id)}/stream`, { text }, onEvent, onError, (e) => e.type === 'done'),
+  stop: async (id) => (await api.post(`/code/sessions/${enc(id)}/stop`)).data,
+
+  getApprovals: async (id) => (await api.get(`/code/sessions/${enc(id)}/approvals`)).data.approvals,
+  answerApproval: async (id, approvalId, decision, reason) => {
+    await api.post(`/code/sessions/${enc(id)}/approvals/${enc(approvalId)}`, { decision, reason: reason || undefined });
+  },
+  getSavedApprovals: async (project) => (await api.get(`/code/projects/${enc(project)}/approvals`)).data.approvals,
+  revokeSavedApproval: async (project, savedId) => {
+    await api.delete(`/code/projects/${enc(project)}/approvals/${enc(savedId)}`);
   },
 };

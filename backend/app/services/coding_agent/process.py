@@ -61,6 +61,10 @@ _AGENT_FLAGS = {
     # A project folder can't change the agent's settings or permissions.
     "OPENGPT_DISABLE_PROJECT_CONFIG": "1",
     "OPENGPT_DISABLE_CLAUDE_CODE": "1",
+    # Files outside the session's project folder count as outside, even when
+    # the folder sits inside a larger git repository (e.g. the default
+    # backend/app/storage/code, inside the OpenGPT repository).
+    "OPENGPT_STRICT_LOCATION": "1",
 }
 
 

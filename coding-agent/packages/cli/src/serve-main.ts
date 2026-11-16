@@ -24,6 +24,9 @@ const noProxy = [
 process.env.NO_PROXY = noProxy
 process.env.no_proxy = noProxy
 
+// File access stops at the session's folder, not the whole repository around it.
+process.env.OPENGPT_STRICT_LOCATION ??= "1"
+
 // Default model: OpenGPT's LLM_* settings, unless a config was passed in.
 if (!process.env.OPENGPT_CONFIG_CONTENT) {
   const config = configFromLlmEnv(process.env)

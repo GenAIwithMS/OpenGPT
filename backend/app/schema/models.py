@@ -1,7 +1,7 @@
 import os
 
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 
 # Size limits for request bodies, so one request can't send megabytes of text
 # to the model (cost) or the database. Override with env vars if needed.
@@ -137,3 +137,61 @@ class DocumentInfoResponse(BaseModel):
     documents: Optional[int] = Field(None, description="Number of document pages")
     chunks: Optional[int] = Field(None, description="Number of text chunks")
     thread_id: str = Field(..., description="Thread ID")
+
+
+# ----- Coding agent -----
+
+class ProjectCreateRequest(BaseModel):
+    """Create a project folder for the coding agent"""
+
+    name: str = Field(..., min_length=1, max_length=64, description="Folder name inside CODE_PROJECTS_ROOT")
+
+
+class ProjectOpenRequest(BaseModel):
+    """Open an existing folder on this computer as a project"""
+
+    path: str = Field(..., min_length=1, max_length=4096, description="Full folder path, e.g. ~/projects/my-app")
+
+
+class ProjectResponse(BaseModel):
+    """A project folder"""
+
+    id: str = Field(..., description="Project id")
+    name: str = Field(..., description="Folder name")
+    path: str = Field(..., description="Full folder path")
+    exists: bool = Field(..., description="Whether the folder is still there")
+    last_opened: Optional[str] = Field(None, description="Last used (ISO 8601, UTC)")
+
+
+class ProjectListResponse(BaseModel):
+    """Project folders, most recently used first"""
+
+    projects: List[ProjectResponse] = Field(..., description="Project folders")
+    projects_root: str = Field(..., description="Where New project creates folders")
+    can_browse: bool = Field(..., description="Whether folders can be browsed and opened (local API only)")
+
+
+class CodeSessionCreateRequest(BaseModel):
+    """Start a coding session in a project"""
+
+    project: str = Field(..., min_length=1, max_length=64, description="Project id")
+    title: Optional[str] = Field(None, max_length=100, description="Session title; the agent names it if omitted")
+
+
+class CodeSessionTitleRequest(BaseModel):
+    """Rename a coding session"""
+
+    title: str = Field(..., min_length=1, max_length=100, description="New title")
+
+
+class CodeMessageRequest(BaseModel):
+    """Send a message to a coding session"""
+
+    text: str = Field(..., min_length=1, max_length=MAX_MESSAGE_CHARS, description="What the coding agent should do")
+
+
+class CodeApprovalReply(BaseModel):
+    """Answer an approval request from the coding agent"""
+
+    decision: Literal["once", "always", "reject"] = Field(..., description="once, always (this project), or reject")
+    reason: Optional[str] = Field(None, max_length=2000, description="With reject: tell the agent why")

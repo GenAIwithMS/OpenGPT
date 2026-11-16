@@ -12,6 +12,7 @@ import { Global } from "@opencode/util/global"
 import { tmpdirScoped, withTempDir } from "./fixture/tmpdir"
 import { location } from "./fixture/location"
 import { it } from "./lib/effect"
+import { withEnv } from "./fixture/env"
 import { permissionLayer } from "./lib/permission"
 
 function provide(directory: string, projectDirectory = directory, environment?: Environment.Driver) {
@@ -108,6 +109,23 @@ describe("FileAccess.resolve", () => {
         })
         expect(target.externalDirectory).toBeUndefined()
       }).pipe(provide(path.join(directory, "packages", "opencode"), directory)),
+    ),
+  )
+
+  it.live("with OPENGPT_STRICT_LOCATION, the rest of the worktree is external", () =>
+    withTempDir(({ path: directory }) =>
+      withEnv({ OPENGPT_STRICT_LOCATION: "1" }, () =>
+        Effect.gen(function* () {
+          const active = path.join(directory, "projects", "app")
+          yield* Effect.promise(() => fs.mkdir(active, { recursive: true }))
+          const access = yield* FileAccess.Service
+          const outside = yield* access.resolve({ path: "../../.env" })
+          expect(outside).toMatchObject({ absolute: path.join(directory, ".env") })
+          expect(outside.externalDirectory?.action).toBe("external_directory")
+          const inside = yield* access.resolve({ path: "src/main.py" })
+          expect(inside.externalDirectory).toBeUndefined()
+        }).pipe(provide(path.join(directory, "projects", "app"), directory)),
+      ),
     ),
   )
 
