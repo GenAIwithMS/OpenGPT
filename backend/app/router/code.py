@@ -1,15 +1,17 @@
 """Coding agent routes (/api/code/...)."""
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 
 from app.rate_limit import rate_limit
 from app.schema.models import (
+    CodeMessageRequest,
     CodeSessionCreateRequest,
     CodeSessionTitleRequest,
     ProjectCreateRequest,
     ProjectListResponse,
     ProjectResponse,
 )
-from app.services.coding_agent import projects, sessions
+from app.services.coding_agent import projects, sessions, stream
 from app.services.coding_agent.process import agent
 
 code_router = APIRouter(prefix="/code")
@@ -69,3 +71,20 @@ async def delete_session(session_id: str):
 async def session_messages(session_id: str):
     """The session and its messages, oldest first."""
     return await sessions.session_messages(session_id)
+
+
+@code_router.post("/sessions/{session_id}/stream", dependencies=[Depends(rate_limit)])
+async def stream_turn(session_id: str, request: CodeMessageRequest):
+    """Send a message and stream the agent's progress (Server-Sent Events)."""
+    events = await stream.run_turn(session_id, request.text)
+    return StreamingResponse(
+        events,
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@code_router.post("/sessions/{session_id}/stop")
+async def stop_turn(session_id: str):
+    """Stop the agent's current work in this session."""
+    return await stream.stop(session_id)

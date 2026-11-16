@@ -171,3 +171,9 @@ class CodeSessionTitleRequest(BaseModel):
     """Rename a coding session"""
 
     title: str = Field(..., min_length=1, max_length=100, description="New title")
+
+
+class CodeMessageRequest(BaseModel):
+    """Send a message to a coding session"""
+
+    text: str = Field(..., min_length=1, max_length=MAX_MESSAGE_CHARS, description="What the coding agent should do")

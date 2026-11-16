@@ -96,9 +96,14 @@ def _session_info(raw: dict, project: str) -> dict:
     }
 
 
+def is_stop(error: Optional[dict]) -> bool:
+    """The "error" the agent records when a turn is stopped on purpose."""
+    return bool(error) and error.get("type") == "aborted"
+
+
 def public_model_error(error: Optional[dict]) -> Optional[str]:
     """A safe, useful message for a model/agent error. Details are logged, not returned."""
-    if not error:
+    if not error or is_stop(error):
         return None
     status = error.get("status")
     text = f"{error.get('type', '')} {error.get('message', '')}".lower()
@@ -161,7 +166,7 @@ def convert_message(raw: dict) -> Optional[dict]:
             elif part.get("type") == "tool":
                 parts.append(_tool_part(part))
         message = {**base, "role": "assistant", "parts": parts}
-        if raw.get("error"):
+        if raw.get("error") and not is_stop(raw["error"]):
             message["error"] = public_model_error(raw["error"])
         return message
     if kind == "shell":
@@ -171,8 +176,10 @@ def convert_message(raw: dict) -> Optional[dict]:
         return {**base, "role": "shell", "command": _clip(raw.get("command"), 5000),
                 "output": _clip(output), "exit": raw.get("exit")}
     if kind == "idle":
+        if raw.get("outcome") == "succeeded":
+            return None  # only failed or stopped turns are worth showing
         message = {**base, "role": "status", "outcome": raw.get("outcome")}
-        if raw.get("error"):
+        if raw.get("error") and not is_stop(raw["error"]):
             message["error"] = public_model_error(raw["error"])
         return message
     return None  # bookkeeping messages (model/agent switches, compaction, …)
