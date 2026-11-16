@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
-from typing import Optional
+from typing import Literal, Optional
 import json
+import re
 import os
 import uuid
 from app.schema.models import (
@@ -23,6 +24,8 @@ from app.schema.models import (
     DocumentInfoResponse
 )
 from app.services.chat import ChatService
+from app.services import chat_approvals
+from pydantic import BaseModel
 from app.services.rag import ingest_document, retrieve_from_document, has_document, get_document_info, SUPPORTED_EXTENSIONS
 from app.exceptions import NotFoundError, ValidationError, AppError
 from app.error_handlers import log_error, public_error
@@ -237,6 +240,18 @@ def end_temporary_chat(session_id: str):
     except ValueError:
         raise ValidationError("Invalid session_id: expected a UUID")
     end_temp_session(f"temp-{session}")
+    return {"status": "success"}
+
+
+class ApprovalAnswer(BaseModel):
+    decision: Literal["allow", "deny"]
+
+
+@chat_router.post("/chat/approvals/{approval_id}")
+def answer_chat_approval(approval_id: str, body: ApprovalAnswer):
+    """Allow or deny a connector action the assistant asked about in chat."""
+    if not re.fullmatch(r"[0-9a-f]{32}", approval_id) or not chat_approvals.answer(approval_id, body.decision):
+        raise NotFoundError("This request is no longer waiting for an answer")
     return {"status": "success"}
 
 

@@ -156,6 +156,11 @@ export const chatService = {
       onError,
     ),
 
+  // Answer a connector tool's question in chat: decision 'allow' | 'deny'.
+  answerApproval: async (approvalId, decision) => {
+    await api.post(`/chat/approvals/${enc(approvalId)}`, { decision });
+  },
+
   // Get all threads
   getThreads: async () => {
     const response = await api.get('/threads');
@@ -237,8 +242,11 @@ export const connectorsService = {
   importJson: async (json) => (await api.post('/connectors/import', { json })).data.connectors,
   update: async (id, changes) => (await api.put(`/connectors/${enc(id)}`, changes)).data,
   remove: async (id) => { await api.delete(`/connectors/${enc(id)}`); },
-  // Sign in with OAuth: {catalog_id} | {name, url} | {connector_id}; returns the provider URL to open.
-  startSignIn: async (target) => (await api.post('/connectors/oauth/start', target)).data.authorize_url,
+  // Sign in: {catalog_id} | {name, url} | {connector_id}. Returns {authorize_url} (page to open)
+  // or {device: {flow_id, user_code, verification_uri, interval}} (enter a code, e.g. GitHub).
+  startSignIn: async (target) => (await api.post('/connectors/oauth/start', target)).data,
+  // Device sign-in: {status: 'pending'|'done'|'denied'|'expired', connector?}
+  pollDeviceSignIn: async (flowId) => (await api.post(`/connectors/oauth/device/${enc(flowId)}`)).data,
 };
 
 // Coding agent (the Code page). See backend/app/router/code.py.

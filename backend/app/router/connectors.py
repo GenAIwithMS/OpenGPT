@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from app.error_handlers import log_error
 from app.exceptions import AppError
 from app.rate_limit import rate_limit
-from app.services import connector_oauth, connectors
+from app.services import connector_oauth, connectors, mcp_tools
 from app.services.coding_agent import stream as coding_stream
 from app.services.coding_agent.process import agent
 
@@ -51,14 +51,21 @@ class ImportRequest(BaseModel):
 
 
 def _apply_to_agent() -> bool:
-    """Restart the coding agent in the background so it picks up the change."""
+    """Restart the coding agent in the background so it picks up the change,
+    and (re)connect chat's connectors so the next message doesn't wait."""
     threading.Thread(target=agent.restart, daemon=True).start()
+    mcp_tools.warm()
     return True
 
 
 @connectors_router.get("")
 def list_connectors():
-    return {"connectors": connectors.list_connectors()}
+    # chat: connection state of connectors used in chat (absent until first connect)
+    status = mcp_tools.status()
+    items = connectors.list_connectors()
+    for item in items:
+        item["chat"] = status.get(item["id"])
+    return {"connectors": items}
 
 
 @connectors_router.get("/catalog")
@@ -99,8 +106,16 @@ class SignInStart(BaseModel):
 @connectors_router.post("/oauth/start", dependencies=[Depends(rate_limit)])
 def start_sign_in(request: SignInStart):
     """The provider's sign-in page to open (catalog entry, custom URL, or sign in again)."""
-    return {"authorize_url": connectors.start_sign_in(**request.model_dump()),
-            "redirect_uri": connector_oauth.redirect_uri()}
+    return {**connectors.start_sign_in(**request.model_dump()), "redirect_uri": connector_oauth.redirect_uri()}
+
+
+@connectors_router.post("/oauth/device/{flow_id}")
+def poll_device_sign_in(flow_id: str):
+    """Device sign-in (GitHub): has the user entered the code and authorized yet?"""
+    result = connectors.poll_device_sign_in(flow_id[:64])
+    if result["status"] == "done":
+        _apply_to_agent()
+    return result
 
 
 # The provider sends the browser here after sign-in. It can't carry the API

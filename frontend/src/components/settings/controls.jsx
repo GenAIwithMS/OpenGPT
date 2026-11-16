@@ -123,7 +123,7 @@ export const Select = ({ id, value, onChange, options, label }) => {
           ref={listRef}
           role="listbox"
           aria-labelledby={id}
-          className="thin-scroll absolute right-0 z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-gray-700/80 bg-[#2a2b32] p-1 shadow-2xl shadow-black/40 animate-scale-in"
+          className="thin-scroll absolute right-0 z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-gray-700/80 bg-[#2a2b32] p-1 shadow-2xl shadow-black/40 animate-menu-in origin-top"
         >
           {options.map((option, i) => {
             const isSelected = option.value === value;

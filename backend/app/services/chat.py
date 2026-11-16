@@ -15,6 +15,7 @@ from app.services.chatbot import (
 )
 from app.services.thread import generate_thread_id, generate_id_name
 from app.services.rag import has_document
+from app.services import chat_approvals
 from app.services.citations import extract_sources, link_citations, renumber_sources
 from app.error_handlers import log_error, public_error
 from app.llm import split_content
@@ -303,6 +304,9 @@ class ChatService:
         # to resolve its ``【n†source】`` citation markers.
         tool_outputs = []
 
+        # can_ask: connector tools may pause and ask the user (see chat_approvals);
+        # their questions arrive as "custom" stream events.
+        run_config = {**config, "configurable": {**config["configurable"], "can_ask": True}}
         stream = graph.stream(
             {
                 "messages": input_messages,
@@ -310,8 +314,8 @@ class ChatService:
                 "thread_id": config["configurable"]["thread_id"],
                 "tools": list(tools or []),
             },
-            config=config,
-            stream_mode="messages",
+            config=run_config,
+            stream_mode=["messages", "custom"],
         )
         try:
             yield from ChatService._relay_chat_stream(
@@ -322,6 +326,8 @@ class ChatService:
             # End the graph run now and keep what was already streamed, so the
             # answer isn't lost. A tool call left unanswered by the stop is
             # repaired by close_dangling_tool_calls on the next message.
+            # A tool waiting for the user's approval gets "no" first.
+            chat_approvals.cancel_thread(config["configurable"]["thread_id"])
             stream.close()
             if not temporary:
                 partial = "".join(answer_parts).strip()
@@ -374,7 +380,15 @@ class ChatService:
     @staticmethod
     def _relay_chat_stream(stream, seen_tool_calls, answer_parts, reasoning_parts, tool_outputs):
         """Turn graph message chunks into client events, collecting the answer."""
-        for message_chunk, metadata in stream:
+        for mode, payload in stream:
+            if mode == "custom":
+                # A connector tool asks the user before acting, then reports the answer.
+                if isinstance(payload, dict) and payload.get("type") == "approval":
+                    yield {"message_type": "approval", "approval": payload["approval"]}
+                elif isinstance(payload, dict) and payload.get("type") == "approval_done":
+                    yield {"message_type": "approval_done", "id": payload["id"], "decision": payload["decision"]}
+                continue
+            message_chunk, metadata = payload
             # Tool produced a result -> live "finished" signal
             if isinstance(message_chunk, ToolMessage):
                 name = getattr(message_chunk, "name", None) or "tool"
@@ -393,8 +407,13 @@ class ChatService:
                     name = tc.get("name", "tool")
                     if tc_id and tc_id not in seen_tool_calls:
                         seen_tool_calls.add(tc_id)
-                        label = ("Searching your knowledge base..." if name == "Knowledge"
-                                 else f"Using {name}...")
+                        if name == "Knowledge":
+                            label = "Searching your knowledge base..."
+                        elif "__" in name:  # connector tool: server__tool
+                            server, tool = name.split("__", 1)
+                            label = f"Using {tool} ({server})..."
+                        else:
+                            label = f"Using {name}..."
                         yield {
                             "content": label,
                             "message_type": "thinking",

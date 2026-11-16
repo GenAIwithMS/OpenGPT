@@ -63,6 +63,42 @@ code {
   animation: scaleIn 0.3s ease-out;
 }
 
+/* Popups: windows rise and zoom in softly; menus grow from their button
+   (set transform-origin on the menu to the side its button is on). */
+@keyframes dialogIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes menuIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-backdrop-in {
+  animation: fadeIn 0.18s ease-out;
+}
+
+.animate-dialog-in {
+  animation: dialogIn 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-menu-in {
+  animation: menuIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* ChatGPT-like thin scrollbar for scrollable lists */
 .thin-scroll {
   scrollbar-width: thin;
@@ -108,6 +144,12 @@ code {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .animate-dialog-in,
+  .animate-menu-in,
+  .animate-scale-in {
+    animation: fadeIn 0.12s ease-out;
+  }
+
   .thinking-shimmer {
     animation: none;
     color: #c5c5d2;

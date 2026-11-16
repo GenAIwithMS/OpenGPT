@@ -225,8 +225,8 @@ def catalog() -> list[dict]:
         auth = _auth(c)
         item = {**c, "added": c["id"] in added, "auth": auth}
         if c.get("auth") == "oauth" and auth == "key":
-            item["oauth_hint"] = ("Sign in with GitHub needs OpenGPT's GitHub OAuth app: set "
-                                  "GITHUB_OAUTH_CLIENT_ID and GITHUB_OAUTH_CLIENT_SECRET in backend/.env.")
+            item["oauth_hint"] = ("Sign in with GitHub needs a GitHub OAuth app for OpenGPT: set "
+                                  "GITHUB_OAUTH_CLIENT_ID in backend/.env (see .env.example).")
         out.append(item)
     return out
 
@@ -361,9 +361,9 @@ def _check_id(connector_id: str) -> str:
 # ----- sign in (OAuth) -----
 
 def start_sign_in(catalog_id: Optional[str] = None, name: Optional[str] = None,
-                  url: Optional[str] = None, connector_id: Optional[str] = None) -> str:
-    """URL of the provider's sign-in page for a catalog entry, a custom URL,
-    or an existing connector (sign in again)."""
+                  url: Optional[str] = None, connector_id: Optional[str] = None) -> dict:
+    """Start signing in for a catalog entry, a custom URL, or an existing
+    connector (sign in again): {"authorize_url"} or {"device": {...}}."""
     preset = None
     if connector_id:
         with _session() as db:
@@ -390,7 +390,18 @@ def start_sign_in(catalog_id: Optional[str] = None, name: Optional[str] = None,
 
 def finish_sign_in(state: str, code: str) -> dict:
     """Store the tokens from a finished sign-in: add the connector, or update it."""
-    result = connector_oauth.finish(state, code)
+    return _save_sign_in(connector_oauth.finish(state, code))
+
+
+def poll_device_sign_in(flow_id: str) -> dict:
+    """Device sign-in: {"status": "pending"|"denied"|"expired"} or {"status": "done", "connector"}."""
+    result = connector_oauth.device_poll(flow_id)
+    if result["status"] != "done":
+        return {"status": result["status"]}
+    return {"status": "done", "connector": _save_sign_in(result)}
+
+
+def _save_sign_in(result: dict) -> dict:
     target, oauth = result["target"], result["oauth"]
     if target.get("connector_id"):
         with _session() as db:
@@ -438,25 +449,48 @@ def refresh_due(within_seconds: int = 900) -> int:
 
 # ----- runtime -----
 
-def agent_mcp_config() -> dict:
-    """MCP servers for the coding agent's config (enabled, used in Code)."""
-    servers = {}
+def _servers(where: str) -> list[dict]:
+    """Enabled connectors used in ``where`` ("code" or "chat"), with their
+    secrets and a fresh sign-in token."""
+    flag = Connector.use_in_code if where == "code" else Connector.use_in_chat
+    out = []
     with _session() as db:
-        rows = db.query(Connector).filter_by(enabled=True, use_in_code=True).all()
-        for row in rows:
+        for row in db.query(Connector).filter(Connector.enabled.is_(True), flag.is_(True)).all():
             secrets = _secrets(row)
+            entry = _CATALOG_BY_ID.get(row.catalog_id or "")
+            spec = {"id": row.id, "name": row.name, "title": entry["name"] if entry else row.name,
+                    "catalog_id": row.catalog_id, "kind": row.kind}
             if row.kind == "local":
-                spec = {"type": "local", "command": json.loads(row.command)}
-                if secrets["env"]:
-                    spec["environment"] = secrets["env"]
+                spec["command"] = json.loads(row.command)
+                spec["env"] = dict(secrets["env"])
             else:
-                spec = {"type": "remote", "url": row.url, "oauth": False}
                 headers = dict(secrets["headers"])
                 oauth = _fresh_oauth(row, secrets)
                 if oauth:
                     headers["Authorization"] = f"Bearer {oauth['access_token']}"
-                if headers:
-                    spec["headers"] = headers
-            servers[row.name] = spec
+                spec["url"] = row.url
+                spec["headers"] = headers
+            out.append(spec)
         db.commit()  # refreshed tokens
+    return out
+
+
+def chat_servers() -> list[dict]:
+    """Connectors for chat: [{id, name, title, catalog_id, kind, command/env | url/headers}]."""
+    return _servers("chat")
+
+
+def agent_mcp_config() -> dict:
+    """MCP servers for the coding agent's config (enabled, used in Code)."""
+    servers = {}
+    for spec in _servers("code"):
+        if spec["kind"] == "local":
+            entry = {"type": "local", "command": spec["command"]}
+            if spec["env"]:
+                entry["environment"] = spec["env"]
+        else:
+            entry = {"type": "remote", "url": spec["url"], "oauth": False}
+            if spec["headers"]:
+                entry["headers"] = spec["headers"]
+        servers[spec["name"]] = entry
     return {"servers": servers} if servers else {}

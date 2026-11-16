@@ -43,8 +43,8 @@ const UserMenu = ({ displayName, onOpenSettings, collapsed = false }) => {
 
       {open && (
         <div role="menu"
-          className={`absolute z-50 w-60 rounded-xl border border-gray-700/80 bg-[#2a2b32] p-1 shadow-2xl shadow-black/40 ${
-            collapsed ? 'bottom-0 left-full ml-2' : 'bottom-full left-0 mb-2'
+          className={`animate-menu-in absolute z-50 w-60 rounded-xl border border-gray-700/80 bg-[#2a2b32] p-1 shadow-2xl shadow-black/40 ${
+            collapsed ? 'bottom-0 left-full ml-2 origin-bottom-left' : 'bottom-full left-0 mb-2 origin-bottom-left'
           }`}>
           <div className="flex items-center gap-2.5 px-3 py-2">
             <Avatar name={displayName} />

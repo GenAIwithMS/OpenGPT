@@ -280,7 +280,7 @@ const MessageInput = ({
                   role="menu"
                   aria-label="Add"
                   onKeyDown={handleMenuKeyDown}
-                  className="absolute bottom-full left-0 mb-3 w-48 origin-bottom-left rounded-xl bg-[#2a2b32] border border-gray-700/80 shadow-2xl shadow-black/40 p-1 z-50 animate-scale-in"
+                  className="absolute bottom-full left-0 mb-3 w-48 origin-bottom-left rounded-xl bg-[#2a2b32] border border-gray-700/80 shadow-2xl shadow-black/40 p-1 z-50 animate-menu-in"
                   style={{ transformOrigin: "bottom left" }}
                 >
                   {menuActions.map((action, index) => {

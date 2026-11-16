@@ -7,8 +7,11 @@ own page, and authorizes OpenGPT:
    which names its authorization server; that server's metadata gives the
    authorize/token (and registration) endpoints.
 2. Client: register OpenGPT dynamically (RFC 7591) when the server allows it,
-   or use a pre-registered app from backend/.env (GitHub needs this:
-   GITHUB_OAUTH_CLIENT_ID / GITHUB_OAUTH_CLIENT_SECRET).
+   or use a pre-registered app (GitHub needs this). With only the app's public
+   client ID, GitHub signs in with the device flow (RFC 8628): OpenGPT shows a
+   code, the user enters it on github.com and authorizes. With an ID and a
+   secret (GITHUB_OAUTH_CLIENT_ID / GITHUB_OAUTH_CLIENT_SECRET) it uses the
+   redirect flow below.
 3. Authorize with PKCE (S256) and a single-use `state`; the provider sends the
    browser back to /api/connectors/oauth/callback.
 4. Exchange the code for tokens, store them encrypted, refresh before expiry.
@@ -44,8 +47,19 @@ _flows_lock = threading.Lock()
 # Pre-registered OAuth apps for servers without dynamic registration.
 PRESET_CLIENTS = {
     "github": {"client_id_env": "GITHUB_OAUTH_CLIENT_ID", "client_secret_env": "GITHUB_OAUTH_CLIENT_SECRET",
-               "scope": "repo read:org read:user user:email"},
+               "scope": "repo read:org read:user user:email",
+               "device_code_url": "https://github.com/login/device/code",
+               "token_url": "https://github.com/login/oauth/access_token",
+               "resource": "https://api.githubcopilot.com/mcp/"},
 }
+
+# Public client IDs of OpenGPT's own apps, used when backend/.env sets none.
+# A client ID isn't a secret (it's shown on every sign-in page), and the
+# device flow needs no secret, so it can ship with the code.
+DEFAULT_CLIENT_IDS = {"github": ""}
+
+DEVICE_POLL_FLOOR = 5      # seconds; GitHub's minimum interval
+_device_flows: dict[str, dict] = {}   # flow id -> pending device sign-in
 
 
 def public_base() -> str:
@@ -61,11 +75,14 @@ def preset_client(name: Optional[str]) -> Optional[dict]:
     preset = PRESET_CLIENTS.get(name or "")
     if not preset:
         return None
-    client_id = (os.getenv(preset["client_id_env"]) or "").strip()
+    client_id = (os.getenv(preset["client_id_env"]) or "").strip() or DEFAULT_CLIENT_IDS.get(name, "")
     client_secret = (os.getenv(preset["client_secret_env"]) or "").strip()
-    if not client_id or not client_secret:
+    if not client_id:
         return None
-    return {"client_id": client_id, "client_secret": client_secret, "scope": preset["scope"]}
+    if not client_secret and not preset.get("device_code_url"):
+        return None
+    return {"client_id": client_id, "client_secret": client_secret or None, "scope": preset["scope"],
+            "device": not client_secret}
 
 
 # ----- discovery -----
@@ -184,14 +201,21 @@ def _prune() -> None:
         _flows.pop(state, None)
 
 
-def start(server_url: str, target: dict, preset: Optional[str] = None) -> str:
+def start(server_url: str, target: dict, preset: Optional[str] = None) -> dict:
     """Begin a sign-in. `target` says what to do on success (create or update a connector).
-    Returns the provider URL to open."""
+    Returns {"authorize_url"} (the provider page to open) or, for the device
+    flow, {"device": {flow_id, user_code, verification_uri, interval, expires_in}}."""
+    client = preset_client(preset)
+    if client and client["device"]:
+        return {"device": device_start(preset, client, target)}
     oauth = discover(server_url)
     if not oauth:
         raise ValidationError("This server doesn't offer sign-in. Add it with a token instead.")
-    client = preset_client(preset)
-    scope = client.pop("scope") if client else " ".join(oauth["scopes"])
+    if client:
+        scope = client.pop("scope")
+        client.pop("device", None)
+    else:
+        scope = " ".join(oauth["scopes"])
     if client is None:
         if not oauth["registration_endpoint"]:
             raise ValidationError("This service needs an app registered for OpenGPT before you can sign in. "
@@ -208,7 +232,79 @@ def start(server_url: str, target: dict, preset: Optional[str] = None) -> str:
               "resource": oauth["resource"]}
     if scope:
         params["scope"] = scope
-    return f"{oauth['authorization_endpoint']}?{urlencode(params)}"
+    return {"authorize_url": f"{oauth['authorization_endpoint']}?{urlencode(params)}"}
+
+
+# ----- device flow (RFC 8628), for GitHub without a client secret -----
+
+def _post_json(url: str, data: dict) -> tuple[int, dict]:
+    try:
+        r = httpx.post(url, data=data, timeout=TIMEOUT, headers={"Accept": "application/json"})
+        return r.status_code, (r.json() if r.content else {})
+    except (httpx.HTTPError, ValueError) as e:
+        logger.warning("Device sign-in request failed: %s", e)
+        raise UpstreamError("Couldn't reach the service to sign in. Try again.") from None
+
+
+def device_start(preset: str, client: dict, target: dict) -> dict:
+    spec = PRESET_CLIENTS[preset]
+    status, body = _post_json(spec["device_code_url"], {"client_id": client["client_id"], "scope": client["scope"]})
+    if body.get("error") == "device_flow_disabled":
+        raise ValidationError("Sign-in with a code is turned off for OpenGPT's GitHub app. "
+                              "Turn on \"Enable Device Flow\" in the app's settings on GitHub.")
+    if status >= 400 or not body.get("device_code") or not body.get("user_code"):
+        logger.warning("Device code request refused (%s): %s", status, str(body)[:300])
+        raise UpstreamError("GitHub refused the sign-in request. Check GITHUB_OAUTH_CLIENT_ID.")
+    interval = max(int(body.get("interval") or DEVICE_POLL_FLOOR), DEVICE_POLL_FLOOR)
+    expires_in = int(body.get("expires_in") or 900)
+    flow_id = secrets.token_urlsafe(24)
+    now = time.time()
+    with _flows_lock:
+        for fid in [f for f, flow in _device_flows.items() if flow["expires_at"] < now]:
+            _device_flows.pop(fid, None)
+        _device_flows[flow_id] = {"device_code": body["device_code"], "interval": interval, "next_poll": now,
+                                  "expires_at": now + expires_in, "client": client, "preset": preset,
+                                  "target": target}
+    return {"flow_id": flow_id, "user_code": body["user_code"], "interval": interval, "expires_in": expires_in,
+            "verification_uri": body.get("verification_uri") or "https://github.com/login/device"}
+
+
+def device_poll(flow_id: str) -> dict:
+    """Check once whether the user has authorized. Returns {"status": "pending"},
+    {"status": "denied"|"expired"}, or {"status": "done", "target", "oauth"}."""
+    with _flows_lock:
+        flow = _device_flows.get(flow_id or "")
+    now = time.time()
+    if not flow or flow["expires_at"] < now:
+        _device_flows.pop(flow_id or "", None)
+        return {"status": "expired"}
+    if now < flow["next_poll"]:
+        return {"status": "pending"}
+    flow["next_poll"] = now + flow["interval"]
+    spec = PRESET_CLIENTS[flow["preset"]]
+    _, body = _post_json(spec["token_url"], {"client_id": flow["client"]["client_id"],
+                                             "device_code": flow["device_code"],
+                                             "grant_type": "urn:ietf:params:oauth:grant-type:device_code"})
+    error = body.get("error")
+    if body.get("access_token"):
+        with _flows_lock:
+            if _device_flows.pop(flow_id, None) is None:
+                return {"status": "pending"}  # another check already finished it
+        oauth = {"token_endpoint": spec["token_url"], "resource": spec["resource"]}
+        return {"status": "done", "target": flow["target"], "oauth": _stored(body, flow["client"], oauth)}
+    if error == "authorization_pending":
+        return {"status": "pending"}
+    if error == "slow_down":
+        flow["interval"] = max(int(body.get("interval") or 0), flow["interval"] + 5)
+        flow["next_poll"] = now + flow["interval"]
+        return {"status": "pending"}
+    _device_flows.pop(flow_id, None)
+    if error == "access_denied":
+        return {"status": "denied"}
+    if error == "expired_token":
+        return {"status": "expired"}
+    logger.warning("Device sign-in failed: %s", str(body)[:300])
+    raise UpstreamError("GitHub refused the sign-in. Try again.")
 
 
 def finish(state: str, code: str) -> dict:

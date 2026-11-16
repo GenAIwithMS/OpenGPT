@@ -433,7 +433,7 @@ const Sidebar = ({
 
                           {openMenuId === thread.thread_id && (
                             <div
-                              className="absolute right-2 top-full mt-1 w-36 bg-gray-800 rounded-xl shadow-xl shadow-black/40 z-50 py-1 border border-gray-700/70 animate-scale-in"
+                              className="absolute right-2 top-full mt-1 w-36 bg-gray-800 rounded-xl shadow-xl shadow-black/40 z-50 py-1 border border-gray-700/70 animate-menu-in origin-top-right"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <button

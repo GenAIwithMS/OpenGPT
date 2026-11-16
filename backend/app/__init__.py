@@ -5,6 +5,7 @@ from app.observability import configure_langsmith
 configure_langsmith()
 
 import logging
+import asyncio
 import threading
 from contextlib import asynccontextmanager
 
@@ -18,6 +19,7 @@ from app.router.settings import settings_router
 from app.router.connectors import connectors_callback_router, connectors_router
 from app.router.connectors import refresh_loop as connectors_refresh_loop
 from app.services.coding_agent.process import agent as coding_agent
+from app.services import mcp_tools
 from app.services.coding_agent import client as coding_agent_client
 from app.database.init_db import DatabaseInitError, init_database
 from app.error_handlers import register_error_handlers
@@ -41,10 +43,13 @@ async def _lifespan(app: FastAPI):
     # Keeps connector sign-ins (OAuth tokens) fresh.
     stop_refresh = threading.Event()
     threading.Thread(target=connectors_refresh_loop, args=(stop_refresh,), daemon=True).start()
+    # Connect chat's connectors in the background.
+    mcp_tools.warm()
     try:
         yield
     finally:
         stop_refresh.set()
+        await asyncio.to_thread(mcp_tools.close_all)
         await coding_agent_client.close()
         coding_agent.stop()
 

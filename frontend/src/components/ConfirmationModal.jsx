@@ -88,7 +88,7 @@ const ConfirmationModal = ({
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in"
+      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-backdrop-in"
       onClick={(e) => e.target === e.currentTarget && close()}
     >
       <div
@@ -97,7 +97,7 @@ const ConfirmationModal = ({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={messageId}
-        className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-sm w-full border border-gray-200 dark:border-gray-700 animate-scale-in"
+        className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-sm w-full border border-gray-200 dark:border-gray-700 animate-dialog-in"
       >
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">

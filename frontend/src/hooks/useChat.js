@@ -208,6 +208,16 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
         // Deep research activity (planning, searches, sources, ...) is kept on
         // the message so it stays with the conversation.
         updateMessage(placeholderId, m => ({ ...m, research: [...(m.research || []), data.event] }));
+      } else if (data.message_type === 'approval') {
+        // A connector tool asks before changing something (Allow / Deny card).
+        updateMessage(placeholderId, m => ({ ...m, approvals: [...(m.approvals || []), data.approval] }));
+        setStreamingProgress(prev => (prev ? { ...prev, current: 'Waiting for your approval...' } : prev));
+      } else if (data.message_type === 'approval_done') {
+        updateMessage(placeholderId, m => ({
+          ...m,
+          approvals: (m.approvals || []).map(a => (a.id === data.id ? { ...a, decision: data.decision } : a)),
+        }));
+        setStreamingProgress(prev => (prev ? { ...prev, current: 'Thinking...' } : prev));
       } else if (data.message_type === 'ai_replace') {
         // Final answer with citation markers rewritten as source links
         updateMessage(placeholderId, m => ({ ...m, content: data.content }));

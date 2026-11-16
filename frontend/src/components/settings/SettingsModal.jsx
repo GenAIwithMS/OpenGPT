@@ -100,7 +100,7 @@ const SettingsModal = ({ section, onSectionChange, onClose, settings, save, disp
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-0 sm:p-6" onClick={onClose}>
+    <div className="animate-backdrop-in fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-0 sm:p-6" onClick={onClose}>
       <div
         ref={panelRef}
         tabIndex={-1}
@@ -108,7 +108,7 @@ const SettingsModal = ({ section, onSectionChange, onClose, settings, save, disp
         aria-modal="true"
         aria-label="Settings"
         onClick={(e) => e.stopPropagation()}
-        className="relative flex h-full w-full max-w-5xl flex-col overflow-hidden border border-gray-700/80 bg-[#2a2b32] shadow-2xl outline-none sm:h-[85vh] sm:rounded-2xl md:flex-row"
+        className="animate-dialog-in relative flex h-full w-full max-w-5xl flex-col overflow-hidden border border-gray-700/80 bg-[#2a2b32] shadow-2xl outline-none sm:h-[85vh] sm:rounded-2xl md:flex-row"
       >
         <button type="button" onClick={onClose} aria-label="Close settings"
           className="absolute right-3 top-3 z-10 rounded-lg p-1.5 text-gray-400 hover:bg-white/5 hover:text-gray-200">

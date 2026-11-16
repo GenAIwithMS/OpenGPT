@@ -13,7 +13,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.memory import MemorySaver
 from app.tools import Search, Weather, Calculator, Stock_price
 from app.services.rag import retrieve_from_document
-from app.services import knowledge
+from app.services import knowledge, mcp_tools
 from app.services.knowledge import Knowledge
 from app.services.personalization import profile_text
 from app.services.citations import renumber_sources
@@ -205,6 +205,16 @@ def chat_node(state: Chatstate):
             "document the answer comes from."
         )
 
+    # Settings > Connectors: tools from MCP servers that are on for chat.
+    connector_tools = mcp_tools.chat_tools()
+    if connector_tools:
+        tools.extend(connector_tools)
+        system_text += (
+            "\n\nTools named server__tool come from the user's connected apps. Use them when "
+            "the question is about those apps. Tools that change something ask the user "
+            "first; if the user declines, don't try again."
+        )
+
     messages = [SystemMessage(content=system_text)] + messages
     messages = close_dangling_tool_calls(list(messages))
 
@@ -229,7 +239,11 @@ def _tool_error(e: Exception) -> str:
     return f"Tool error ({type(e).__name__}): {e}. Check the arguments and try again, or answer without this tool."
 
 
-tool_node = ToolNode(graph_tools, handle_tool_errors=_tool_error)
+def tool_node(state: Chatstate, config):
+    """Run the model's tool calls. Connector tools change while the app runs
+    (connectors added, removed or switched off), so they are looked up per call."""
+    tools = graph_tools + mcp_tools.chat_tools()
+    return ToolNode(tools, handle_tool_errors=_tool_error).invoke(state, config)
 
 # Build the state graph
 graph = StateGraph(Chatstate)

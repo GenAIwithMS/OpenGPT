@@ -13,7 +13,9 @@ async function signInWindow(target) {
   const popup = window.open('', 'opengpt-signin', 'width=620,height=760');
   let url;
   try {
-    url = await connectorsService.startSignIn(target);
+    const started = await connectorsService.startSignIn(target);
+    if (started.device) return deviceSignIn(started.device, popup);
+    url = started.authorize_url;
   } catch (e) {
     popup?.close();
     throw e;
@@ -47,9 +49,9 @@ const Modal = ({ title, onClose, children, wide = false }) => {
     return () => document.removeEventListener('keydown', onKey, true);
   }, [onClose]);
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div className="animate-backdrop-in fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div role="dialog" aria-label={title} onClick={(e) => e.stopPropagation()}
-        className={`flex w-full flex-col rounded-2xl border border-gray-700 bg-[#26272e] shadow-2xl ${
+        className={`animate-dialog-in flex w-full flex-col rounded-2xl border border-gray-700 bg-[#26272e] shadow-2xl ${
           wide ? 'h-[85vh] max-w-3xl' : 'max-h-[85vh] max-w-lg'
         }`}>
         <div className="flex items-center border-b border-gray-700/70 px-5 py-3.5">
@@ -187,7 +189,7 @@ const CreateMenu = ({ onPick }) => {
         Create <ChevronDown size={14} />
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 z-20 mt-1 w-64 rounded-xl border border-gray-700/80 bg-[#2a2b32] p-1 shadow-2xl shadow-black/40">
+        <div role="menu" className="animate-menu-in origin-top-right absolute right-0 z-20 mt-1 w-64 rounded-xl border border-gray-700/80 bg-[#2a2b32] p-1 shadow-2xl shadow-black/40">
           {CREATE_MODES.map(({ id, label, hint, icon: Icon }) => (
             <button key={id} type="button" role="menuitem" onClick={() => { setOpen(false); onPick(id); }}
               className="flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left hover:bg-gray-700">
@@ -311,6 +313,106 @@ const BrowseModal = ({ onClose, onChanged }) => {
   );
 };
 
+// ----- Sign in with a code (GitHub's device flow) -----
+
+// The page shows one code window at a time; signInWindow asks it through this.
+let showDeviceWindow = null;
+
+function deviceSignIn(device, popup) {
+  if (popup) popup.location.href = device.verification_uri;
+  // Usually still allowed right after the click; the window has a Copy button too.
+  navigator.clipboard?.writeText(device.user_code).catch(() => {});
+  if (!showDeviceWindow) { popup?.close(); return Promise.resolve(null); }
+  return new Promise((resolve) => showDeviceWindow({ ...device, popup, resolve }));
+}
+
+const DeviceSignInHost = () => {
+  const [flow, setFlow] = useState(null);
+  const [status, setStatus] = useState('pending');
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    showDeviceWindow = (next) => { setFlow(next); setStatus('pending'); setError(null); setCopied(false); };
+    return () => { showDeviceWindow = null; };
+  }, []);
+
+  const finish = (value) => {
+    flow?.popup?.close();
+    flow?.resolve(value);
+    setFlow(null);
+  };
+
+  // Ask the backend every few seconds whether GitHub has been authorized.
+  useEffect(() => {
+    if (!flow || status !== 'pending') return undefined;
+    let stopped = false;
+    const timer = setInterval(async () => {
+      try {
+        const r = await connectorsService.pollDeviceSignIn(flow.flow_id);
+        if (stopped) return;
+        if (r.status === 'done') finish(true);
+        else if (r.status !== 'pending') setStatus(r.status);
+      } catch (e) {
+        if (!stopped) setError(e.message);
+      }
+    }, Math.max(flow.interval || 5, 3) * 1000);
+    return () => { stopped = true; clearInterval(timer); };
+  }, [flow, status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!flow) return null;
+  const copy = () => {
+    navigator.clipboard?.writeText(flow.user_code).then(() => setCopied(true)).catch(() => {});
+  };
+  const openGitHub = () => {
+    const w = window.open(flow.verification_uri, 'opengpt-signin', 'width=620,height=760');
+    if (w) setFlow((f) => ({ ...f, popup: w }));
+  };
+  return (
+    <Modal title="Sign in with GitHub" onClose={() => finish(null)}>
+      <div className="flex flex-col items-center text-center">
+        <ConnectorLogo id="github" name="GitHub" size="h-12 w-12" />
+        {status === 'pending' ? (
+          <>
+            <p className="mt-4 text-sm text-gray-300">
+              Enter this code on GitHub, then click <span className="text-gray-100">Authorize</span>.
+            </p>
+            <button type="button" onClick={copy} title="Copy code"
+              className="mt-4 rounded-xl border border-gray-600 bg-black/30 px-5 py-3 font-mono text-2xl tracking-[0.3em] text-gray-50 hover:border-gray-400">
+              {flow.user_code}
+            </button>
+            <p className="mt-2 h-4 text-xs text-gray-500">{copied ? 'Copied' : 'Click the code to copy it'}</p>
+            <div className="mt-4 flex gap-2">
+              <button type="button" onClick={openGitHub}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500">
+                Open GitHub
+              </button>
+              <button type="button" onClick={() => finish(null)}
+                className="rounded-lg px-4 py-2 text-sm text-gray-300 hover:bg-white/5">
+                Cancel
+              </button>
+            </div>
+            <p className="mt-5 flex items-center gap-2 text-xs text-gray-400">
+              <Loader2 size={13} className="animate-spin" /> Waiting for you to authorize on GitHub…
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="mt-4 text-sm text-gray-300">
+              {status === 'denied' ? 'The sign-in was cancelled on GitHub.' : 'The code expired. Start again.'}
+            </p>
+            <button type="button" onClick={() => finish(false)}
+              className="mt-4 rounded-lg border border-gray-600 px-4 py-2 text-sm text-gray-200 hover:bg-white/5">
+              Close
+            </button>
+          </>
+        )}
+        {error && <p className="mt-3 text-xs text-red-300">{error}</p>}
+      </div>
+    </Modal>
+  );
+};
+
 // ----- Added connectors -----
 
 const ConnectorCard = ({ connector, onChange, onRemove, onReload }) => {
@@ -337,11 +439,28 @@ const ConnectorCard = ({ connector, onChange, onRemove, onReload }) => {
           </p>
           <p className="mt-0.5 truncate font-mono text-[11px] text-gray-500" title={detail}>{detail}</p>
           {secrets.length > 0 && <p className="mt-0.5 text-[11px] text-gray-500">Keys set: {secrets.join(', ')}</p>}
+          {connector.enabled && connector.use_in_chat && connector.chat && (
+            connector.chat.connected ? (
+              <p className="mt-0.5 text-[11px] text-green-300/80">
+                Connected · {connector.chat.tools} tool{connector.chat.tools === 1 ? '' : 's'}
+              </p>
+            ) : (
+              <p className="mt-0.5 text-[11px] text-red-300/90" title={connector.chat.error || ''}>
+                Couldn't connect{connector.chat.error ? `: ${connector.chat.error}` : ''}
+              </p>
+            )
+          )}
         </div>
         <Toggle label={`${connector.title} on or off`} checked={connector.enabled}
           onChange={(v) => onChange(connector.id, { enabled: v })} />
       </div>
-      <div className="mt-3 flex items-center gap-3 border-t border-gray-700/50 pt-2.5 text-xs">
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 whitespace-nowrap border-t border-gray-700/50 pt-2.5 text-xs">
+        <label className="flex items-center gap-1.5 text-gray-300">
+          <input type="checkbox" checked={connector.use_in_chat} disabled={!connector.enabled}
+            onChange={(e) => onChange(connector.id, { use_in_chat: e.target.checked })}
+            className="h-3.5 w-3.5 accent-blue-500" />
+          Use in Chat
+        </label>
         <label className="flex items-center gap-1.5 text-gray-300">
           <input type="checkbox" checked={connector.use_in_code} disabled={!connector.enabled}
             onChange={(e) => onChange(connector.id, { use_in_code: e.target.checked })}
@@ -382,12 +501,25 @@ const ConnectorsPage = () => {
   const load = () => connectorsService.list().then(setItems).catch((e) => setError(e.message));
   useEffect(() => { load(); }, []);
 
+  // Chat connects in the background after a change: check back until every
+  // connector used in chat reports connected or an error (about 30 s at most).
+  const connecting = (items || []).some((c) => c.enabled && c.use_in_chat && !c.chat);
+  const polls = useRef(0);
+  useEffect(() => {
+    if (!connecting) { polls.current = 0; return undefined; }
+    if (polls.current >= 10) return undefined;
+    const timer = setTimeout(() => { polls.current += 1; load(); }, 3000);
+    return () => clearTimeout(timer);
+  }, [items, connecting]);
+
   const shown = useMemo(() => (items || []).filter((c) =>
     `${c.title} ${c.name}`.toLowerCase().includes(query.trim().toLowerCase())), [items, query]);
 
   const change = async (id, changes) => {
     setError(null);
-    setItems((list) => list.map((c) => (c.id === id ? { ...c, ...changes } : c)));
+    // A change reconnects chat, so its status is unknown until the next check.
+    setItems((list) => list.map((c) => (c.id === id ? { ...c, ...changes, chat: null } : c)));
+    polls.current = 0;
     try { await connectorsService.update(id, changes); } catch (e) { setError(e.message); load(); }
   };
   const remove = async (id) => {
@@ -402,8 +534,8 @@ const ConnectorsPage = () => {
       <div className="mb-4 flex items-start gap-2 rounded-xl border border-gray-700/60 bg-black/10 px-3.5 py-2.5 text-xs leading-relaxed text-gray-400">
         <Info size={14} className="mt-0.5 shrink-0" />
         <span>
-          Connectors are available to the coding agent, which asks before using any of their tools. Chat support
-          is coming next. Changes restart the coding agent (about 10 seconds).
+          Connectors work in chat and in the coding agent. Tools that only read run straight away; anything that
+          could change your data asks you first. Changes restart the coding agent (about 10 seconds).
         </span>
       </div>
 
@@ -440,6 +572,7 @@ const ConnectorsPage = () => {
           <CreateForm mode={creating} onCancel={() => setCreating(null)} onDone={() => { setCreating(null); load(); }} />
         </Modal>
       )}
+      <DeviceSignInHost />
     </div>
   );
 };

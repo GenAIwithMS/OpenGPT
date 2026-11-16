@@ -102,7 +102,7 @@ class OAuthTests(unittest.TestCase):
 
     def sign_in(self, **kwargs):
         """Start, then play the provider: approve and send the browser back."""
-        url = connectors.start_sign_in(**kwargs)
+        url = connectors.start_sign_in(**kwargs)["authorize_url"]
         q = {k: v[0] for k, v in parse_qs(urlparse(url).query).items()}
         self.assertEqual(q["code_challenge_method"], "S256")
         self.assertEqual(q["redirect_uri"], "http://127.0.0.1:8000/api/connectors/oauth/callback")
@@ -177,6 +177,114 @@ class CatalogAuthTests(unittest.TestCase):
         self.assertEqual(next(c for c in connectors.catalog() if c["id"] == "notion")["auth"], "oauth")
         with self.assertRaises(ValidationError):
             connectors.add_from_catalog("notion", {})
+
+
+class FakeGitHub:
+    """github.com's device-flow endpoints: device code, then token polling."""
+
+    def __init__(self):
+        self.answers = []          # what the token endpoint says next, in order
+        self.code_error = None
+        self.base = None
+
+    def handler(self):
+        gh = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def _json(self, body):
+                data = json.dumps(body).encode()
+                self.send_response(200)  # GitHub reports errors with 200 + {"error"}
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def do_POST(self):
+                form = {k: v[0] for k, v in parse_qs(self.rfile.read(int(self.headers["Content-Length"])).decode()).items()}
+                if self.path == "/login/device/code":
+                    if gh.code_error:
+                        return self._json({"error": gh.code_error})
+                    assert form["client_id"] == "public-id" and "repo" in form["scope"]
+                    return self._json({"device_code": "dev-1", "user_code": "WDJB-MJHT", "interval": 5,
+                                       "expires_in": 900, "verification_uri": "https://github.com/login/device"})
+                assert form["grant_type"] == "urn:ietf:params:oauth:grant-type:device_code"
+                assert form["device_code"] == "dev-1" and "client_secret" not in form
+                self._json(gh.answers.pop(0))
+
+        return Handler
+
+
+class GitHubDeviceFlowTests(unittest.TestCase):
+    def setUp(self):
+        _helpers.use_sqlite()
+        env = mock.patch.dict(os.environ, {"SETTINGS_SECRET": "t", "GITHUB_OAUTH_CLIENT_ID": "public-id",
+                                           "GITHUB_OAUTH_CLIENT_SECRET": ""})
+        env.start()
+        self.addCleanup(env.stop)
+        secret_box._reset_for_tests()
+        self.gh = FakeGitHub()
+        server = HTTPServer(("127.0.0.1", 0), self.gh.handler())
+        self.gh.base = f"http://127.0.0.1:{server.server_port}"
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        preset = dict(connector_oauth.PRESET_CLIENTS["github"],
+                      device_code_url=f"{self.gh.base}/login/device/code",
+                      token_url=f"{self.gh.base}/login/oauth/access_token")
+        patcher = mock.patch.dict(connector_oauth.PRESET_CLIENTS, {"github": preset})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        connector_oauth._device_flows.clear()
+
+    def start(self):
+        device = connectors.start_sign_in(catalog_id="github")["device"]
+        self.assertEqual(device["user_code"], "WDJB-MJHT")
+        self.assertEqual(device["verification_uri"], "https://github.com/login/device")
+        return device["flow_id"]
+
+    def poll_now(self, flow_id):
+        connector_oauth._device_flows[flow_id]["next_poll"] = 0
+        return connectors.poll_device_sign_in(flow_id)
+
+    def test_client_id_alone_means_sign_in_with_a_code(self):
+        self.assertEqual(next(c for c in connectors.catalog() if c["id"] == "github")["auth"], "oauth")
+        self.gh.answers = [{"error": "authorization_pending"},
+                           {"access_token": "gho_abc", "token_type": "bearer", "scope": "repo"}]
+        flow_id = self.start()
+        self.assertEqual(connectors.poll_device_sign_in(flow_id)["status"], "pending")
+        # Asked again too soon: GitHub isn't called (it would answer slow_down).
+        self.assertEqual(connectors.poll_device_sign_in(flow_id)["status"], "pending")
+        result = self.poll_now(flow_id)
+        self.assertEqual(result["status"], "done")
+        self.assertTrue(result["connector"]["signed_in"])
+        self.assertEqual(result["connector"]["catalog_id"], "github")
+        github = connectors.agent_mcp_config()["servers"]["github"]
+        self.assertEqual(github["url"], "https://api.githubcopilot.com/mcp/")
+        self.assertEqual(github["headers"]["Authorization"], "Bearer gho_abc")
+        self.assertEqual(connectors.poll_device_sign_in(flow_id)["status"], "expired")  # single use
+
+    def test_slow_down_denied_and_expired(self):
+        self.gh.answers = [{"error": "slow_down", "interval": 10}, {"error": "access_denied"}]
+        flow_id = self.start()
+        self.assertEqual(self.poll_now(flow_id)["status"], "pending")
+        self.assertEqual(connector_oauth._device_flows[flow_id]["interval"], 10)
+        self.assertEqual(self.poll_now(flow_id)["status"], "denied")
+        self.assertEqual(connectors.list_connectors(), [])
+        self.assertEqual(connectors.poll_device_sign_in("unknown")["status"], "expired")
+
+    def test_device_flow_turned_off_on_the_app(self):
+        self.gh.code_error = "device_flow_disabled"
+        with self.assertRaises(ValidationError) as e:
+            connectors.start_sign_in(catalog_id="github")
+        self.assertIn("Enable Device Flow", str(e.exception))
+
+    def test_secret_switches_to_the_redirect_flow(self):
+        with mock.patch.dict(os.environ, {"GITHUB_OAUTH_CLIENT_SECRET": "s"}):
+            self.assertFalse(connector_oauth.preset_client("github")["device"])
+        self.assertTrue(connector_oauth.preset_client("github")["device"])
 
 
 class CallbackRouteTests(unittest.TestCase):
