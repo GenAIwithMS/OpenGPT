@@ -79,6 +79,9 @@ export const resolvePath = (directory: string, input: string, home = Global.Path
 
 const slash = (value: string) => value.replaceAll("\\", "/")
 
+/** Whether file access is limited to the session's folder (see OPENGPT_STRICT_LOCATION). */
+export const strictLocation = () => ["1", "true"].includes(process.env.OPENGPT_STRICT_LOCATION?.toLowerCase() ?? "")
+
 const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
@@ -90,9 +93,12 @@ const layer = Layer.effect(
     const resolve = Effect.fn("FileAccess.resolve")(function* (input: ResolveInput) {
       const absolute = AbsolutePath.make(resolvePath(location.directory, input.path))
       const worktree = path.resolve(location.project.directory)
+      // OPENGPT_STRICT_LOCATION=1: only the session's own folder is inside, not the
+      // rest of the repository it sits in (OpenGPT points each session at one
+      // project folder, which may live inside a larger repository).
       const internal =
         FSUtil.contains(location.directory, absolute) ||
-        (worktree !== path.parse(worktree).root && FSUtil.contains(worktree, absolute))
+        (!strictLocation() && worktree !== path.parse(worktree).root && FSUtil.contains(worktree, absolute))
       if (internal) {
         return {
           absolute,

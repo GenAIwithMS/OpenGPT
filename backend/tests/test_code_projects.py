@@ -101,6 +101,18 @@ class ListAndCreateTests(ProjectsTestCase):
         projects.create_project("new")
         self.assertEqual([p["name"] for p in projects.list_projects()], ["new", "old"])
 
+    def test_new_project_is_its_own_git_repo(self):
+        import shutil
+        if not shutil.which("git"):
+            self.skipTest("git not installed")
+        projects.create_project("repo")
+        self.assertTrue((self.root / "repo" / ".git").is_dir())
+
+    def test_create_works_without_git(self):
+        with mock.patch("shutil.which", return_value=None):
+            projects.create_project("plain")
+        self.assertFalse((self.root / "plain" / ".git").exists())
+
     def test_create_conflicts(self):
         projects.create_project("app")
         for name in ("app", "APP"):

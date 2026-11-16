@@ -11,12 +11,17 @@ folders, so the checks here decide what it can touch:
 
 Point CODE_PROJECTS_ROOT at e.g. ~/projects to work on your own repositories.
 """
+import logging
 import os
 import re
+import shutil
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
 from app.exceptions import ConflictError, NotFoundError, ValidationError
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[2] / "storage" / "code"
 
@@ -103,4 +108,22 @@ def create_project(name: str) -> dict:
         path.mkdir()
     except FileExistsError:
         raise ConflictError("A project with that name already exists") from None
+    _git_init(path)
     return _info(path)
+
+
+def _git_init(path: Path) -> None:
+    """Make the project its own git repository, when git is installed.
+
+    The coding agent keeps "always allow" approvals per repository, so this
+    keeps them from applying to other projects; git also lets the agent show
+    what it changed. Not having git is fine.
+    """
+    git = shutil.which("git")
+    if not git:
+        return
+    try:
+        subprocess.run([git, "init", "-q"], cwd=path, check=True, timeout=15,
+                       stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    except (OSError, subprocess.SubprocessError) as e:
+        logger.warning("git init failed for project %s: %s", path.name, e)

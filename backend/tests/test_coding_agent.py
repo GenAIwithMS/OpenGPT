@@ -79,6 +79,7 @@ class ChildEnvTests(unittest.TestCase):
         self.assertEqual(env["OPENGPT_PASSWORD"], "pw")
         self.assertEqual(env["OPENGPT_DISABLE_FREE_MODELS"], "1")
         self.assertEqual(env["OPENGPT_DISABLE_PROJECT_CONFIG"], "1")
+        self.assertEqual(env["OPENGPT_STRICT_LOCATION"], "1")
 
 
 class FakeAgent(BaseHTTPRequestHandler):

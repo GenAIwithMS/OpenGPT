@@ -10,7 +10,7 @@ into a small set of events for the browser, until the turn ends:
     {"type": "tool", "id", "name", "status": "running", "input": {...}}
     {"type": "tool", "id", "name", "status": "completed", "output": "..."}
     {"type": "tool", "id", "name", "status": "error", "error": "..."}
-    {"type": "approval", "id", "action", "resources", "message"?}
+    {"type": "approval", "id", "action", "resources", "always", "diff"?, ...}  (see approvals.py)
     {"type": "approval_done", "id", "decision"}
     {"type": "title", "title": "..."}
     {"type": "error", "message": "..."}        safe text, details are logged
@@ -28,7 +28,7 @@ import httpx
 
 from app.error_handlers import log_error
 from app.exceptions import ConflictError
-from app.services.coding_agent import client, sessions
+from app.services.coding_agent import approvals, client, sessions
 
 logger = logging.getLogger(__name__)
 
@@ -108,11 +108,7 @@ class _Translator:
                                                   "error": data.get("error")}})
             return [{k: part[k] for k in ("type", "id", "name", "status", "output", "error")}]
         if kind == "permission.asked":
-            out = {"type": "approval", "id": data.get("id"), "action": data.get("action"),
-                   "resources": [sessions._clip(r, 2000) for r in (data.get("resources") or [])[:20]]}
-            if data.get("message"):
-                out["message"] = sessions._clip(data["message"], 2000)
-            return [out]
+            return [{"type": "approval", **approvals.approval_info(data)}]
         if kind == "permission.replied":
             return [{"type": "approval_done", "id": data.get("requestID"), "decision": data.get("reply")}]
         if kind == "session.renamed":

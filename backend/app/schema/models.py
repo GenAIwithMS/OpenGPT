@@ -1,7 +1,7 @@
 import os
 
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 
 # Size limits for request bodies, so one request can't send megabytes of text
 # to the model (cost) or the database. Override with env vars if needed.
@@ -177,3 +177,10 @@ class CodeMessageRequest(BaseModel):
     """Send a message to a coding session"""
 
     text: str = Field(..., min_length=1, max_length=MAX_MESSAGE_CHARS, description="What the coding agent should do")
+
+
+class CodeApprovalReply(BaseModel):
+    """Answer an approval request from the coding agent"""
+
+    decision: Literal["once", "always", "reject"] = Field(..., description="once, always (this project), or reject")
+    reason: Optional[str] = Field(None, max_length=2000, description="With reject: tell the agent why")
