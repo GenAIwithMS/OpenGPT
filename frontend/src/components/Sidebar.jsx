@@ -337,7 +337,9 @@ const Sidebar = ({
                 className={`
                   overflow-y-auto px-2 py-2 space-y-0.5 thin-scroll
                   transition-[max-height,opacity] duration-300 ease-out
-                  ${recentsOpen ? 'max-h-[60vh] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}
+                  ${recentsOpen
+                    ? 'flex-1 min-h-0 max-h-[100vh] opacity-100' /* fill down to the footer, scroll inside */
+                    : 'flex-none max-h-0 opacity-0 overflow-hidden'}
                 `}
               >
               {filteredThreads.length === 0 ? (
