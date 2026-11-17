@@ -67,6 +67,11 @@ OpenGPT is an open-source, ChatGPT-style assistant built with LangGraph. It has 
 - **Persistent threads** in MySQL, plus **temporary chats** that are never saved
 - **Safe defaults**: local-only server, optional API token, rate limits, size limits, sanitized rendering
 - **Coding agent** (the Code page): works in a project folder, reads and edits code and runs commands, with live progress. It asks before editing files or running commands and shows the diff first ([Coding agent](#coding-agent))
+- **Connectors (MCP)**: add GitHub, Notion, Linear and other MCP servers by signing in, or your own by command, URL or JSON; chat and the coding agent can use their tools, and anything that changes data asks first
+- **Skills**: reusable instructions (SKILL.md) that chat and the coding agent load when a task fits; built-in ones, an Explore catalog, or create, upload and import from GitHub
+- **Personalization and knowledge base**: your profile and custom instructions, plus documents every chat can search
+- **Settings for providers**: add more model providers and choose a model for each job (chat, titles, research, blogs, coding)
+- **Search window** (Ctrl/Cmd+K) for chats, coding projects and sessions
 
 ## Technology Stack
 
@@ -183,7 +188,7 @@ How it is protected: the agent listens only on 127.0.0.1 with a password made fo
 
 ## Configuration
 
-All settings live in `backend/.env`. [`backend/.env.example`](backend/.env.example) lists every option with comments. The main groups:
+All settings live in `backend/.env`. [`backend/.env.example`](backend/.env.example) lists them with comments, and [docs/configuration.md](docs/configuration.md) describes every one. More providers and a model per job can be set in the app (Settings > Developer). The main groups:
 
 | Group | Settings |
 |---|---|
@@ -202,84 +207,23 @@ Tools without a key are simply unavailable. For example, without `GOOGLE_API_KEY
 ## Project Structure
 
 ```
-.
-├── backend/
-│   ├── main.py                    # Entry point (python main.py)
-│   ├── app/
-│   │   ├── __init__.py            # App factory: CORS, routers, startup checks
-│   │   ├── llm.py                 # Model provider settings (OpenAI/Anthropic-compatible)
-│   │   ├── security.py            # Optional API token, network exposure check
-│   │   ├── rate_limit.py          # Per-client rate limiting
-│   │   ├── error_handlers.py      # Error responses (generic messages + ref codes)
-│   │   ├── router/                # HTTP routes (chat, threads, documents, code, health)
-│   │   ├── schema/models.py       # Request/response models
-│   │   ├── services/
-│   │   │   ├── chatbot.py         # LangGraph chat graph and thread metadata
-│   │   │   ├── chat.py            # Chat, blog and deep-research turns
-│   │   │   ├── rag.py             # Document upload and retrieval
-│   │   │   ├── citations.py       # Search citations -> links
-│   │   │   ├── run_lock.py        # One reply at a time per thread
-│   │   │   ├── thread.py          # Thread ids and titles
-│   │   │   └── coding_agent/      # Starts the coding agent; projects, sessions,
-│   │   │                          # live turns and approvals
-│   │   ├── database/              # MySQL config, models, checkpoint saver
-│   │   ├── tools/                 # Search, weather, stocks, calculator,
-│   │   │                          # blogs/ and deep_research/
-│   │   └── storage/               # Uploaded documents, blogs, images (git-ignored)
-│   ├── scripts/                   # One-off maintenance scripts
-│   ├── evals/                     # LangSmith evaluations
-│   └── tests/
-├── frontend/
-│   ├── src/
-│   │   ├── components/            # Chat UI; code/ for the Code page
-│   │   ├── hooks/                 # useChat, useThreads, useCodeSession, useCodeWorkspace
-│   │   ├── services/api.js        # API client
-│   │   └── App.jsx
-│   └── vite.config.js             # Dev server; proxies /api to the backend
-├── coding-agent/                  # Coding agent service (Bun/TypeScript), started by the backend
-├── start.sh / start.bat           # Start backend + frontend
-└── README.md
+backend/        FastAPI app: routers, services, chat graph, tools, tests
+frontend/       React app (Vite, Tailwind)
+coding-agent/   Coding agent service (Bun/TypeScript), started by the backend
+docs/           Developer documentation
+start.sh / start.bat   Start backend + frontend
 ```
 
-## API Endpoints
+How the parts fit together: [docs/architecture.md](docs/architecture.md).
+Each feature has its own page in [docs/](docs/README.md).
 
-All routes are under `/api`. When `API_TOKEN` is set, send `Authorization: Bearer <token>`.
+## API
 
-### Chat
-- `POST /api/chat/stream`: stream a reply (Server-Sent Events). Body: `message`, `thread_id`, `tools`, `temporary`, `session_id`
-- `POST /api/chat`: send a message, get the full reply
-- `POST /api/chat/edit`: edit an earlier message and stream the new reply
-- `POST /api/chat/regenerate`: regenerate the last reply
-- `POST /api/chat/temp/{session_id}/end`: forget a temporary chat
-
-### Threads
-- `GET /api/threads`: list threads
-- `POST /api/threads/new`: create a thread
-- `GET /api/threads/{id}`: thread messages
-- `PUT /api/threads/{id}/title`: rename
-- `PUT /api/threads/{id}/reports/{n}`: save an edited deep research report
-- `DELETE /api/threads/{id}`: delete a thread with its documents
-
-### Documents
-- `POST /api/upload-pdf`: attach a PDF, Markdown or text file to a thread
-- `POST /api/query-document`: ask a question about a thread's documents
-- `GET /api/threads/{id}/document`: a thread's documents
-
-### Code (coding agent)
-- `GET /api/code/status`: whether the coding agent is ready, and its model
-- `GET /api/code/projects`: opened and created project folders; `POST /api/code/projects`: create one in `CODE_PROJECTS_ROOT`
-- `GET /api/code/folders?path=...`: browse folders; `POST /api/code/projects/open`: open a folder as a project (local API only)
-- `DELETE /api/code/projects/{id}`: remove a project from the list (its files are kept)
-- `GET /api/code/sessions?project=...`, `POST /api/code/sessions`: list or start coding sessions
-- `GET /api/code/sessions/{id}`, `PUT /api/code/sessions/{id}/title`, `DELETE /api/code/sessions/{id}`
-- `GET /api/code/sessions/{id}/messages`: a session's history
-- `POST /api/code/sessions/{id}/stream`: send a task and stream the agent's work (Server-Sent Events); `POST /api/code/sessions/{id}/stop` stops it
-- `GET /api/code/sessions/{id}/approvals`, `POST /api/code/sessions/{id}/approvals/{approval_id}`: pending approvals; answer `once`, `always` or `reject`
-- `GET /api/code/projects/{name}/approvals`, `DELETE /api/code/projects/{name}/approvals/{id}`: saved "always" approvals
-
-### Other
-- `GET /api/health`: health check
-- `GET /api/blog-images/{file}`: images generated for blogs
+All routes are under `/api`; when `API_TOKEN` is set, send
+`Authorization: Bearer <token>`. The interactive reference with every route
+and its parameters is at http://127.0.0.1:8000/docs on a running backend.
+The [service pages](docs/README.md#services) explain what each group of
+routes does.
 
 ## Development
 
@@ -321,7 +265,7 @@ The backend logs a reminder at startup if old data is still present.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, checks and commit conventions. AI coding agents read [AGENTS.md](AGENTS.md) and the `AGENTS.md` in each part of the project.
 
 ## Thanks to Contributors
 
@@ -343,7 +287,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - FastAPI for the modern Python web framework
 - React and Vite for the frontend tooling
 - [opencode](https://github.com/anomalyco/opencode): the coding agent is based on the opencode agent harness (MIT License, see [coding-agent/LICENSE](coding-agent/LICENSE))
-
-## Related Resources
-
-- [Equibles](https://equibles.com): stock market data API
