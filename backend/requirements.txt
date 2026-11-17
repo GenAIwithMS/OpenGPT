@@ -32,6 +32,9 @@ pymysql==1.2.0
 # Coding agent client (talks to the coding-agent service)
 httpx==0.27.2
 
+# Connectors: MCP servers as chat tools (Settings > Connectors)
+mcp==2.3.0
+
 # Tools: web search, deep research, blog images
 requests==2.34.2
 parallel-web==1.3.7

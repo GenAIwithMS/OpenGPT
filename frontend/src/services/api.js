@@ -156,6 +156,11 @@ export const chatService = {
       onError,
     ),
 
+  // Answer a connector tool's question in chat: decision 'allow' | 'deny'.
+  answerApproval: async (approvalId, decision) => {
+    await api.post(`/chat/approvals/${enc(approvalId)}`, { decision });
+  },
+
   // Get all threads
   getThreads: async () => {
     const response = await api.get('/threads');
@@ -208,6 +213,73 @@ export const chatService = {
     });
     return response.data;
   },
+};
+
+// App settings (the Settings popup). See backend/app/services/settings.py.
+export const settingsService = {
+  // {profile, general, display_name}
+  get: async () => (await api.get('/settings')).data,
+  // Partial update, e.g. {general: {sound_on_finish: true}}; returns all settings.
+  update: async (changes) => (await api.put('/settings', changes)).data,
+
+  // Knowledge base: {files: [{id, filename, chunks, pages}], max_files, max_mb}
+  listKnowledge: async () => (await api.get('/settings/knowledge')).data,
+  addKnowledge: async (file) => {
+    const form = new FormData();
+    form.append('file', file);
+    return (await api.post('/settings/knowledge', form, { headers: { 'Content-Type': 'multipart/form-data' } })).data;
+  },
+  removeKnowledge: async (id) => { await api.delete(`/settings/knowledge/${enc(id)}`); },
+};
+
+// Connectors (MCP servers). See backend/app/router/connectors.py.
+export const connectorsService = {
+  list: async () => (await api.get('/connectors')).data.connectors,
+  catalog: async () => (await api.get('/connectors/catalog')).data.catalog,
+  // {name, kind: 'local'|'remote', command?, url?, env?, headers?}
+  create: async (body) => (await api.post('/connectors', body)).data,
+  addFromCatalog: async (id, values = {}) => (await api.post(`/connectors/catalog/${enc(id)}`, { values })).data,
+  importJson: async (json) => (await api.post('/connectors/import', { json })).data.connectors,
+  update: async (id, changes) => (await api.put(`/connectors/${enc(id)}`, changes)).data,
+  remove: async (id) => { await api.delete(`/connectors/${enc(id)}`); },
+  // Sign in: {catalog_id} | {name, url} | {connector_id}. Returns {authorize_url} (page to open)
+  // or {device: {flow_id, user_code, verification_uri, interval}} (enter a code, e.g. GitHub).
+  startSignIn: async (target) => (await api.post('/connectors/oauth/start', target)).data,
+  // Device sign-in: {status: 'pending'|'done'|'denied'|'expired', connector?}
+  pollDeviceSignIn: async (flowId) => (await api.post(`/connectors/oauth/device/${enc(flowId)}`)).data,
+};
+
+// Skills. See backend/app/router/skills.py. Ids look like "builtin/name",
+// "personal/name" or "local/claude/name" (sent as a path, so not encoded).
+const skillPath = (id) => id.split('/').map(enc).join('/');
+export const skillsService = {
+  list: async () => (await api.get('/skills')).data.skills,
+  get: async (id) => (await api.get(`/skills/item/${skillPath(id)}`)).data,
+  setEnabled: async (id, enabled) => (await api.put(`/skills/item/${skillPath(id)}`, { enabled })).data,
+  saveContent: async (id, skillMd) => (await api.put(`/skills/content/${skillPath(id)}`, { skill_md: skillMd })).data,
+  remove: async (id) => { await api.delete(`/skills/item/${skillPath(id)}`); },
+  create: async (body) => (await api.post('/skills', body)).data,
+  upload: async (file, replace = false) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('replace', replace ? 'true' : 'false');
+    return (await api.post('/skills/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } })).data.skills;
+  },
+  importGithub: async (url, replace = false) => (await api.post('/skills/import', { url, replace })).data.skills,
+  catalog: async () => (await api.get('/skills/catalog')).data.catalog,
+  install: async (id) => (await api.post(`/skills/catalog/${enc(id)}`)).data,
+};
+
+// Model providers (Settings > Developer). See backend/app/router/providers.py.
+export const providersService = {
+  // {env, providers, active, roles, presets}
+  overview: async () => (await api.get('/providers')).data,
+  create: async (body) => (await api.post('/providers', body)).data,
+  update: async (id, changes) => (await api.put(`/providers/${enc(id)}`, changes)).data,
+  remove: async (id) => { await api.delete(`/providers/${enc(id)}`); },
+  // {provider_id} for a saved one ('env' for backend/.env), or {preset, kind, base_url, api_key}
+  test: async (body) => (await api.post('/providers/test', body)).data.models,
+  setActive: async (active, roles) => (await api.put('/providers/active', { active, roles })).data,
 };
 
 // Coding agent (the Code page). See backend/app/router/code.py.

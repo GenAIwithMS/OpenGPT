@@ -1,7 +1,9 @@
 """Coding agent settings and process manager (no real agent is started)."""
 import json
 import os
+import sys
 import threading
+import time
 import unittest
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from unittest import mock
@@ -175,3 +177,32 @@ class StatusRouteTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SpawnThreadTests(unittest.TestCase):
+    """The agent must outlive the (short-lived) thread that restarts it."""
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "PR_SET_PDEATHSIG is Linux-only")
+    def test_child_started_from_an_ended_thread_keeps_running(self):
+        from app.services.coding_agent import process as agent_process
+
+        box = {}
+
+        def restart_like():
+            box["p"] = agent_process.spawn(["sleep", "30"], preexec_fn=agent_process._die_with_parent)
+
+        t = threading.Thread(target=restart_like)
+        t.start()
+        t.join()
+        time.sleep(0.5)
+        try:
+            self.assertIsNone(box["p"].poll(), "the agent was stopped when the thread that started it ended")
+        finally:
+            box["p"].kill()
+            box["p"].wait()
+
+    def test_start_errors_reach_the_caller(self):
+        from app.services.coding_agent import process as agent_process
+
+        with self.assertRaises(OSError):
+            agent_process.spawn(["/nonexistent/program"])

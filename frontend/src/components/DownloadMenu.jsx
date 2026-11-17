@@ -63,8 +63,8 @@ const DownloadMenu = ({ content, placement = 'up', buttonClassName = '' }) => {
       {open && (
         <div
           role="menu"
-          className={`absolute right-0 z-50 w-40 rounded-xl border border-gray-700/80 bg-[#2a2b32] p-1 shadow-2xl shadow-black/40 ${
-            placement === 'down' ? 'top-full mt-2' : 'bottom-full mb-2'
+          className={`animate-menu-in absolute right-0 z-50 w-40 rounded-xl border border-gray-700/80 bg-[#2a2b32] p-1 shadow-2xl shadow-black/40 ${
+            placement === 'down' ? 'top-full mt-2 origin-top-right' : 'bottom-full mb-2 origin-bottom-right'
           }`}
         >
           {FORMATS.map(({ key, label, icon: Icon }) => (

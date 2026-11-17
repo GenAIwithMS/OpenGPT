@@ -8,6 +8,7 @@ import {
   TooltipTrigger,
 } from "./tooltip"
 import { cn } from "../../lib/utils"
+import { isSendKey } from "../../lib/preferences"
 import React, {
   createContext,
   useContext,
@@ -125,8 +126,9 @@ function PromptInputTextarea({
   }
 
   const handleKeyDown = (e) => {
-    // Enter while an IME is composing confirms the text, it doesn't send.
-    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) {
+    // Enter sends, Shift+Enter makes a new line; Enter while an IME is
+    // composing confirms the text, it doesn't send.
+    if (isSendKey(e)) {
       e.preventDefault()
       onSubmit?.()
     }

@@ -43,7 +43,7 @@ function applyEvent(message, event) {
   }
 }
 
-export function useCodeSession(sessionId, { onTitle, onTurnEnd } = {}) {
+export function useCodeSession(sessionId, { onTitle, onTurnEnd, onApproval } = {}) {
   const [session, setSession] = useState(null);
   const [messages, setMessages] = useState([]);
   // Approvals by id: {id, action, resources, always, diff?, files?, decision?}
@@ -52,8 +52,8 @@ export function useCodeSession(sessionId, { onTitle, onTurnEnd } = {}) {
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState(null);
   const streamRef = useRef(null);
-  const callbacks = useRef({ onTitle, onTurnEnd });
-  callbacks.current = { onTitle, onTurnEnd };
+  const callbacks = useRef({ onTitle, onTurnEnd, onApproval });
+  callbacks.current = { onTitle, onTurnEnd, onApproval };
 
   const load = useCallback(async (id, { quiet = false } = {}) => {
     if (!quiet) setLoading(true);
@@ -143,6 +143,7 @@ export function useCodeSession(sessionId, { onTitle, onTurnEnd } = {}) {
           const { type: _type, ...approval } = event;
           setApprovals((all) => ({ ...all, [approval.id]: approval }));
           updateLive((m) => applyEvent(m, event));
+          callbacks.current.onApproval?.(approval);
         } else if (event.type === 'approval_done') {
           setApprovals((all) =>
             all[event.id] ? { ...all, [event.id]: { ...all[event.id], decision: event.decision } } : all,

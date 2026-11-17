@@ -13,6 +13,7 @@ keeps working and the status says why.
 import json
 import logging
 import os
+import queue
 import secrets
 import shutil
 import signal
@@ -60,7 +61,10 @@ _AGENT_FLAGS = {
     "OPENGPT_DISABLE_FREE_MODELS": "1",
     # A project folder can't change the agent's settings or permissions.
     "OPENGPT_DISABLE_PROJECT_CONFIG": "1",
+    # Skills come only from Settings > Skills (passed in the config), not
+    # from ~/.claude or ~/.agents on their own.
     "OPENGPT_DISABLE_CLAUDE_CODE": "1",
+    "OPENGPT_DISABLE_AGENTS_SKILLS": "1",
     # Files outside the session's project folder count as outside, even when
     # the folder sits inside a larger git repository (e.g. the default
     # backend/app/storage/code, inside the OpenGPT repository).
@@ -115,7 +119,11 @@ def child_env(password: str, config_json: str) -> dict:
 
 
 def _die_with_parent():
-    """Linux: stop the agent if the backend process dies without cleaning up."""
+    """Linux: stop the agent if the backend process dies without cleaning up.
+
+    The kernel sends this signal when the *thread* that started the child
+    exits, not only the process, so agents must be started through spawn()
+    below, never from a short-lived thread."""
     try:
         import ctypes
 
@@ -123,6 +131,44 @@ def _die_with_parent():
         libc.prctl(1, signal.SIGTERM)  # PR_SET_PDEATHSIG
     except Exception:
         pass
+
+
+class _Spawner:
+    """Starts child processes from one thread that lives as long as the backend.
+
+    Restarts happen on short-lived threads (e.g. after a connector change).
+    Starting the agent there would tie it to that thread: the thread ends a
+    moment later and the agent receives SIGTERM (exit code -15)."""
+
+    def __init__(self):
+        self._jobs: "queue.Queue" = queue.Queue()
+        self._thread: Optional[threading.Thread] = None
+        self._lock = threading.Lock()
+
+    def popen(self, *args, **kwargs) -> subprocess.Popen:
+        with self._lock:
+            if self._thread is None or not self._thread.is_alive():
+                self._thread = threading.Thread(target=self._run, name="coding-agent-spawner", daemon=True)
+                self._thread.start()
+        done, box = threading.Event(), {}
+        self._jobs.put((args, kwargs, box, done))
+        done.wait()
+        if "error" in box:
+            raise box["error"]
+        return box["process"]
+
+    def _run(self) -> None:
+        while True:
+            args, kwargs, box, done = self._jobs.get()
+            try:
+                box["process"] = subprocess.Popen(*args, **kwargs)
+            except BaseException as e:  # handed back to the caller
+                box["error"] = e
+            finally:
+                done.set()
+
+
+spawn = _Spawner().popen
 
 
 class CodingAgent:
@@ -193,7 +239,7 @@ class CodingAgent:
         LOG_DIR.mkdir(parents=True, exist_ok=True)
         self._log_file = open(LOG_DIR / "agent.log", "ab")
         try:
-            process = subprocess.Popen(
+            process = spawn(
                 [find_bun(), "run", "src/serve-main.ts", "--hostname", "127.0.0.1", "--port", str(port)],
                 cwd=cli_dir,
                 env=child_env(self._password, config_json),
@@ -213,6 +259,20 @@ class CodingAgent:
             self._status = Status(STARTING, "The coding agent is starting.", url=url, managed=True)
         logger.info("Starting the coding agent on %s (log: %s)", url, LOG_DIR / "agent.log")
         threading.Thread(target=self._wait_ready, args=(url, process), daemon=True).start()
+
+    def restart(self) -> bool:
+        """Restart the agent the backend started, so it reads its config again
+        (e.g. after connectors change). An agent started by hand is left alone."""
+        if config.external_url() or not config.enabled():
+            return False
+        with self._lock:
+            managed = self._process is not None or self._status.state in (RUNNING, STARTING)
+        if not managed:
+            return False
+        logger.info("Restarting the coding agent to apply new settings")
+        self.stop()
+        self.start()
+        return True
 
     def stop(self) -> None:
         with self._lock:

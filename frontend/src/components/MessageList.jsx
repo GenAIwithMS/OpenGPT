@@ -8,6 +8,7 @@ import AttachmentCard from './AttachmentCard';
 import ThinkingIndicator from './ThinkingIndicator';
 import ResearchCard from './ResearchCard';
 import ReportCard from './ReportCard';
+import ChatApprovalCard from './ChatApprovalCard';
 import { CodeBlock, CodeBlockCode, CodeBlockGroup, CopyButton } from './ui/code-block';
 import CitationChip from './CitationChip';
 import { cleanTableRows, parseCitation, stripCitationMarkers, withSourceTag } from '../lib/citations';
@@ -447,6 +448,10 @@ const MessageItem = memo(function MessageItem({
           reasoning={progress.reasoning}
         />
       )}
+
+      {message.approvals?.map((approval) => (
+        <ChatApprovalCard key={approval.id} approval={approval} />
+      ))}
 
       {message.streaming && progress?.isStreaming && progress.steps && (
         <div className="mb-3 rounded-md border border-gray-700 bg-[#1a1b1e]/60 p-3">

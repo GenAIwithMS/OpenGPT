@@ -12,6 +12,7 @@ import {
   Check,
 } from "lucide-react";
 import AttachmentCard from "./AttachmentCard";
+import { SEND_HINT } from "../lib/preferences";
 import { PromptInput, PromptInputTextarea, PromptInputActions, PromptInputAction } from "./ui/prompt-input";
 
 const MessageInput = ({
@@ -279,7 +280,7 @@ const MessageInput = ({
                   role="menu"
                   aria-label="Add"
                   onKeyDown={handleMenuKeyDown}
-                  className="absolute bottom-full left-0 mb-3 w-48 origin-bottom-left rounded-xl bg-[#2a2b32] border border-gray-700/80 shadow-2xl shadow-black/40 p-1 z-50 animate-scale-in"
+                  className="absolute bottom-full left-0 mb-3 w-48 origin-bottom-left rounded-xl bg-[#2a2b32] border border-gray-700/80 shadow-2xl shadow-black/40 p-1 z-50 animate-menu-in"
                   style={{ transformOrigin: "bottom left" }}
                 >
                   {menuActions.map((action, index) => {
@@ -387,7 +388,7 @@ const MessageInput = ({
           <span className="text-blue-400">Drop your document here</span>
         ) : (
           <span>
-            Press Enter to send, Shift+Enter for new line • Drag & drop documents (PDF, MD, TXT) to upload
+            {SEND_HINT} • Drag & drop documents (PDF, MD, TXT) to upload
           </span>
         )}
       </div>

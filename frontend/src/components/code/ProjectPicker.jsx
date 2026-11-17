@@ -24,9 +24,9 @@ const SavedApprovals = ({ project, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={onClose}>
+    <div className="animate-backdrop-in fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={onClose}>
       <div role="dialog" aria-label="Saved approvals" onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-xl border border-gray-700 bg-[#26272e] p-4 shadow-2xl">
+        className="animate-dialog-in w-full max-w-md rounded-xl border border-gray-700 bg-[#26272e] p-4 shadow-2xl">
         <div className="mb-3 flex items-center gap-2">
           <ShieldCheck size={17} className="text-gray-300" />
           <h2 className="min-w-0 truncate text-base font-semibold text-gray-100">Always allowed in {project.name}</h2>
@@ -99,7 +99,7 @@ const ProjectPicker = ({ projects, project, onChange, onAdded, onRemove, canBrow
       </button>
 
       {open && (
-        <div role="menu" className="absolute left-0 top-full z-40 mt-1 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-gray-700/80 bg-[#2a2b32] p-1 shadow-2xl shadow-black/40">
+        <div role="menu" className="animate-menu-in origin-top-left absolute left-0 top-full z-40 mt-1 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-gray-700/80 bg-[#2a2b32] p-1 shadow-2xl shadow-black/40">
           <div className="thin-scroll max-h-72 overflow-y-auto">
             {projects.length === 0 && <p className="px-3 py-2 text-xs text-gray-500">No projects yet. Open a folder to start.</p>}
             {projects.map((p) => (

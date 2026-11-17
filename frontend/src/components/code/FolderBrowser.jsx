@@ -45,12 +45,12 @@ const FolderBrowser = ({ onOpen, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={onClose}>
+    <div className="animate-backdrop-in fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={onClose}>
       <div
         role="dialog"
         aria-label="Open a folder"
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[80vh] w-full max-w-lg flex-col rounded-xl border border-gray-700 bg-[#26272e] shadow-2xl"
+        className="animate-dialog-in flex max-h-[80vh] w-full max-w-lg flex-col rounded-xl border border-gray-700 bg-[#26272e] shadow-2xl"
       >
         <div className="flex items-center gap-2 border-b border-gray-700/80 px-4 py-3">
           <FolderOpen size={17} className="text-gray-300" />

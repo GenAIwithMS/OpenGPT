@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Plus,
   Edit2,
@@ -12,6 +12,7 @@ import {
   PanelLeftOpen,
   Code2,
 } from 'lucide-react';
+import UserMenu from './settings/UserMenu';
 
 const SquarePenIcon = (props) => (
   <svg
@@ -47,22 +48,14 @@ const Sidebar = ({
   onOpenCode,
   listLabel = 'Recents',
   emptyText = 'No chats yet',
+  displayName = 'Muhammad',
+  onOpenSettings = () => {},
+  onOpenSearch = () => {},
 }) => {
   const [editingThreadId, setEditingThreadId] = useState(null);
   const [editTitle, setEditTitle] = useState('');
   const [openMenuId, setOpenMenuId] = useState(null);
-  const [query, setQuery] = useState('');
-  const [activeIndex, setActiveIndex] = useState(-1);
   const [recentsOpen, setRecentsOpen] = useState(true);
-  const searchInputRef = useRef(null);
-
-  const filteredThreads = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return threads;
-    return threads.filter((t) =>
-      (t.title || 'New Chat').toLowerCase().includes(q)
-    );
-  }, [threads, query]);
 
   const handleRename = (threadId, currentTitle) => {
     setEditingThreadId(threadId);
@@ -96,40 +89,6 @@ const Sidebar = ({
     if (window.innerWidth < 1024) toggleSidebar();
   };
 
-  const clearSearch = () => {
-    setQuery('');
-    setActiveIndex(-1);
-    searchInputRef.current?.focus();
-  };
-
-  const handleSearchKeyDown = (e) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setActiveIndex((i) => (filteredThreads.length ? (i + 1) % filteredThreads.length : -1));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setActiveIndex((i) =>
-        filteredThreads.length ? (i - 1 + filteredThreads.length) % filteredThreads.length : -1
-      );
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      const target = filteredThreads[activeIndex] || filteredThreads[0];
-      if (target) openChat(target);
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      if (query) {
-        clearSearch();
-      } else {
-        searchInputRef.current?.blur();
-      }
-    }
-  };
-
-  // Keep active index in range when the filtered list changes
-  useEffect(() => {
-    setActiveIndex((i) => (i >= filteredThreads.length ? filteredThreads.length - 1 : i));
-  }, [filteredThreads.length]);
-
   // Close thread dropdown menus when clicking elsewhere
   useEffect(() => {
     if (!openMenuId) return;
@@ -141,11 +100,6 @@ const Sidebar = ({
     document.addEventListener('mousedown', handle);
     return () => document.removeEventListener('mousedown', handle);
   }, [openMenuId]);
-
-  const expandThenSearch = () => {
-    if (isCollapsed) onToggleCollapse?.();
-    setTimeout(() => searchInputRef.current?.focus(), 60);
-  };
 
   return (
     <>
@@ -184,7 +138,7 @@ const Sidebar = ({
 
         {isCollapsed ? (
           /* Collapsed rail (desktop) */
-          <div className="flex flex-col items-center py-3 px-2">
+          <div className="flex flex-1 flex-col items-center py-3 px-2">
             {/* Brand — click the "O" to expand; hovering reveals the expand icon */}
             <button
               onClick={() => onToggleCollapse?.()}
@@ -207,7 +161,7 @@ const Sidebar = ({
             </button>
 
             <button
-              onClick={expandThenSearch}
+              onClick={onOpenSearch}
               title="Search chats"
               className="flex items-center justify-center w-10 h-10 rounded-xl hover:bg-gray-700 transition-colors mt-1"
             >
@@ -224,6 +178,10 @@ const Sidebar = ({
             >
               <Code2 size={18} />
             </button>
+
+            <div className="mt-auto">
+              <UserMenu displayName={displayName} onOpenSettings={onOpenSettings} collapsed />
+            </div>
           </div>
         ) : (
           /* Expanded sidebar */
@@ -256,40 +214,21 @@ const Sidebar = ({
               </button>
             </div>
 
-            {/* Search chats */}
+            {/* Search chats: opens the search window (Ctrl/Cmd+K) */}
             <div className="px-2 pt-2 pb-1">
-              <div
+              <button
+                type="button"
+                onClick={onOpenSearch}
+                aria-haspopup="dialog"
                 className="
-                  flex items-center gap-2 px-3 py-2 rounded-xl
-                  bg-transparent border border-transparent
-                  focus-within:bg-gray-700/60 focus-within:border-gray-600
+                  flex w-full items-center gap-2 px-3 py-2 rounded-xl text-left
+                  bg-transparent border border-transparent hover:bg-gray-700/60
                   transition-colors
                 "
               >
                 <SearchIcon size={16} className="text-gray-400 shrink-0" />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={query}
-                  onChange={(e) => {
-                    setQuery(e.target.value);
-                    setActiveIndex(-1);
-                  }}
-                  onKeyDown={handleSearchKeyDown}
-                  placeholder="Search chats"
-                  aria-label="Search chats"
-                  className="w-full bg-transparent text-sm text-gray-100 placeholder-gray-500 outline-none"
-                />
-                {query && (
-                  <button
-                    onClick={clearSearch}
-                    title="Clear search"
-                    className="shrink-0 p-0.5 text-gray-400 hover:text-white rounded transition-colors"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
+                <span className="w-full text-sm text-gray-500">Search chats</span>
+              </button>
             </div>
 
             {/* Code — coding agent */}
@@ -344,12 +283,12 @@ const Sidebar = ({
                     : 'flex-none max-h-0 opacity-0 overflow-hidden'}
                 `}
               >
-              {filteredThreads.length === 0 ? (
+              {threads.length === 0 ? (
                 <div className="px-3 py-6 text-center text-xs text-gray-500">
-                  {query ? 'Nothing found' : emptyText}
+                  {emptyText}
                 </div>
               ) : (
-                filteredThreads.map((thread, index) => {
+                threads.map((thread) => {
                   const isActive = currentThreadId === thread.thread_id;
                   const isEditing = editingThreadId === thread.thread_id;
                   return (
@@ -360,7 +299,6 @@ const Sidebar = ({
                         group relative flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer
                         transition-colors duration-100 outline-none focus-visible:ring-2 focus-visible:ring-white/50
                         ${isActive ? 'bg-gray-700/90' : 'hover:bg-gray-700/60'}
-                        ${activeIndex === index && query ? 'ring-1 ring-white/30' : ''}
                       `}
                       role={isEditing ? undefined : 'button'}
                       tabIndex={isEditing ? undefined : 0}
@@ -416,7 +354,7 @@ const Sidebar = ({
 
                           {openMenuId === thread.thread_id && (
                             <div
-                              className="absolute right-2 top-full mt-1 w-36 bg-gray-800 rounded-xl shadow-xl shadow-black/40 z-50 py-1 border border-gray-700/70 animate-scale-in"
+                              className="absolute right-2 top-full mt-1 w-36 bg-gray-800 rounded-xl shadow-xl shadow-black/40 z-50 py-1 border border-gray-700/70 animate-menu-in origin-top-right"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <button
@@ -450,11 +388,9 @@ const Sidebar = ({
             </div>
             </div>
 
-            {/* Footer */}
-            <div className="px-3 py-3 border-t border-gray-700/60 shrink-0">
-              <div className="text-xs text-gray-500 text-center">
-                OpenGPT
-              </div>
+            {/* Footer: you, and the menu for Account / Settings */}
+            <div className="px-2 py-2 border-t border-gray-700/60 shrink-0">
+              <UserMenu displayName={displayName} onOpenSettings={onOpenSettings} />
             </div>
           </>
         )}

@@ -5,6 +5,7 @@ import ProjectPicker from './code/ProjectPicker';
 import CodeMessages from './code/CodeMessages';
 import { useCodeSession } from '../hooks/useCodeSession';
 import { codeService } from '../services/api';
+import { notifyFinished } from '../lib/notify';
 
 // Message box with Send, or Stop while the agent works.
 const Composer = ({ onSend, onStop, working, disabled, placeholder }) => {
@@ -47,7 +48,11 @@ const CodeView = ({
   const [startError, setStartError] = useState(null);
   const code = useCodeSession(sessionId, {
     onTitle: () => onSessionsChanged?.(),
-    onTurnEnd: () => onSessionsChanged?.(),
+    onTurnEnd: () => {
+      onSessionsChanged?.();
+      notifyFinished('OpenGPT', 'The coding agent finished.');
+    },
+    onApproval: () => notifyFinished('OpenGPT', 'The coding agent is waiting for your approval.'),
   });
 
   const sessionProject = code.session?.project;
