@@ -15,7 +15,7 @@ from app.services.chatbot import (
 )
 from app.services.thread import generate_thread_id, generate_id_name
 from app.services.rag import has_document
-from app.services import chat_approvals
+from app.services import chat_approvals, model_router
 from app.services.citations import extract_sources, link_citations, renumber_sources
 from app.error_handlers import log_error, public_error
 from app.llm import split_content
@@ -191,7 +191,7 @@ class ChatService:
             raise Exception(f"Failed to send message: {str(e)}")
 
     @staticmethod
-    def regenerate_message(thread_id: str, tools: Optional[List[str]] = None) -> Dict[str, Any]:
+    def regenerate_message(thread_id: str, tools: Optional[List[str]] = None, model: Optional[str] = None) -> Dict[str, Any]:
         """Regenerate the last AI response without appending a new human message.
 
         This re-runs the agent from the current thread state so the prior user
@@ -237,13 +237,16 @@ class ChatService:
             removals = [RemoveMessage(id=m.id) for m in messages[last_human + 1:] if getattr(m, "id", None)]
             chatbot.update_state(current.config, {"messages": removals})
 
+            doc_exists = has_document(thread_id)
+            question = messages[last_human].content if isinstance(messages[last_human].content, str) else ""
+            name, _ = model_router.choose(question, model, has_document=doc_exists)
             final_state = chatbot.invoke(
                 {
                     "messages": [],
-                    "has_document": has_document(thread_id),
+                    "has_document": doc_exists,
                     "thread_id": thread_id,
                 },
-                config=config,
+                config={**config, "configurable": {**config["configurable"], "model_name": name}},
             )
             touch_thread(thread_id)
 
@@ -276,7 +279,8 @@ class ChatService:
             raise Exception(f"Failed to regenerate message: {str(e)}")
 
     @staticmethod
-    def _stream_chatbot(graph, config, doc_exists: bool, human_message, temporary: bool = False, tools=None):
+    def _stream_chatbot(graph, config, doc_exists: bool, human_message, temporary: bool = False, tools=None,
+                        model: Optional[str] = None, route_text: Optional[str] = None):
         """Yield live-thinking/ai chunks while running the chatbot graph.
 
         When ``human_message`` is provided it is sent as a new turn; when it is
@@ -304,9 +308,15 @@ class ChatService:
         # to resolve its ``【n†source】`` citation markers.
         tool_outputs = []
 
+        # The model for this reply: the one picked in the menu, or Auto's choice
+        # (see model_router). The UI shows which one answered.
+        name, auto = model_router.choose(
+            human_message if human_message is not None else (route_text or ""), model, has_document=doc_exists)
+        yield {"message_type": "model", "model": name, "auto": auto}
+
         # can_ask: connector tools may pause and ask the user (see chat_approvals);
         # their questions arrive as "custom" stream events.
-        run_config = {**config, "configurable": {**config["configurable"], "can_ask": True}}
+        run_config = {**config, "configurable": {**config["configurable"], "can_ask": True, "model_name": name}}
         stream = graph.stream(
             {
                 "messages": input_messages,
@@ -619,7 +629,8 @@ class ChatService:
                 logger.warning(f"Error saving deep research turn: {e}")
 
     @staticmethod
-    def stream_message(message: str, thread_id: str, tools: Optional[List[str]] = None, temporary: bool = False):
+    def stream_message(message: str, thread_id: str, tools: Optional[List[str]] = None, temporary: bool = False,
+                       model: Optional[str] = None):
         # Temporary chats run on an in-memory checkpointer and never touch the
         # database. Use the memory-backed graph so nothing is persisted.
         graph = chatbot_memory if temporary else chatbot
@@ -649,13 +660,14 @@ class ChatService:
             doc_exists = False if temporary else has_document(thread_id)
 
             # Stream tokens from the chatbot graph (live thinking + AI output)
-            yield from ChatService._stream_chatbot(graph, config, doc_exists, message, temporary, tools)
+            yield from ChatService._stream_chatbot(graph, config, doc_exists, message, temporary, tools, model=model)
         except Exception as e:
             logger.warning(f"Error streaming message: {e}")
             raise Exception(f"Failed to stream message: {str(e)}")
     
     @staticmethod
-    def edit_message_stream(thread_id: str, new_content: str, human_index: int, tools: Optional[List[str]] = None):
+    def edit_message_stream(thread_id: str, new_content: str, human_index: int, tools: Optional[List[str]] = None,
+                            model: Optional[str] = None):
         """Edit a previously sent user message and regenerate the response.
 
         The targeted human turn is rewritten in-place, every message after it
@@ -707,7 +719,8 @@ class ChatService:
                 touch_thread(thread_id)
                 return
 
-            yield from ChatService._stream_chatbot(chatbot, config, doc_exists, None, tools=tools)
+            yield from ChatService._stream_chatbot(chatbot, config, doc_exists, None, tools=tools, model=model,
+                                                   route_text=new_content)
             touch_thread(thread_id)
         except Exception as e:
             logger.warning(f"Error editing message: {e}")

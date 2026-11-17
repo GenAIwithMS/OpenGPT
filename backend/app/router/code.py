@@ -102,7 +102,7 @@ async def session_messages(session_id: str):
 @code_router.post("/sessions/{session_id}/stream", dependencies=[Depends(rate_limit)])
 async def stream_turn(session_id: str, request: CodeMessageRequest):
     """Send a message and stream the agent's progress (Server-Sent Events)."""
-    events = await stream.run_turn(session_id, request.text)
+    events = await stream.run_turn(session_id, request.text, request.model)
     return StreamingResponse(
         events,
         media_type="text/event-stream",

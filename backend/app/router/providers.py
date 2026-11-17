@@ -45,6 +45,21 @@ def overview():
     return providers.overview()
 
 
+@providers_router.get("/models")
+def models():
+    """The model menu: {models, chat_default, code_default, auto: {chat, code}}."""
+    from app import llm
+    from app.services import model_router
+
+    cfg = llm.settings()
+    return {
+        "models": providers.available_models(),
+        "chat_default": cfg["model"],
+        "code_default": cfg["coding_model"],
+        "auto": {"chat": model_router.auto_summary("chat"), "code": model_router.auto_summary("code")},
+    }
+
+
 @providers_router.post("", status_code=201, dependencies=[Depends(rate_limit)])
 def create(request: ProviderCreate):
     return providers.create(**request.model_dump())

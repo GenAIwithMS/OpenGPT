@@ -110,7 +110,8 @@ def model_config() -> dict:
                 "name": "OpenGPT",
                 "package": _PACKAGES[provider],
                 "settings": settings,
-                "models": {model: {"name": model}},
+                # Every model the menu offers, so a turn can switch to any of them.
+                "models": {name: {"name": name} for name in _menu_models(model)},
             }
         },
         "model": f"{PROVIDER_ID}/{model}",
@@ -131,6 +132,16 @@ def _mcp() -> dict:
         logger.warning("Could not load connectors for the coding agent: %s", e)
         return {}
     return {"mcp": mcp} if mcp else {}
+
+
+def _menu_models(default: str) -> list[str]:
+    """The default model plus the models offered in the model menu."""
+    try:
+        from app.services import providers
+        return [default] + [m for m in providers.available_models() if m != default]
+    except Exception as e:  # never keep the agent from starting
+        logger.warning("Could not list models for the coding agent: %s", e)
+        return [default]
 
 
 def _skills() -> dict:

@@ -28,8 +28,8 @@ import httpx
 
 from app.error_handlers import log_error
 from app.exceptions import ConflictError
-from app.services import personalization
-from app.services.coding_agent import approvals, client, sessions
+from app.services import model_router, personalization
+from app.services.coding_agent import approvals, client, config, sessions
 
 logger = logging.getLogger(__name__)
 
@@ -134,16 +134,20 @@ def sse(event: dict) -> str:
     return f"data: {json.dumps(event)}\n\n"
 
 
-async def run_turn(session_id: str, text: str) -> AsyncIterator[str]:
-    """SSE text for one coding turn. Raises ConflictError before streaming if the session is busy."""
+async def run_turn(session_id: str, text: str, model: Optional[str] = None) -> AsyncIterator[str]:
+    """SSE text for one coding turn. Raises ConflictError before streaming if the session is busy.
+
+    ``model`` is what the user picked in the model menu; empty or "auto" lets
+    Auto choose for this task (see model_router)."""
     raw, project, directory = await sessions._get_raw(session_id)
     info = sessions._session_info(raw, project)
     if session_id in _running or info["busy"]:
         raise ConflictError("This session is already working on something")
-    return _relay(session_id, text, info, directory)
+    return _relay(session_id, text, info, directory, model)
 
 
-async def _relay(session_id: str, text: str, info: dict, directory) -> AsyncIterator[str]:
+async def _relay(session_id: str, text: str, info: dict, directory,
+                 model: Optional[str] = None) -> AsyncIterator[str]:
     # Claimed here, when streaming starts, so a stream that is never read
     # can't leave the session marked busy.
     if session_id in _running:
@@ -163,6 +167,14 @@ async def _relay(session_id: str, text: str, info: dict, directory) -> AsyncIter
                 yield sse(out)
 
         await sync_profile(session_id, directory)
+        # The model for this turn: the menu's choice or Auto's.
+        name, auto = model_router.choose(text, model, purpose="code")
+        try:
+            await client.call("POST", f"/api/session/{session_id}/model", directory=directory,
+                              json={"model": {"providerID": config.PROVIDER_ID, "id": name}})
+            yield sse({"type": "model", "model": name, "auto": auto})
+        except Exception as e:  # e.g. a model added after the agent started: keep the current one
+            logger.warning("Could not switch the coding session to %s: %s", name, e)
         await client.call("POST", f"/api/session/{session_id}/prompt", directory=directory,
                           json={"text": text})
 

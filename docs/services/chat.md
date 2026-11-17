@@ -19,6 +19,9 @@ calls tools when it needs them.
      [skills](skills.md), [connector](connectors.md) tools), adds document
      context for the question when the thread has files, binds the tools and
      streams the model.
+   - The model is the one sent with the message (`model`), or Auto's
+     choice ([providers](providers.md#the-model-menu-and-auto)); it reaches
+     `chat_node` as `configurable.model_name`.
    - `tool_node` runs the tool calls. It builds its tool list on each call,
      because connector tools change while the app runs.
 4. `ChatService._relay_chat_stream` turns graph output into SSE events for
@@ -26,6 +29,7 @@ calls tools when it needs them.
 
 | Event `message_type` | Meaning |
 |---|---|
+| `model` | The model answering this reply, and whether Auto picked it |
 | `thinking` | A status line ("Using Search...") or the model's reasoning |
 | `ai` | Answer text |
 | `ai_replace` | The final answer with citation markers turned into links |

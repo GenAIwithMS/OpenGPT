@@ -154,7 +154,7 @@ def regenerate(request: RegenerateRequest):
     try:
         thread_id = _require_thread_id(request.thread_id)
         with exclusive_run(thread_id):
-            result = ChatService.regenerate_message(thread_id, request.tools)
+            result = ChatService.regenerate_message(thread_id, request.tools, model=request.model)
         return ChatResponse(**result)
     except AppError:
         raise
@@ -170,7 +170,7 @@ def edit_message(request: EditMessageRequest):
         stream = _sse(
             thread_id,
             lambda: ChatService.edit_message_stream(
-                thread_id, request.message, request.index, request.tools
+                thread_id, request.message, request.index, request.tools, model=request.model
             ),
             {"thread_id": thread_id, "done": True},
         )
@@ -207,7 +207,7 @@ def chat_stream(request: ChatStreamRequest):
             stream = _sse(
                 thread_id,
                 lambda: _untraced(
-                    ChatService.stream_message(message, thread_id, tools_list, temporary=True)
+                    ChatService.stream_message(message, thread_id, tools_list, temporary=True, model=request.model)
                 ),
                 {"done": True},
             )
@@ -221,7 +221,7 @@ def chat_stream(request: ChatStreamRequest):
 
         stream = _sse(
             thread_id,
-            lambda: ChatService.stream_message(message, thread_id, tools_list),
+            lambda: ChatService.stream_message(message, thread_id, tools_list, model=request.model),
             {"thread_id": thread_id, "done": True},
         )
         return StreamingResponse(stream, media_type="text/event-stream")

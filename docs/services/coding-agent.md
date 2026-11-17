@@ -23,8 +23,11 @@ in `coding-agent/`; the backend manages it in
 3. **Sessions** (`sessions.py`): created in the agent for a project folder.
    The agent stores them and their messages itself. `PERMISSION_RULES` lets
    read-only actions run; everything else asks.
-4. **A turn** (`stream.py`): subscribe to the agent's events, send the
-   message, relay text, reasoning, tool calls and diffs as SSE.
+4. **A turn** (`stream.py`): subscribe to the agent's events, switch the
+   session to the model from the menu (or Auto's choice) with
+   `POST /api/session/{id}/model`, send the message, relay text, reasoning,
+   tool calls and diffs as SSE. The agent's config lists every model the
+   menu offers, so any of them can be used.
 5. **Approvals** (`approvals.py`): when the agent asks, the UI shows the
    request; the user allows once, always (saved for the project) or denies.
 6. **Changes to settings** (connectors, skills, provider) restart the agent

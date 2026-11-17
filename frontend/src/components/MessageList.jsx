@@ -61,7 +61,7 @@ function UserActions({ content, onEdit }) {
   );
 }
 
-function MessageActions({ content, onRegenerate }) {
+function MessageActions({ content, onRegenerate, model, autoModel }) {
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState(null); // 'like' | 'dislike'
 
@@ -79,6 +79,11 @@ function MessageActions({ content, onRegenerate }) {
 
   return (
     <div className="mt-2 flex items-center gap-1 justify-end">
+      {model && (
+        <span className="mr-auto truncate text-[11px] text-gray-500" title={autoModel ? `Auto picked ${model}` : model}>
+          {autoModel ? 'Auto · ' : ''}{model.split('/').pop()}
+        </span>
+      )}
       <button
         type="button"
         onClick={handleCopy}
@@ -550,6 +555,8 @@ const MessageItem = memo(function MessageItem({
           <MessageActions
             content={message.content}
             onRegenerate={canRegenerate ? onRegenerate : undefined}
+            model={message.model}
+            autoModel={message.autoModel}
           />
         </div>
       </div>

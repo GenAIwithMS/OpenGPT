@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AlertTriangle, ArrowUp, Code2, Loader2, Square } from 'lucide-react';
 import { PromptInput, PromptInputTextarea, PromptInputActions, PromptInputAction } from './ui/prompt-input';
+import ModelPicker from './ModelPicker';
 import ProjectPicker from './code/ProjectPicker';
 import CodeMessages from './code/CodeMessages';
 import { useCodeSession } from '../hooks/useCodeSession';
@@ -18,7 +19,8 @@ const Composer = ({ onSend, onStop, working, disabled, placeholder }) => {
   return (
     <PromptInput value={value} onValueChange={setValue} onSubmit={submit} disabled={disabled} maxHeight={200}>
       <PromptInputTextarea placeholder={placeholder} aria-label={placeholder} className="px-2" />
-      <PromptInputActions className="flex justify-end px-1 pb-1">
+      <PromptInputActions className="flex items-center justify-end gap-1 px-1 pb-1">
+        <ModelPicker page="code" disabled={disabled && !working} />
         <PromptInputAction tooltip={working ? 'Stop' : 'Send'}>
           <button
             type="button"
@@ -114,9 +116,6 @@ const CodeView = ({
               projectsRoot={workspace.projectsRoot}
               disabled={!available}
             />
-          )}
-          {status?.model && available && (
-            <span className="ml-auto hidden truncate text-xs text-gray-500 sm:block" title="Model">{status.model}</span>
           )}
         </div>
       </div>

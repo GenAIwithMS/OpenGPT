@@ -11,6 +11,7 @@ replaces the old one rather than rewriting history.
 | [0003](0003-ask-before-connector-actions.md) | Chat asks before connector tools that can change data | 2026-11-16 |
 | [0004](0004-skills-installed-not-bundled.md) | Third-party skills are installed from GitHub at a pinned version, not bundled | 2026-11-16 |
 | [0005](0005-agent-start-thread.md) | Child processes start from one long-lived thread | 2026-11-16 |
+| [0006](0006-auto-model-per-message.md) | Auto picks a model per message without an extra model call | 2026-11-17 |
 
 ## Template
 

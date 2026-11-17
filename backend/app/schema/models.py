@@ -29,6 +29,8 @@ class ChatStreamRequest(BaseModel):
     tools: ToolList = Field(None, max_length=MAX_TOOLS, description="Tools to use (e.g., ['blogs'])")
     temporary: bool = Field(False, description="If true, the chat is session-only (never persisted)")
     session_id: Optional[str] = Field(None, max_length=ID_MAX_CHARS, description="Client-generated UUID for one temporary chat session")
+    model: Optional[str] = Field(None, max_length=200, pattern=r"^[A-Za-z0-9._:/@+-]+$",
+                                 description='Model for this reply; empty or "auto" lets Auto pick')
 
 
 class RegenerateRequest(BaseModel):
@@ -36,6 +38,8 @@ class RegenerateRequest(BaseModel):
 
     thread_id: str = Field(..., max_length=ID_MAX_CHARS, description="Thread ID for the conversation")
     tools: ToolList = Field(None, max_length=MAX_TOOLS, description="List of tools used (e.g., ['blogs'])")
+    model: Optional[str] = Field(None, max_length=200, pattern=r"^[A-Za-z0-9._:/@+-]+$",
+                                 description='Model for this reply; empty or "auto" lets Auto pick')
 
 
 class EditMessageRequest(BaseModel):
@@ -45,6 +49,8 @@ class EditMessageRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=MAX_MESSAGE_CHARS, description="New (edited) content of the user message")
     index: int = Field(..., ge=0, le=10000, description="0-based index of the human message among human turns")
     tools: ToolList = Field(None, max_length=MAX_TOOLS, description="List of tools used (e.g., ['blogs'])")
+    model: Optional[str] = Field(None, max_length=200, pattern=r"^[A-Za-z0-9._:/@+-]+$",
+                                 description='Model for this reply; empty or "auto" lets Auto pick')
 
 
 class ChatResponse(BaseModel):
@@ -188,6 +194,8 @@ class CodeMessageRequest(BaseModel):
     """Send a message to a coding session"""
 
     text: str = Field(..., min_length=1, max_length=MAX_MESSAGE_CHARS, description="What the coding agent should do")
+    model: Optional[str] = Field(None, max_length=200, pattern=r"^[A-Za-z0-9._:/@+-]+$",
+                                 description='Model for this reply; empty or "auto" lets Auto pick')
 
 
 class CodeApprovalReply(BaseModel):

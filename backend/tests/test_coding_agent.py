@@ -24,8 +24,12 @@ class ModelConfigTests(unittest.TestCase):
         llm.settings.cache_clear()
 
     def build(self, **env):
-        with llm_env(**env):
+        # No network: the provider's model list is unavailable, so only the
+        # models chosen for each job are offered.
+        with llm_env(**env), mock.patch("app.services.providers.test", side_effect=RuntimeError("offline")):
             llm.settings.cache_clear()
+            from app.services import providers
+            providers.forget_models()
             return config.model_config()
 
     def test_openai_compatible_endpoint(self):
@@ -46,7 +50,8 @@ class ModelConfigTests(unittest.TestCase):
     def test_coding_agent_model_override(self):
         cfg = self.build(LLM_API_KEY="k", LLM_MODEL="chat", CODING_AGENT_MODEL="coder")
         self.assertEqual(cfg["model"], "opengpt/coder")
-        self.assertEqual(list(cfg["providers"]["opengpt"]["models"]), ["coder"])
+        # The coding model is the default; the chat model is offered in the menu too.
+        self.assertEqual(list(cfg["providers"]["opengpt"]["models"]), ["coder", "chat"])
 
     def test_self_hosted_without_key(self):
         cfg = self.build(LLM_BASE_URL="http://localhost:11434/v1", LLM_MODEL="m")

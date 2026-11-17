@@ -112,6 +112,7 @@ def _changed() -> None:
     from app.services.coding_agent.process import agent
 
     llm.reload()
+    forget_models()
     threading.Thread(target=agent.restart, daemon=True).start()
 
 
@@ -322,3 +323,45 @@ def test(provider_id: Optional[str] = None, kind: str = "openai", base_url: str 
         base_url = "https://api.openai.com/v1"
     models = _list_models(kind, base_url, api_key)
     return {"ok": True, "models": models}
+
+
+# ---------------------------------------------------------------- the model menu
+
+MODELS_CACHE_SECONDS = 600
+# Model ids that are clearly not chat models (embeddings, speech, safety filters, images).
+_NOT_CHAT = re.compile(r"embed|whisper|tts|speech|transcri|moderation|guard|rerank|dall-e|image|orpheus|audio", re.I)
+MAX_MENU_MODELS = 200
+_models_cache: dict = {}
+
+
+def available_models() -> list[str]:
+    """Models for the menu next to the send button (and the coding agent's
+    config): the models chosen for each job first, then the active provider's
+    list (cached for 10 minutes). Never raises: without a list, only the
+    chosen models are offered."""
+    import time
+
+    from app import llm
+    from app.services.model_router import unique
+
+    try:
+        cfg = llm.settings()
+    except llm.LLMConfigError:
+        return []
+    chosen = [cfg[r] for r in ROLES]
+    active = _load()["active"]
+    cached = _models_cache.get(active)
+    if cached and time.time() - cached[0] < MODELS_CACHE_SECONDS:
+        listed = cached[1]
+    else:
+        try:
+            listed = test(provider_id=active)["models"]
+        except Exception:  # noqa: BLE001 - offline, no list endpoint, refused key
+            listed = []
+        _models_cache[active] = (time.time(), listed)
+    listed = [m for m in listed if not _NOT_CHAT.search(m)]
+    return unique(chosen + listed)[:MAX_MENU_MODELS]
+
+
+def forget_models() -> None:
+    _models_cache.clear()

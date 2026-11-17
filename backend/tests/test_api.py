@@ -62,7 +62,7 @@ class ApiTests(unittest.TestCase):
     def test_temporary_chats_get_separate_threads(self):
         seen = []
 
-        def fake_stream(message, thread_id, tools=None, temporary=False):
+        def fake_stream(message, thread_id, tools=None, temporary=False, model=None):
             seen.append(thread_id)
             yield {"content": "ok", "message_type": "ai"}
 

@@ -208,6 +208,9 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
         // Deep research activity (planning, searches, sources, ...) is kept on
         // the message so it stays with the conversation.
         updateMessage(placeholderId, m => ({ ...m, research: [...(m.research || []), data.event] }));
+      } else if (data.message_type === 'model') {
+        // Which model answers this reply (picked in the menu, or by Auto).
+        updateMessage(placeholderId, m => ({ ...m, model: data.model, autoModel: Boolean(data.auto) }));
       } else if (data.message_type === 'approval') {
         // A connector tool asks before changing something (Allow / Deny card).
         updateMessage(placeholderId, m => ({ ...m, approvals: [...(m.approvals || []), data.approval] }));

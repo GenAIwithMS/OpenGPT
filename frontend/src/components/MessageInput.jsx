@@ -14,6 +14,7 @@ import {
 import AttachmentCard from "./AttachmentCard";
 import { SEND_HINT } from "../lib/preferences";
 import { PromptInput, PromptInputTextarea, PromptInputActions, PromptInputAction } from "./ui/prompt-input";
+import ModelPicker from "./ModelPicker";
 
 const MessageInput = ({
   onSendMessage,
@@ -355,7 +356,9 @@ const MessageInput = ({
             })}
           </div>
 
-          {/* Send / Stop Button — same round button as the Code page */}
+          {/* Model menu, then Send / Stop — same as the Code page */}
+          <div className="flex shrink-0 items-center gap-1">
+          <ModelPicker page="chat" />
           <PromptInputAction tooltip={showStop ? "Stop generating" : "Send message"}>
             <button
               type="button"
@@ -368,6 +371,7 @@ const MessageInput = ({
               {showStop ? <Square size={13} fill="currentColor" /> : <ArrowUp size={16} />}
             </button>
           </PromptInputAction>
+          </div>
         </PromptInputActions>
 
         <input
