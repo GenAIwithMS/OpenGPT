@@ -31,7 +31,7 @@ A provider chosen in Settings > Developer overrides these (see
 | `WEATHER_API_KEY` | Weather (OpenWeather) |
 | `STOCK_API_KEY` | Stock prices (Alpha Vantage) |
 | `GOOGLE_API_KEY` | Images in blog posts (skipped when empty) |
-| `TAVILY_API_KEY` | Deep research with `SEARCH_API=tavily` |
+| `TAVILY_API_KEY` | Research for blog posts, and deep research with `SEARCH_API=tavily` |
 
 ## Database
 
