@@ -16,6 +16,21 @@ import { SEND_HINT } from "../lib/preferences";
 import { PromptInput, PromptInputTextarea, PromptInputActions, PromptInputAction } from "./ui/prompt-input";
 import ModelPicker from "./ModelPicker";
 
+/**
+ * The chat message box: text, attachments, the + menu (attach a file, web
+ * search, blogs, deep research), the model menu and Send / Stop. Enter sends,
+ * Shift+Enter adds a line; files can also be dropped on it.
+ *
+ * @param {object} props
+ * @param {(text: string, tools: string[], attachments: object[]) => (void|Promise)} props.onSendMessage
+ *   Send the text with the tools picked in the + menu (e.g. `['search']`).
+ * @param {(file: File) => void} props.onAddAttachment  A file was picked or dropped.
+ * @param {(id: string) => void} props.onRemoveAttachment
+ * @param {() => void} props.onStop  Stop the reply being written.
+ * @param {boolean} props.disabled  A reply is being written (Send turns into Stop).
+ * @param {object[]} [props.pendingAttachments]  Files waiting to be sent with the next message.
+ * @param {boolean} [props.uploadingAttachment]
+ */
 const MessageInput = ({
   onSendMessage,
   onAddAttachment,

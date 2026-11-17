@@ -126,6 +126,13 @@ const randomGreeting = (current) => {
   return options[Math.floor(Math.random() * options.length)];
 };
 
+/**
+ * The whole app: reads the URL (`/chat`, `/chat/<id>`, `/code`, `/code/<id>`,
+ * `?temporary-chat=true`) and lays out the sidebar, the chat or Code page, the
+ * settings popup, the search window and the keyboard shortcuts. Chat state
+ * comes from `useChat`, the thread list from `useThreads`, the Code page's
+ * workspace from `useCodeWorkspace`, and settings from `useSettings`.
+ */
 function App() {
   const location = useLocation();
   const navigate = useNavigate();

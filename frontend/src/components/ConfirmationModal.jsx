@@ -3,6 +3,20 @@ import { AlertTriangle, Loader2, X } from 'lucide-react';
 
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+/**
+ * A small "are you sure?" dialog. Focus stays inside it, Escape or a click
+ * outside cancels, and focus returns to where it was when it closes.
+ *
+ * @param {object} props
+ * @param {boolean} props.isOpen
+ * @param {() => void} props.onClose  Cancel.
+ * @param {() => void} props.onConfirm
+ * @param {string} [props.title]
+ * @param {string} [props.message]
+ * @param {string} [props.confirmText]
+ * @param {string} [props.cancelText]
+ * @param {boolean} [props.danger]  Red confirm button, for deleting things.
+ */
 const ConfirmationModal = ({
   isOpen,
   onClose,

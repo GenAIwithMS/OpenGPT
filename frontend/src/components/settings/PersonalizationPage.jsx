@@ -186,6 +186,14 @@ const KnowledgeTab = () => {
   );
 };
 
+/**
+ * Settings > Personalization: the Profile tab (nickname, occupation, about
+ * you, custom instructions) and the Knowledge tab (documents every chat can search).
+ *
+ * @param {object} props
+ * @param {object} props.settings  All settings from `useSettings`.
+ * @param {(changes: object) => Promise} props.save  Save a partial update, e.g. `{profile: {...}}`.
+ */
 const PersonalizationPage = ({ settings, save }) => {
   const [tab, setTab] = useState('profile');
   const tabs = [{ id: 'profile', label: 'Profile' }, { id: 'knowledge', label: 'Knowledge' }];

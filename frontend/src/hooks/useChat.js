@@ -43,6 +43,20 @@ const BLOG_NODE_STEP = {
   orchestrator: ['Planning...', 'Writing sections...'],
 };
 
+/**
+ * The open chat: its messages, sending and streaming replies, edit,
+ * regenerate and stop. Turns the backend's SSE events (`thinking`, `ai`,
+ * `model`, `approval`, `research`, ...) into message state; see the README in
+ * this folder.
+ *
+ * @param {string|null} threadId  The open thread, or null for a new chat.
+ * @param {(id: string) => void} onThreadCreated  The backend created a thread for a new chat.
+ * @param {{current: boolean}} skipLoadRef  Set to skip reloading history once (the thread was just created here).
+ * @param {boolean} [isTempChat]  Temporary chat: kept in server memory only.
+ * @returns {{messages: object[], loading: boolean, error: string|null, clearError: Function,
+ *   sendMessage: Function, regenerate: Function, editMessage: Function, loadMessages: Function,
+ *   reset: Function, streamingProgress: object|null, stop: Function, updateReport: Function}}
+ */
 export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = false) => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);

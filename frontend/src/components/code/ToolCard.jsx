@@ -45,6 +45,13 @@ const statusIcon = {
   error: <X size={14} className="text-red-400" aria-label="Failed" />,
 };
 
+/**
+ * One tool call by the coding agent: what it did in one line, and its output
+ * or error when expanded.
+ *
+ * @param {object} props
+ * @param {{name: string, input?: object, output?: string, error?: string, status?: string}} props.part
+ */
 const ToolCard = ({ part }) => {
   const [open, setOpen] = useState(false);
   const { icon: Icon, label, detail } = toolSummary(part.name, part.input);

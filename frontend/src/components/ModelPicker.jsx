@@ -59,6 +59,15 @@ const moveFocus = (container, step) => {
   items[(i + step + items.length) % items.length].focus();
 };
 
+/**
+ * The model menu next to the send button. Saves the choice per page in this
+ * browser (`lib/modelChoice.js`); `services/api.js` sends it with each
+ * message. See the README in this folder for layout and keyboard rules.
+ *
+ * @param {object} props
+ * @param {'chat'|'code'} props.page  Which page's choice to show and change.
+ * @param {boolean} [props.disabled]
+ */
 const ModelPicker = ({ page, disabled = false }) => {
   const [choice, setChoice] = useModelChoice(page);
   const [open, setOpen] = useState(false);

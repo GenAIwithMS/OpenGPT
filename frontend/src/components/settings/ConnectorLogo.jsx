@@ -50,6 +50,14 @@ const visible = (hex) => {
   return luminance < 0.35 ? '#ffffff' : `#${hex}`;
 };
 
+/**
+ * A connector's official logo on a dark tile (or an icon / first letter).
+ *
+ * @param {object} props
+ * @param {string} props.id  Catalog id or connector name (`github`, `notion`, ...).
+ * @param {string} [props.name]  For the alt text and the letter tile.
+ * @param {string} [props.size]  Tailwind size classes for the tile.
+ */
 const ConnectorLogo = ({ id, name, size = 'h-9 w-9' }) => {
   const icon = ICONS[id];
   const image = IMAGES[id];

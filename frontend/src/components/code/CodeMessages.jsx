@@ -113,6 +113,15 @@ const Status = ({ message }) => (
   </div>
 );
 
+/**
+ * A coding session's conversation: the user's tasks, the agent's text and
+ * reasoning, tool calls (`ToolCard`) and approval requests (`ApprovalCard`).
+ *
+ * @param {object} props
+ * @param {object[]} props.messages  From `useCodeSession`: `{id, role, parts}`.
+ * @param {object} props.approvals  Approvals by id, shown where the agent asked.
+ * @param {(id: string, decision: 'once'|'always'|'reject', reason?: string) => void} props.onAnswer
+ */
 const CodeMessages = ({ messages, approvals, onAnswer }) => {
   const endRef = useRef(null);
   useEffect(() => {

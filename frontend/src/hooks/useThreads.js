@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react';
 import { chatService } from '../services/api';
 
+/**
+ * The sidebar's chat list.
+ *
+ * @returns {{threads: {thread_id: string, title?: string}[], loading: boolean, error: string|null,
+ *   clearError: Function, fetchThreads: Function, createNewThread: Function, updateThreadTitle: Function}}
+ */
 export const useThreads = () => {
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(true);

@@ -37,6 +37,17 @@ const Composer = ({ onSend, onStop, working, disabled, placeholder }) => {
   );
 };
 
+/**
+ * The Code page: project picker, the agent's status, and either the start
+ * screen (describe a task to start a session) or the open session's messages,
+ * approvals and composer.
+ *
+ * @param {object} props
+ * @param {string|null} props.sessionId  The open coding session, or null for the start screen.
+ * @param {object|null} props.status  `/api/code/status`: `{state, available, detail}`.
+ * @param {object} props.workspace  `useCodeWorkspace()`: projects, current project, sessions.
+ * @param {(id: string) => void} props.onSessionCreated  Called with a new session's id.
+ */
 const CodeView = ({
   sessionId,
   status,

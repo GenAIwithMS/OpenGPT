@@ -50,6 +50,10 @@ const GROUPS = [
   },
 ];
 
+/**
+ * Settings > Shortcuts: every keyboard shortcut, grouped. The list comes from
+ * `lib/shortcuts.js`, which also makes them work.
+ */
 const ShortcutsPage = () => (
   <div>
     <PageHeader title="Shortcuts" description="Work faster with the keyboard. These work anywhere in OpenGPT." />

@@ -564,6 +564,21 @@ const MessageItem = memo(function MessageItem({
   );
 });
 
+/**
+ * The conversation: user and assistant messages with markdown, code blocks,
+ * citations, research and report cards, approval cards, and per-message
+ * actions (copy, edit, regenerate). Scrolls to the newest message.
+ *
+ * @param {object} props
+ * @param {object[]} props.messages  From `useChat`: `{id, type: 'human'|'ai', content, streaming?, research?, approvals?, model?, autoModel?}`.
+ * @param {boolean} props.loading  Loading a thread's history.
+ * @param {boolean} props.streaming  A reply is being written.
+ * @param {object|null} props.streamingProgress  The live status for the message being written (thinking, steps).
+ * @param {() => void} props.onRegenerate  Regenerate the last answer.
+ * @param {(text: string, index: number) => void} props.onEditMessage  Edit a user message and answer again.
+ * @param {(index: number, view: 'activity'|'report') => void} props.onOpenResearch  Open a research run in the side panel.
+ * @param {{index: number, view: string}|null} props.openResearch  What the side panel shows.
+ */
 const MessageList = ({ messages, loading, streaming, streamingProgress, onRegenerate, onEditMessage, onOpenResearch, openResearch }) => {
   const messagesEndRef = useRef(null);
 

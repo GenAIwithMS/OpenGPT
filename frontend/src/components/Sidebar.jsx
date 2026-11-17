@@ -33,6 +33,30 @@ const SquarePenIcon = (props) => (
   </svg>
 );
 
+/**
+ * The left sidebar: new chat, search, Code, the list of chats (or coding
+ * sessions on the Code page) with rename and delete, and the user menu.
+ * Collapses to a narrow rail on desktop and slides in on mobile.
+ *
+ * @param {object} props
+ * @param {{thread_id: string, title?: string}[]} props.threads  Chats, or coding sessions on the Code page.
+ * @param {string|null} props.currentThreadId
+ * @param {(id: string) => void} props.onThreadSelect
+ * @param {() => void} props.onNewThread
+ * @param {(id: string, title: string) => void} props.onThreadRename
+ * @param {(id: string) => void} props.onThreadDelete
+ * @param {boolean} props.isSidebarOpen  Mobile drawer open.
+ * @param {() => void} props.toggleSidebar  Open or close the mobile drawer.
+ * @param {boolean} props.isCollapsed  Desktop rail mode.
+ * @param {() => void} props.onToggleCollapse
+ * @param {boolean} [props.isCodeActive]  The Code page is showing.
+ * @param {() => void} props.onOpenCode
+ * @param {string} [props.listLabel]  Heading over the list ("Recents", "Sessions · project").
+ * @param {string} [props.emptyText]
+ * @param {string} [props.displayName]  Shown in the user menu.
+ * @param {(section?: string) => void} [props.onOpenSettings]
+ * @param {() => void} [props.onOpenSearch]  Open the search window.
+ */
 const Sidebar = ({
   threads,
   currentThreadId,

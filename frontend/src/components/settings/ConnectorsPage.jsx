@@ -464,6 +464,12 @@ const ConnectorCard = ({ connector, onChange, onRemove, onReload }) => {
   );
 };
 
+/**
+ * Settings > Connectors: added connectors (on/off, use in chat / Code,
+ * connection status, sign in again, remove), the Browse catalog, and Create
+ * (command, URL, JSON). Sign-in opens the provider's page in a small window,
+ * or shows a code for GitHub's device flow.
+ */
 const ConnectorsPage = () => {
   const [items, setItems] = useState(null);
   const [query, setQuery] = useState('');
