@@ -29,6 +29,10 @@ Which model service OpenGPT uses, and which model does each job.
 ## The model menu and Auto
 
 Next to the send button (chat and Code) is a menu: **Auto** or one model.
+It shows Auto and the models set for each job (with what each is for), then
+**More models** with the rest in a side panel, and a link to Settings >
+Developer. It opens below the button, or above when there is no room below
+(`frontend/src/components/ModelPicker.jsx`).
 
 - The list comes from `GET /api/providers/models`: the models chosen for
   each job first, then the active provider's list (cached 10 minutes,

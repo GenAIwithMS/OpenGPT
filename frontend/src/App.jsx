@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useLayoutEffect, lazy, Suspense } f
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import SearchPalette, { searchActionIcons } from './components/SearchPalette';
+import { OPEN_SETTINGS_EVENT } from './components/ModelPicker';
 import MessageList from './components/MessageList';
 import MessageInput from './components/MessageInput';
 import ConfirmationModal from './components/ConfirmationModal';
@@ -137,6 +138,12 @@ function App() {
   // Which settings page is open (null: the popup is closed).
   const [settingsSection, setSettingsSection] = useState(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  // Other parts of the UI can open a settings page (e.g. the model menu's "Change").
+  useEffect(() => {
+    const onOpen = (e) => setSettingsSection(e.detail || 'general');
+    window.addEventListener(OPEN_SETTINGS_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_SETTINGS_EVENT, onOpen);
+  }, []);
   const [codeSessionToDelete, setCodeSessionToDelete] = useState(null);
   // Temporary mode is driven by the `?temporary-chat=true` URL query param, so
   // it survives refreshes and is shareable. A temp chat is never persisted.
