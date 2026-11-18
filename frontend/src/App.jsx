@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useLayoutEffect, lazy, Suspense } f
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import SearchPalette, { searchActionIcons } from './components/SearchPalette';
+import { OPEN_SETTINGS_EVENT } from './components/ModelPicker';
 import MessageList from './components/MessageList';
 import MessageInput from './components/MessageInput';
 import ConfirmationModal from './components/ConfirmationModal';
@@ -125,6 +126,13 @@ const randomGreeting = (current) => {
   return options[Math.floor(Math.random() * options.length)];
 };
 
+/**
+ * The whole app: reads the URL (`/chat`, `/chat/<id>`, `/code`, `/code/<id>`,
+ * `?temporary-chat=true`) and lays out the sidebar, the chat or Code page, the
+ * settings popup, the search window and the keyboard shortcuts. Chat state
+ * comes from `useChat`, the thread list from `useThreads`, the Code page's
+ * workspace from `useCodeWorkspace`, and settings from `useSettings`.
+ */
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -137,6 +145,12 @@ function App() {
   // Which settings page is open (null: the popup is closed).
   const [settingsSection, setSettingsSection] = useState(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  // Other parts of the UI can open a settings page (e.g. the model menu's "Change").
+  useEffect(() => {
+    const onOpen = (e) => setSettingsSection(e.detail || 'general');
+    window.addEventListener(OPEN_SETTINGS_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_SETTINGS_EVENT, onOpen);
+  }, []);
   const [codeSessionToDelete, setCodeSessionToDelete] = useState(null);
   // Temporary mode is driven by the `?temporary-chat=true` URL query param, so
   // it survives refreshes and is shareable. A temp chat is never persisted.
@@ -238,21 +252,37 @@ function App() {
   const [slideUp, setSlideUp] = useState(0);
   const [inputHeight, setInputHeight] = useState(0);
 
+  // The slide is animated only after the first measurement on screen, so the
+  // input doesn't glide into place when the chat page appears (e.g. coming
+  // back from the Code page).
+  const [slideReady, setSlideReady] = useState(false);
+
   useLayoutEffect(() => {
     const block = inputBlockRef.current;
     const section = chatSectionRef.current;
-    if (!block || !section) return;
-    // Measure the input block so the scroll area can reserve matching bottom
-    // space (keeping the last message visible above the absolute input).
-    setInputHeight(block.offsetHeight);
-    if (!centered) {
-      setSlideUp(0);
-      return;
+    // Not on screen (the Code page is showing): measure again when it returns.
+    if (!block || !section) {
+      setSlideReady(false);
+      return undefined;
     }
-    const containerH = section.clientHeight;
-    const blockH = block.offsetHeight;
-    setSlideUp(Math.max(0, containerH / 2 - blockH / 2));
-  }, [centered, messages.length, isTempChat, chatLoading, uploadingAttachment]);
+    const measure = () => {
+      // The scroll area reserves the input's height at the bottom, keeping the
+      // last message visible above the absolute input.
+      const blockH = block.offsetHeight;
+      setInputHeight(blockH);
+      setSlideUp(centered ? Math.max(0, section.clientHeight / 2 - blockH / 2) : 0);
+    };
+    measure();
+    // The window or the input's height can change while nothing else does.
+    const observer = new ResizeObserver(measure);
+    observer.observe(section);
+    observer.observe(block);
+    const frame = requestAnimationFrame(() => setSlideReady(true));
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, [centered, isCodeView, messages.length, isTempChat, chatLoading, uploadingAttachment]);
 
   const handleNewThread = () => {
     // New chat stays client-side until the first message is sent; the backend
@@ -594,9 +624,9 @@ function App() {
               -> bottom; empty chats -> centered). */}
           <div
             ref={inputBlockRef}
-            className={`absolute inset-x-0 bottom-0 z-20 px-4 pb-4 transition-transform duration-300 ease-out ${
-              centered ? '' : 'bg-chat-bg'
-            }`}
+            className={`absolute inset-x-0 bottom-0 z-20 px-4 pb-4 ${
+              slideReady ? 'transition-transform duration-300 ease-out' : ''
+            } ${centered ? '' : 'bg-chat-bg'}`}
             style={{ transform: centered ? `translateY(-${slideUp}px)` : 'translateY(0)' }}
           >
             {/* Messages scroll under the input: the full-width background hides

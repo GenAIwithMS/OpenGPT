@@ -159,6 +159,11 @@ const ProviderForm = ({ presets, existing, onDone }) => {
 
 // ----- the page -----
 
+/**
+ * Settings > Developer: the active provider and the model for each job, and
+ * the providers list (add from presets, test, edit, remove). The provider
+ * from the server's settings shows as "Default".
+ */
 const DeveloperPage = () => {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);

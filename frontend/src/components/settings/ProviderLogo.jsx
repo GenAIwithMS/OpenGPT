@@ -24,6 +24,14 @@ const visible = (hex) => {
   return luminance < 0.35 ? '#ffffff' : `#${hex}`;
 };
 
+/**
+ * A model provider's official logo on a dark tile (a server icon for custom ones).
+ *
+ * @param {object} props
+ * @param {string} props.preset  Preset id from `/api/providers` (`openai`, `ollama`, ...).
+ * @param {string} [props.name]  For the alt text.
+ * @param {string} [props.size]  Tailwind size classes for the tile.
+ */
 const ProviderLogo = ({ preset, name, size = 'h-9 w-9' }) => {
   const image = IMAGES[preset];
   const icon = ICONS[preset];

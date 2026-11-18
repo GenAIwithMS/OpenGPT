@@ -30,6 +30,19 @@ export const SECTIONS = [
   ] },
 ];
 
+/**
+ * The settings popup: searchable navigation on the left (`SECTIONS`), the
+ * chosen page on the right. Escape or a click outside closes it.
+ *
+ * @param {object} props
+ * @param {string} props.section  The open page id (`general`, `connectors`, ...).
+ * @param {(id: string) => void} props.onSectionChange
+ * @param {() => void} props.onClose
+ * @param {object} props.settings  From `useSettings`.
+ * @param {(changes: object) => Promise} props.save
+ * @param {string} props.displayName
+ * @param {string|null} [props.error]  A settings load or save error to show.
+ */
 const SettingsModal = ({ section, onSectionChange, onClose, settings, save, displayName, error }) => {
   const [query, setQuery] = useState('');
   const panelRef = useRef(null);

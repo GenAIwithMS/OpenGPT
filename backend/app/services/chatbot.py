@@ -7,7 +7,7 @@ from langsmith import traceable
 from typing import TypedDict, Annotated
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.graph.message import add_messages
-from app.llm import LazyChatModel
+from app.llm import LazyChatModel, chat_model
 from langgraph.graph import StateGraph, START
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.memory import MemorySaver
@@ -160,7 +160,7 @@ def _question_with_context(question: HumanMessage, context_text: str) -> HumanMe
     return question.model_copy(update={"content": content})
 
 
-def chat_node(state: Chatstate):
+def chat_node(state: Chatstate, config=None):
     """Main chat node that processes messages and uses tools"""
     # Exactly one system message, first: some APIs (Anthropic) reject system
     # messages anywhere else.
@@ -228,7 +228,9 @@ def chat_node(state: Chatstate):
     # single merged message: ``add_messages`` replaces a message that shares an
     # id, so yielding raw chunks would leave only the last (empty) chunk in the
     # state and drop the tool calls before the tool node ever ran.
-    model_with_tools = model.bind_tools(tools)
+    # The model picked for this reply (menu or Auto, see model_router), or the chat model.
+    picked = ((config or {}).get("configurable") or {}).get("model_name")
+    model_with_tools = (chat_model(picked) if picked else model).bind_tools(tools)
     response = None
     for chunk in model_with_tools.stream(messages):
         response = chunk if response is None else response + chunk

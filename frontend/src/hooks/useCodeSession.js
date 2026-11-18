@@ -43,6 +43,19 @@ function applyEvent(message, event) {
   }
 }
 
+/**
+ * One coding session: its history, sending a task and streaming the agent's
+ * work, stop, and answering approvals.
+ *
+ * @param {string|null} sessionId
+ * @param {object} [callbacks]
+ * @param {(title: string) => void} [callbacks.onTitle]  The agent named the session.
+ * @param {(outcome: string) => void} [callbacks.onTurnEnd]  A turn finished (`succeeded`, `failed`, `interrupted`).
+ * @param {(approval: object) => void} [callbacks.onApproval]  The agent is asking (used for notifications).
+ * @returns {{session: object|null, messages: object[], approvals: object, loading: boolean,
+ *   streaming: boolean, busy: boolean, error: string|null, setError: Function,
+ *   send: (id: string, text: string) => void, stop: Function, answer: Function, reload: Function}}
+ */
 export function useCodeSession(sessionId, { onTitle, onTurnEnd, onApproval } = {}) {
   const [session, setSession] = useState(null);
   const [messages, setMessages] = useState([]);

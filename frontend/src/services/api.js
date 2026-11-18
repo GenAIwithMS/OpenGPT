@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getModelChoice } from '../lib/modelChoice';
 
 // Backend base URL. The Vite dev server proxies /api to the backend; set
 // VITE_API_URL (e.g. https://api.example.com/api) when it lives elsewhere.
@@ -107,6 +108,7 @@ export const chatService = {
     const response = await api.post('/chat/regenerate', {
       thread_id: threadId,
       tools: tools,
+      model: getModelChoice('chat'),
     });
     return response.data;
   },
@@ -126,6 +128,7 @@ export const chatService = {
         tools: tools.length > 0 ? tools : undefined,
         temporary: Boolean(tempSessionId),
         session_id: tempSessionId || undefined,
+        model: getModelChoice('chat'), // 'auto' or a model name (the menu by the send button)
       },
       onMessage,
       onError,
@@ -151,6 +154,7 @@ export const chatService = {
         message,
         index,
         tools: tools.length > 0 ? tools : undefined,
+        model: getModelChoice('chat'),
       },
       onMessage,
       onError,
@@ -280,6 +284,8 @@ export const providersService = {
   // {provider_id} for a saved one ('env' for backend/.env), or {preset, kind, base_url, api_key}
   test: async (body) => (await api.post('/providers/test', body)).data.models,
   setActive: async (active, roles) => (await api.put('/providers/active', { active, roles })).data,
+  // The model menu: {models, chat_default, code_default, auto: {chat, code}}
+  models: async () => (await api.get('/providers/models')).data,
 };
 
 // Coding agent (the Code page). See backend/app/router/code.py.
@@ -303,7 +309,8 @@ export const codeService = {
   // Send a message and stream the agent's work. Events: start, text,
   // reasoning, tool, approval, approval_done, title, error, done.
   streamTurn: (id, text, onEvent, onError) =>
-    postStream(`/code/sessions/${enc(id)}/stream`, { text }, onEvent, onError, (e) => e.type === 'done'),
+    postStream(`/code/sessions/${enc(id)}/stream`, { text, model: getModelChoice('code') }, onEvent, onError,
+      (e) => e.type === 'done'),
   stop: async (id) => (await api.post(`/code/sessions/${enc(id)}/stop`)).data,
 
   getApprovals: async (id) => (await api.get(`/code/sessions/${enc(id)}/approvals`)).data.approvals,

@@ -8,7 +8,9 @@ tools menu.
 The graph is in `app/tools/blogs/graph.py`:
 
 1. **Router**: decides whether the topic needs research.
-2. **Research** (when needed): gathers sources with web search.
+2. **Research** (when needed): gathers dated sources with Tavily
+   (`TAVILY_API_KEY`); without the key the post is written from the
+   model's knowledge.
 3. **Orchestrator**: plans the post and its sections (at most
    `MAX_BLOG_SECTIONS`).
 4. **Workers**: write the sections in parallel.

@@ -37,6 +37,13 @@ the page for the part you are changing. To install and run OpenGPT, see the
 
 Short records of why things are the way they are: [decisions/](decisions/README.md).
 
+## Next to the code
+
+Folders with more going on have their own README describing how that part
+works inside: [backend](../backend/README.md) (with READMEs for routers,
+services, the coding agent integration, tools, deep research, blogs, the
+database and tests) and [frontend](../frontend/README.md).
+
 ## Keeping these docs current
 
 Update the page for a service in the same change as its code. Pages explain

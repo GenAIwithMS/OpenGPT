@@ -379,6 +379,11 @@ const AddMenu = ({ onPick }) => {
 
 // ----- the page -----
 
+/**
+ * Settings > Skills: every skill with an on/off switch, filtered by source,
+ * a detail view (instructions, files, edit and remove for your own), Explore
+ * (installable open-source skills) and Add (create, upload, import from GitHub).
+ */
 const SkillsPage = () => {
   const [items, setItems] = useState(null);
   const [error, setError] = useState(null);

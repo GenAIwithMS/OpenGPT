@@ -3,6 +3,7 @@ import { Check, ChevronDown, X } from 'lucide-react';
 
 // Small building blocks shared by the settings pages.
 
+/** A settings page's title and one-line description. */
 export const PageHeader = ({ title, description }) => (
   <div className="mb-6 border-b border-gray-700/70 pb-4">
     <h2 className="text-xl font-semibold text-gray-100">{title}</h2>
@@ -10,6 +11,7 @@ export const PageHeader = ({ title, description }) => (
   </div>
 );
 
+/** A titled group of rows on a settings page. */
 export const Section = ({ title, children }) => (
   <section className="mb-8">
     {title && <h3 className="mb-3 text-base font-medium text-gray-200">{title}</h3>}
@@ -17,6 +19,10 @@ export const Section = ({ title, children }) => (
   </section>
 );
 
+/**
+ * One setting: label and description on the left, its control on the right.
+ * Pass `htmlFor` with the control's id so clicking the label focuses it.
+ */
 // One setting: label + description on the left, control on the right.
 export const Row = ({ label, description, children, htmlFor }) => (
   <div className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
@@ -28,6 +34,15 @@ export const Row = ({ label, description, children, htmlFor }) => (
   </div>
 );
 
+/**
+ * An on/off switch.
+ *
+ * @param {object} props
+ * @param {boolean} props.checked
+ * @param {(value: boolean) => void} props.onChange
+ * @param {string} props.label  Read by screen readers (the switch has no visible text).
+ * @param {boolean} [props.disabled]
+ */
 export const Toggle = ({ checked, onChange, label, disabled }) => (
   <button
     type="button"
@@ -46,6 +61,17 @@ export const Toggle = ({ checked, onChange, label, disabled }) => (
   </button>
 );
 
+/**
+ * A dropdown styled for the dark theme, with keyboard support (arrows, Enter,
+ * Escape closes only the list).
+ *
+ * @param {object} props
+ * @param {string} props.id
+ * @param {string} props.value
+ * @param {(value: string) => void} props.onChange
+ * @param {{value: string, label: string}[]} props.options
+ * @param {string} props.label  Accessible name.
+ */
 // A dropdown in the app's theme (a native <select> opens an unstyled system list).
 // Keyboard: Enter/Space/Arrow keys open it, arrows move, Enter picks, Escape closes.
 export const Select = ({ id, value, onChange, options, label }) => {
@@ -153,12 +179,14 @@ export const Select = ({ id, value, onChange, options, label }) => {
   );
 };
 
+/** A round avatar with the first letter of `name`. */
 export const Avatar = ({ name, size = 'h-8 w-8 text-sm' }) => (
   <span className={`flex shrink-0 items-center justify-center rounded-full bg-violet-600 font-semibold text-white ${size}`} aria-hidden="true">
     {(name || 'M').trim().charAt(0).toUpperCase()}
   </span>
 );
 
+/** Classes for text inputs and textareas in settings. */
 export const inputClass =
   'w-full rounded-lg border border-gray-600 bg-[#26272e] px-3 py-2 text-sm text-gray-100 placeholder-gray-500 outline-none focus:border-gray-400';
 

@@ -11,6 +11,7 @@ function escapeHtml(s) {
     .replace(/>/g, "&gt;")
 }
 
+/** Copies `value` to the clipboard and shows a check for a moment. */
 export function CopyButton({ value, className, inline }) {
   const [copied, setCopied] = useState(false)
 
@@ -46,6 +47,7 @@ export function CopyButton({ value, className, inline }) {
   )
 }
 
+/** The frame around a code block (header + code). */
 export function CodeBlock({ children, className, ...props }) {
   return (
     <div
@@ -69,6 +71,10 @@ const loadShiki = () =>
     throw e
   }))
 
+/**
+ * Highlighted code (Shiki), loaded on demand; plain text until the highlighter is ready.
+ * `language` and `theme` are Shiki names.
+ */
 // `highlight={false}` (while a reply is streaming) shows plain code and skips
 // shiki, which would otherwise re-run on every token.
 export function CodeBlockCode({ code, language = "tsx", theme = "github-dark", highlight = true, className, ...props }) {
@@ -116,6 +122,7 @@ export function CodeBlockCode({ code, language = "tsx", theme = "github-dark", h
   )
 }
 
+/** A row in the code block's header (language label, copy button). */
 export function CodeBlockGroup({ children, className, ...props }) {
   return (
     <div

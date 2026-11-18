@@ -24,6 +24,19 @@ const Key = ({ children }) => (
   </kbd>
 );
 
+/**
+ * The search window (sidebar "Search chats", Ctrl/Cmd+K). Loads coding
+ * projects and sessions when it opens.
+ *
+ * @param {object} props
+ * @param {{thread_id: string, title?: string}[]} props.threads  The chat list.
+ * @param {() => void} props.onClose
+ * @param {(threadId: string) => void} props.onOpenChat
+ * @param {(projectId: string) => void} props.onOpenProject
+ * @param {(projectId: string, sessionId: string) => void} props.onOpenSession
+ * @param {{id: string, title: string, icon: Function, run: () => void, hint?: string}[]} props.actions
+ *   Shown under Actions (new chat, temporary chat, OpenGPT Code, settings).
+ */
 const SearchPalette = ({ threads, onClose, onOpenChat, onOpenProject, onOpenSession, actions }) => {
   const [query, setQuery] = useState('');
   const [tab, setTab] = useState('all');

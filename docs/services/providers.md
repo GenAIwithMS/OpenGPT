@@ -26,6 +26,32 @@ Which model service OpenGPT uses, and which model does each job.
   `llm.reload()`, so chat uses the new choice at once, and restarts the
   coding agent.
 
+## The model menu and Auto
+
+Next to the send button (chat and Code) is a menu: **Auto** or one model.
+It shows Auto and the models set for each job (with what each is for), then
+**More models** with the rest in a side panel, and a link to Settings >
+Developer. It opens below the button, or above when there is no room below
+(`frontend/src/components/ModelPicker.jsx`).
+
+- The list comes from `GET /api/providers/models`: the models chosen for
+  each job first, then the active provider's list (cached 10 minutes,
+  `providers.available_models()`), without ids that are clearly not chat
+  models (embeddings, speech, safety filters, images).
+- **Auto** (`app/services/model_router.py`) picks per message, with no extra
+  model call: the *Titles and summaries* model for greetings and very short
+  replies, the *Chat* model (on Code, the *Coding agent* model) for most
+  messages, and the *Deep research* model for long, code-heavy or analytical
+  requests and questions about attached documents. Code tasks never use the
+  light model. If those jobs share one model, Auto always uses it.
+- Picking a model turns Auto off for that page. The choice is remembered in
+  the browser (`frontend/src/lib/modelChoice.js`) and sent with each message
+  as `model` (`"auto"` or a model id).
+- Chat shows which model answered under each reply ("Auto · name" when Auto
+  picked it). Deep research and blogs keep using their own job's model.
+
+See [decision 0006](../decisions/0006-auto-model-per-message.md).
+
 ## Startup
 
 The backend creates the database first, then checks the model settings, so a

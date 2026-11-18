@@ -61,7 +61,7 @@ function UserActions({ content, onEdit }) {
   );
 }
 
-function MessageActions({ content, onRegenerate }) {
+function MessageActions({ content, onRegenerate, model, autoModel }) {
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState(null); // 'like' | 'dislike'
 
@@ -79,6 +79,11 @@ function MessageActions({ content, onRegenerate }) {
 
   return (
     <div className="mt-2 flex items-center gap-1 justify-end">
+      {model && (
+        <span className="mr-auto truncate text-[11px] text-gray-500" title={autoModel ? `Auto picked ${model}` : model}>
+          {autoModel ? 'Auto · ' : ''}{model.split('/').pop()}
+        </span>
+      )}
       <button
         type="button"
         onClick={handleCopy}
@@ -550,6 +555,8 @@ const MessageItem = memo(function MessageItem({
           <MessageActions
             content={message.content}
             onRegenerate={canRegenerate ? onRegenerate : undefined}
+            model={message.model}
+            autoModel={message.autoModel}
           />
         </div>
       </div>
@@ -557,6 +564,21 @@ const MessageItem = memo(function MessageItem({
   );
 });
 
+/**
+ * The conversation: user and assistant messages with markdown, code blocks,
+ * citations, research and report cards, approval cards, and per-message
+ * actions (copy, edit, regenerate). Scrolls to the newest message.
+ *
+ * @param {object} props
+ * @param {object[]} props.messages  From `useChat`: `{id, type: 'human'|'ai', content, streaming?, research?, approvals?, model?, autoModel?}`.
+ * @param {boolean} props.loading  Loading a thread's history.
+ * @param {boolean} props.streaming  A reply is being written.
+ * @param {object|null} props.streamingProgress  The live status for the message being written (thinking, steps).
+ * @param {() => void} props.onRegenerate  Regenerate the last answer.
+ * @param {(text: string, index: number) => void} props.onEditMessage  Edit a user message and answer again.
+ * @param {(index: number, view: 'activity'|'report') => void} props.onOpenResearch  Open a research run in the side panel.
+ * @param {{index: number, view: string}|null} props.openResearch  What the side panel shows.
+ */
 const MessageList = ({ messages, loading, streaming, streamingProgress, onRegenerate, onEditMessage, onOpenResearch, openResearch }) => {
   const messagesEndRef = useRef(null);
 
