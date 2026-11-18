@@ -18,6 +18,7 @@ import { useCodeWorkspace } from './hooks/useCodeWorkspace';
 import { chatService } from './services/api';
 import { buildAttachmentPreview, removeThreadAttachments } from './lib/attachmentPreview';
 import { X } from 'lucide-react';
+import Logo from './components/Logo';
 
 // Only needed for deep research, so it loads on first use.
 const ResearchPanel = lazy(() => import('./components/ResearchPanel'));
@@ -569,10 +570,7 @@ function App() {
             {/* pl-12 and 40px height: beside and centred on the mobile menu button (fixed at top left) */}
             <div className="flex min-h-[40px] lg:min-h-[32px] items-center justify-between pl-12 lg:pl-0">
               {/* The sidebar already shows the name on desktop; show it here only when the sidebar is a rail */}
-              <span className={`text-base font-semibold tracking-tight text-white select-none ${
-                isSidebarCollapsed ? '' : 'lg:invisible'}`}>
-                OpenGPT
-              </span>
+              <Logo className={`h-5 text-white ${isSidebarCollapsed ? '' : 'lg:invisible'}`} />
               {/* Temporary chat toggle — only on the New Chat screen.
                   Once a temp chat has messages, it can't be toggled off
                   (start a new chat to leave temp mode). */}

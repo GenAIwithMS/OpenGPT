@@ -7,6 +7,7 @@ import CodeMessages from './code/CodeMessages';
 import { useCodeSession } from '../hooks/useCodeSession';
 import { codeService } from '../services/api';
 import { notifyFinished } from '../lib/notify';
+import Logo from './Logo';
 
 // Message box with Send, or Stop while the agent works.
 const Composer = ({ onSend, onStop, working, disabled, placeholder }) => {
@@ -112,7 +113,7 @@ const CodeView = ({
       {/* Header — matches the chat header */}
       <div className="flex-shrink-0 px-4 pt-4 pb-2 lg:py-3 bg-chat-bg">
         <div className="flex min-h-[40px] lg:min-h-[32px] items-center gap-2 pl-12 lg:pl-0">
-          <span className="text-base font-semibold tracking-tight text-white select-none">OpenGPT</span>
+          <Logo className="h-5 text-white" />
           <span className="px-2 py-0.5 rounded-lg bg-gray-700/70 text-xs font-medium text-gray-300">Code</span>
           {sessionId ? (
             sessionProject && <span className="ml-1 truncate text-sm text-gray-400">{sessionProject.name} · {code.session?.title}</span>

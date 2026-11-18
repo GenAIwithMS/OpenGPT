@@ -13,6 +13,7 @@ import {
   Code2,
 } from 'lucide-react';
 import UserMenu from './settings/UserMenu';
+import Logo, { LogoMark } from './Logo';
 
 const SquarePenIcon = (props) => (
   <svg
@@ -169,7 +170,7 @@ const Sidebar = ({
               title="OpenGPT — click to expand"
               className="group/brand relative flex items-center justify-center w-9 h-9 mb-2 text-lg font-semibold text-white select-none rounded-xl hover:bg-gray-700 transition-colors"
             >
-              <span className="group-hover/brand:opacity-0 transition-opacity">O</span>
+              <LogoMark size={20} className="group-hover/brand:opacity-0 transition-opacity" />
               <PanelLeftOpen
                 size={18}
                 className="absolute opacity-0 group-hover/brand:opacity-100 transition-opacity"
@@ -212,9 +213,7 @@ const Sidebar = ({
           <>
             {/* Brand header */}
             <div className="flex items-center justify-between px-2 pt-3 pb-1 shrink-0">
-              <span className="px-2 text-base font-semibold tracking-tight text-white select-none whitespace-nowrap overflow-hidden">
-                OpenGPT
-              </span>
+              <Logo className="mx-2 h-5 text-white" />
               <button
                 onClick={() => onToggleCollapse?.()}
                 title="Close sidebar"
