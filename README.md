@@ -19,11 +19,11 @@ Agentic tool use · Deep Research · Document Q&A (RAG) · Persistent multi-thre
 </p>
 
 <p>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/GenAIwithMS/LangGraph-Chatbot?style=flat-square&color=22c55e" alt="License" /></a>
-  <a href="https://github.com/GenAIwithMS/LangGraph-Chatbot/stargazers"><img src="https://img.shields.io/github/stars/GenAIwithMS/LangGraph-Chatbot?style=flat-square&color=facc15" alt="Stars" /></a>
-  <a href="https://github.com/GenAIwithMS/LangGraph-Chatbot/network/members"><img src="https://img.shields.io/github/forks/GenAIwithMS/LangGraph-Chatbot?style=flat-square&color=60a5fa" alt="Forks" /></a>
-  <a href="https://github.com/GenAIwithMS/LangGraph-Chatbot/issues"><img src="https://img.shields.io/github/issues/GenAIwithMS/LangGraph-Chatbot?style=flat-square&color=f97316" alt="Issues" /></a>
-  <img src="https://img.shields.io/github/last-commit/GenAIwithMS/LangGraph-Chatbot?style=flat-square&color=a78bfa" alt="Last commit" />
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/GenAIwithMS/OpenGPT?style=flat-square&color=22c55e" alt="License" /></a>
+  <a href="https://github.com/GenAIwithMS/OpenGPT/stargazers"><img src="https://img.shields.io/github/stars/GenAIwithMS/OpenGPT?style=flat-square&color=facc15" alt="Stars" /></a>
+  <a href="https://github.com/GenAIwithMS/OpenGPT/network/members"><img src="https://img.shields.io/github/forks/GenAIwithMS/OpenGPT?style=flat-square&color=60a5fa" alt="Forks" /></a>
+  <a href="https://github.com/GenAIwithMS/OpenGPT/issues"><img src="https://img.shields.io/github/issues/GenAIwithMS/OpenGPT?style=flat-square&color=f97316" alt="Issues" /></a>
+  <img src="https://img.shields.io/github/last-commit/GenAIwithMS/OpenGPT?style=flat-square&color=a78bfa" alt="Last commit" />
 </p>
 
 <p>
@@ -262,6 +262,15 @@ The backend logs a reminder at startup if old data is still present.
 - **First document upload is slow**: the embedding model loads on first use (a few seconds, once).
 - **Code page says the coding agent is unavailable**: the notice gives the reason. Usually Bun isn't installed (install it, or set `BUN_PATH`), `bun install` wasn't run in `coding-agent/`, or the API is exposed without `CODING_AGENT_ENABLED=true`. Details are in `backend/app/storage/coding-agent/agent.log`.
 - **Coding tasks fail with "larger than the model allows" or a rate limit**: the agent's requests are bigger than chat's. Use a model or plan with higher limits via `CODING_AGENT_MODEL`.
+
+## Getting help
+
+- **Questions** (setup, model providers, connectors, the coding agent): ask in [Discussions Q&A](https://github.com/GenAIwithMS/OpenGPT/discussions/categories/q-a). Check [Troubleshooting](#troubleshooting) first.
+- **Ideas**: start a thread in [Discussions Ideas](https://github.com/GenAIwithMS/OpenGPT/discussions/categories/ideas).
+- **Bugs**: open an [issue](https://github.com/GenAIwithMS/OpenGPT/issues/new/choose).
+- **Security problems**: report them privately through [Security advisories](https://github.com/GenAIwithMS/OpenGPT/security/advisories/new), not in public.
+
+Never post your `backend/.env`, API keys or tokens.
 
 ## Contributing
 

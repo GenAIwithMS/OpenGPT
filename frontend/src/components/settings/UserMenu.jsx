@@ -4,7 +4,7 @@ import { Avatar } from './controls';
 
 const LINKS = [
   { label: 'Homepage', icon: Home, href: 'https://github.com/GenAIwithMS/OpenGPT' },
-  { label: 'Get help', icon: LifeBuoy, href: 'https://github.com/GenAIwithMS/OpenGPT/issues' },
+  { label: 'Get help', icon: LifeBuoy, href: 'https://github.com/GenAIwithMS/OpenGPT/discussions/categories/q-a' },
   { label: 'Docs', icon: BookOpen, href: 'https://github.com/GenAIwithMS/OpenGPT#readme' },
 ];
 
