@@ -239,7 +239,7 @@ const ModelPicker = ({ page, disabled = false }) => {
       <button ref={button} type="button" onClick={() => (open ? close() : setOpen(true))} disabled={disabled}
         aria-haspopup="menu" aria-expanded={open} aria-label={`Model: ${isAuto ? 'Auto' : choice}`}
         title={isAuto ? 'Auto: picks a model for each message' : choice}
-        className={`flex h-8 max-w-[12rem] items-center gap-1 rounded-lg px-2.5 text-sm text-gray-300 transition-colors hover:bg-white/10 hover:text-gray-100 disabled:opacity-50 ${
+        className={`relative after:absolute after:inset-x-0 after:-inset-y-1.5 after:content-[''] [@media(hover:hover)]:after:hidden flex h-8 max-w-[12rem] items-center gap-1 rounded-lg px-2.5 text-sm text-gray-300 transition-colors hover:bg-white/10 hover:text-gray-100 disabled:opacity-50 ${
           open ? 'bg-white/10 text-gray-100' : ''}`}>
         <span className="truncate">{isAuto ? 'Auto' : shortName(choice)}</span>
         <ChevronDown size={14} className={`shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />

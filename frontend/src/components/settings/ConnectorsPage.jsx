@@ -213,7 +213,7 @@ const CatalogItem = ({ entry, onAdded }) => {
         <div className="min-w-0 flex-1">
           <p className="text-sm text-gray-100">{entry.name}</p>
           <p className="mt-0.5 text-xs leading-relaxed text-gray-400">{entry.description}</p>
-          <p className="mt-1 text-[11px] text-gray-500">
+          <p className="mt-1 text-xs text-gray-500">
             {entry.auth === 'oauth' ? 'Sign in to connect' : entry.kind === 'remote' ? 'Remote server' : `Needs ${entry.requires || 'a local runtime'}`}
             {entry.homepage && <> · <a href={entry.homepage} target="_blank" rel="noopener noreferrer" className="hover:text-gray-300">Docs</a></>}
           </p>
@@ -230,7 +230,7 @@ const CatalogItem = ({ entry, onAdded }) => {
       </div>
       {asking && !entry.added && (
         <div className="mt-3 space-y-2 border-t border-gray-700/60 pt-3">
-          {entry.oauth_hint && <p className="text-[11px] leading-relaxed text-gray-500">{entry.oauth_hint} Until then, use a token:</p>}
+          {entry.oauth_hint && <p className="text-xs leading-relaxed text-gray-500">{entry.oauth_hint} Until then, use a token:</p>}
           {fields.map((f) => (
             <input key={f.name} type="password" autoComplete="off" value={values[f.name] || ''}
               onChange={(e) => setValues((v) => ({ ...v, [f.name]: e.target.value }))}
@@ -407,18 +407,18 @@ const ConnectorCard = ({ connector, onChange, onRemove, onReload }) => {
           <p className="flex items-center gap-1.5 text-sm text-gray-100">
             {connector.title}
             {connector.signed_in && (
-              <span className="rounded-md bg-green-500/10 px-1.5 py-0.5 text-[10px] font-medium text-green-300">Signed in</span>
+              <span className="rounded-md bg-green-500/10 px-1.5 py-0.5 text-[11px] font-medium text-green-300">Signed in</span>
             )}
           </p>
-          <p className="mt-0.5 truncate font-mono text-[11px] text-gray-500" title={detail}>{detail}</p>
-          {secrets.length > 0 && <p className="mt-0.5 text-[11px] text-gray-500">Keys set: {secrets.join(', ')}</p>}
+          <p className="mt-0.5 truncate font-mono text-xs text-gray-500" title={detail}>{detail}</p>
+          {secrets.length > 0 && <p className="mt-0.5 text-xs text-gray-500">Keys set: {secrets.join(', ')}</p>}
           {connector.enabled && connector.use_in_chat && connector.chat && (
             connector.chat.connected ? (
-              <p className="mt-0.5 text-[11px] text-green-300/80">
+              <p className="mt-0.5 text-xs text-green-300/80">
                 Connected · {connector.chat.tools} tool{connector.chat.tools === 1 ? '' : 's'}
               </p>
             ) : (
-              <p className="mt-0.5 text-[11px] text-red-300/90" title={connector.chat.error || ''}>
+              <p className="mt-0.5 text-xs text-red-300/90" title={connector.chat.error || ''}>
                 Couldn't connect{connector.chat.error ? `: ${connector.chat.error}` : ''}
               </p>
             )

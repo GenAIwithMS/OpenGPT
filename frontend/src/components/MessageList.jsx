@@ -78,12 +78,8 @@ function MessageActions({ content, onRegenerate, model, autoModel }) {
   const btn = btnClass;
 
   return (
-    <div className="mt-2 flex items-center gap-1 justify-end">
-      {model && (
-        <span className="mr-auto truncate text-[11px] text-gray-500" title={autoModel ? `Auto picked ${model}` : model}>
-          {autoModel ? 'Auto · ' : ''}{model.split('/').pop()}
-        </span>
-      )}
+    // -ml-1.5 lines the first icon up with the reply's text (buttons have 6px padding)
+    <div className="mt-2 -ml-1.5 flex items-center gap-1">
       <button
         type="button"
         onClick={handleCopy}
@@ -122,6 +118,11 @@ function MessageActions({ content, onRegenerate, model, autoModel }) {
         >
           <RotateCcw size={15} />
         </button>
+      )}
+      {model && (
+        <span className="ml-2 truncate text-xs text-gray-400" title={autoModel ? `Auto picked ${model}` : model}>
+          {autoModel ? 'Auto · ' : ''}{model.split('/').pop()}
+        </span>
       )}
     </div>
   );
@@ -521,7 +522,7 @@ const MessageItem = memo(function MessageItem({
   if (isUser) {
     const attachments = message.attachments;
     return (
-      <div className="py-4 px-4">
+      <div className="py-3 px-4">
         <div className="max-w-3xl mx-auto flex justify-end">
           <div className="max-w-[80%] flex flex-col items-end gap-1">
             {attachments && attachments.length > 0 && (
@@ -548,9 +549,9 @@ const MessageItem = memo(function MessageItem({
   }
 
   return (
-    <div className="py-4 px-4">
+    <div className="py-3 px-4">
       <div className="max-w-3xl mx-auto flex justify-start">
-        <div className="w-full min-w-0 px-4 py-3 rounded-lg text-gray-100">
+        <div className="w-full min-w-0 px-4 py-1 rounded-lg text-gray-100">
           {bubbleInner}
           <MessageActions
             content={message.content}

@@ -21,6 +21,10 @@ App
 └─ SettingsModal ───────── settings/
 ```
 
+`Logo` (the name with the speaking O as its first letter) is in the sidebar
+and page headers; `LogoMark` (the O alone) is on the collapsed sidebar. Both
+take the text colour. Source files and rules: [`/logo`](../../../logo/README.md).
+
 State comes from hooks (see [`../hooks/README.md`](../hooks/README.md));
 components receive data and callbacks as props and don't call the backend,
 except small self-contained ones noted below.

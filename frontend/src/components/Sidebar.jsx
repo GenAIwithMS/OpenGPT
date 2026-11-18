@@ -13,6 +13,7 @@ import {
   Code2,
 } from 'lucide-react';
 import UserMenu from './settings/UserMenu';
+import Logo, { LogoMark } from './Logo';
 
 const SquarePenIcon = (props) => (
   <svg
@@ -142,7 +143,7 @@ const Sidebar = ({
 
       {/* Single sidebar element: animates width in place on desktop,
           slides as a drawer on mobile. */}
-      <div
+      <nav aria-label="Sidebar"
         className={`
           fixed lg:static inset-y-0 left-0 z-40
           ${isCollapsed ? 'w-[60px] lg:w-[60px]' : 'w-64 lg:w-64'}
@@ -169,7 +170,7 @@ const Sidebar = ({
               title="OpenGPT — click to expand"
               className="group/brand relative flex items-center justify-center w-9 h-9 mb-2 text-lg font-semibold text-white select-none rounded-xl hover:bg-gray-700 transition-colors"
             >
-              <span className="group-hover/brand:opacity-0 transition-opacity">O</span>
+              <LogoMark size={20} className="group-hover/brand:opacity-0 transition-opacity" />
               <PanelLeftOpen
                 size={18}
                 className="absolute opacity-0 group-hover/brand:opacity-100 transition-opacity"
@@ -212,9 +213,7 @@ const Sidebar = ({
           <>
             {/* Brand header */}
             <div className="flex items-center justify-between px-2 pt-3 pb-1 shrink-0">
-              <span className="px-2 text-base font-semibold tracking-tight text-white select-none whitespace-nowrap overflow-hidden">
-                OpenGPT
-              </span>
+              <Logo className="mx-2 h-5 text-white" />
               <button
                 onClick={() => onToggleCollapse?.()}
                 title="Close sidebar"
@@ -251,7 +250,7 @@ const Sidebar = ({
                 "
               >
                 <SearchIcon size={16} className="text-gray-400 shrink-0" />
-                <span className="w-full text-sm text-gray-500">Search chats</span>
+                <span className="w-full text-sm text-gray-400">Search chats</span>
               </button>
             </div>
 
@@ -303,7 +302,7 @@ const Sidebar = ({
                   overflow-y-auto px-2 py-2 space-y-0.5 thin-scroll
                   transition-[max-height,opacity] duration-300 ease-out
                   ${recentsOpen
-                    ? 'flex-1 min-h-0 max-h-[100vh] opacity-100' /* fill down to the footer, scroll inside */
+                    ? 'flex-1 min-h-0 max-h-[100dvh] opacity-100' /* fill down to the footer, scroll inside */
                     : 'flex-none max-h-0 opacity-0 overflow-hidden'}
                 `}
               >
@@ -368,8 +367,9 @@ const Sidebar = ({
                             onClick={(e) => toggleMenu(e, thread.thread_id)}
                             aria-label="Chat options"
                             className={`
-                              shrink-0 p-1 rounded-md text-gray-300 hover:bg-gray-600 opacity-0
+                              shrink-0 p-1.5 -my-1 rounded-md text-gray-300 hover:bg-gray-600 opacity-0
                               group-hover:opacity-100 focus:opacity-100 transition-opacity
+                              [@media(hover:none)]:opacity-100
                               ${openMenuId === thread.thread_id ? 'opacity-100' : ''}
                             `}
                           >
@@ -418,7 +418,7 @@ const Sidebar = ({
             </div>
           </>
         )}
-      </div>
+      </nav>
 
       {/* Overlay for mobile — fades with the drawer */}
       <div

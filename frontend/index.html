@@ -2,11 +2,20 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#202123" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>OpenGPT</title>
   </head>
   <body>
+    <noscript>
+      <p style="margin:20vh auto 0;max-width:32rem;padding:0 16px;font:16px/1.5 system-ui,sans-serif;color:#d1d5db;text-align:center">
+        OpenGPT needs JavaScript. Turn it on in your browser, then reload this page.
+      </p>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

@@ -11,7 +11,7 @@ export const Keys = ({ keys }) => (
     {keys.map((k) => (
       <kbd
         key={k}
-        className="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-md border border-gray-600/80 border-b-[2px] bg-gradient-to-b from-[#3a3b44] to-[#2c2d34] px-1.5 font-sans text-[11px] font-medium text-gray-100"
+        className="inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-md border border-gray-600/80 border-b-[2px] bg-gradient-to-b from-[#3a3b44] to-[#2c2d34] px-1.5 font-sans text-xs font-medium text-gray-100"
       >
         {keyLabel(k)}
       </kbd>

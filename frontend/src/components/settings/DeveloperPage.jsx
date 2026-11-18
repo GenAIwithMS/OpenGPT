@@ -82,7 +82,7 @@ const ProviderForm = ({ presets, existing, onDone }) => {
             <ProviderLogo preset={p.id} name={p.name} size="h-8 w-8" />
             <span className="min-w-0">
               <span className="block text-sm leading-tight text-gray-100">{p.name}</span>
-              <span className="block text-[11px] text-gray-500">{p.local ? 'On this computer' : p.id === 'custom' ? 'Any endpoint' : 'Cloud'}</span>
+              <span className="block text-xs text-gray-500">{p.local ? 'On this computer' : p.id === 'custom' ? 'Any endpoint' : 'Cloud'}</span>
             </span>
           </button>
         ))}
@@ -290,20 +290,20 @@ const DeveloperPage = () => {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-1.5 text-sm text-gray-100">
-                  Default {data.active === 'env' && <span className="rounded-md bg-blue-500/15 px-1.5 py-0.5 text-[10px] text-blue-300">In use</span>}
+                  Default {data.active === 'env' && <span className="rounded-md bg-blue-500/15 px-1.5 py-0.5 text-[11px] text-blue-300">In use</span>}
                 </p>
                 {data.env.configured ? (
                   <>
-                    <p className="mt-0.5 text-[11px] text-gray-500">{API_NAMES[data.env.kind]}</p>
-                    <p className="truncate font-mono text-[11px] text-gray-500">{data.env.model}</p>
+                    <p className="mt-0.5 text-xs text-gray-500">{API_NAMES[data.env.kind]}</p>
+                    <p className="truncate font-mono text-xs text-gray-500">{data.env.model}</p>
                   </>
-                ) : <p className="mt-0.5 text-[11px] text-gray-500">Not set up</p>}
+                ) : <p className="mt-0.5 text-xs text-gray-500">Not set up</p>}
               </div>
             </div>
             {data.env.configured && (
               <div className="mt-3 flex items-center gap-3 border-t border-gray-700/50 pt-2.5">
                 <TestButton onTest={() => test('env')} state={tests.env} />
-                <span className="text-[11px] text-gray-500">Set by the server</span>
+                <span className="text-xs text-gray-500">Set by the server</span>
               </div>
             )}
             <TestResult state={tests.env} />
@@ -316,10 +316,10 @@ const DeveloperPage = () => {
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-1.5 text-sm text-gray-100">
                     <span className="truncate">{p.name}</span>
-                    {data.active === p.id && <span className="rounded-md bg-blue-500/15 px-1.5 py-0.5 text-[10px] text-blue-300">In use</span>}
+                    {data.active === p.id && <span className="rounded-md bg-blue-500/15 px-1.5 py-0.5 text-[11px] text-blue-300">In use</span>}
                   </p>
-                  <p className="mt-0.5 text-[11px] text-gray-500">{API_NAMES[p.kind]}{p.has_key ? ' · key saved' : ''}</p>
-                  <p className="truncate font-mono text-[11px] text-gray-500" title={p.base_url}>{p.base_url}{p.model ? ` · ${p.model}` : ''}</p>
+                  <p className="mt-0.5 text-xs text-gray-500">{API_NAMES[p.kind]}{p.has_key ? ' · key saved' : ''}</p>
+                  <p className="truncate font-mono text-xs text-gray-500" title={p.base_url}>{p.base_url}{p.model ? ` · ${p.model}` : ''}</p>
                 </div>
               </div>
               <div className="mt-3 flex items-center gap-3 border-t border-gray-700/50 pt-2.5 text-xs">
