@@ -19,7 +19,7 @@ const RECENT_COUNT = 8;
 const MAX_PROJECTS_SCANNED = 12;
 
 const Key = ({ children }) => (
-  <kbd className="inline-flex min-w-[1.25rem] items-center justify-center rounded border border-gray-600 px-1 font-sans text-[10px] text-gray-300">
+  <kbd className="inline-flex min-w-[1.25rem] items-center justify-center rounded border border-gray-600 px-1 font-sans text-[11px] text-gray-300">
     {children}
   </kbd>
 );

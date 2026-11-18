@@ -260,6 +260,7 @@ const MessageInput = ({
         )}
 
         <PromptInputTextarea
+          aria-label="Message"
           placeholder={isDragging ? "Drop document here..." : "Send a message..."}
           disabled={inputDisabled}
         />
@@ -277,7 +278,7 @@ const MessageInput = ({
                   aria-expanded={showPlusMenu}
                   aria-label="Add attachment or tool"
                   className={[
-                    "flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-full text-gray-400",
+                    "relative after:absolute after:-inset-1 after:content-[''] [@media(hover:hover)]:after:hidden flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-full text-gray-400",
                     "transition-colors duration-150 ease-out",
                     "hover:text-gray-100 hover:bg-gray-700",
                     "focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70",
@@ -372,7 +373,7 @@ const MessageInput = ({
           </div>
 
           {/* Model menu, then Send / Stop — same as the Code page */}
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex shrink-0 items-center gap-2">
           <ModelPicker page="chat" />
           <PromptInputAction tooltip={showStop ? "Stop generating" : "Send message"}>
             <button
@@ -381,7 +382,7 @@ const MessageInput = ({
               disabled={!showStop && (!message.trim() || disabled)}
               title={showStop ? "Stop generating" : "Send message"}
               aria-label={showStop ? "Stop generating" : "Send message"}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-gray-900 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:bg-gray-500 disabled:text-gray-800"
+              className="relative after:absolute after:-inset-1.5 after:content-[''] [@media(hover:hover)]:after:hidden flex h-8 w-8 items-center justify-center rounded-full bg-white text-gray-900 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:bg-gray-500 disabled:text-gray-800"
             >
               {showStop ? <Square size={13} fill="currentColor" /> : <ArrowUp size={16} />}
             </button>
@@ -402,12 +403,14 @@ const MessageInput = ({
         />
       </PromptInput>
 
-      <div className="mt-1 text-xs text-center text-gray-500">
+      <div className="mt-1 text-xs text-center text-gray-400">
         {isDragging ? (
           <span className="text-blue-400">Drop your document here</span>
         ) : (
           <span>
-            {SEND_HINT} • Drag & drop documents (PDF, MD, TXT) to upload
+            {SEND_HINT}
+            {/* Dropping files is a desktop gesture: keep the mobile hint to one line */}
+            <span className="hidden sm:inline"> • Drag & drop documents (PDF, MD, TXT) to upload</span>
           </span>
         )}
       </div>

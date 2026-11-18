@@ -19,7 +19,7 @@ const Composer = ({ onSend, onStop, working, disabled, placeholder }) => {
   return (
     <PromptInput value={value} onValueChange={setValue} onSubmit={submit} disabled={disabled} maxHeight={200}>
       <PromptInputTextarea placeholder={placeholder} aria-label={placeholder} className="px-2" />
-      <PromptInputActions className="flex items-center justify-end gap-1 px-1 pb-1">
+      <PromptInputActions className="flex items-center justify-end gap-2 px-1 pb-1">
         <ModelPicker page="code" disabled={disabled && !working} />
         <PromptInputAction tooltip={working ? 'Stop' : 'Send'}>
           <button
@@ -27,7 +27,7 @@ const Composer = ({ onSend, onStop, working, disabled, placeholder }) => {
             onClick={working ? onStop : submit}
             disabled={!working && (disabled || !value.trim())}
             aria-label={working ? 'Stop the agent' : 'Send'}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-gray-900 transition-colors hover:bg-gray-200 disabled:bg-gray-500 disabled:text-gray-800"
+            className="relative after:absolute after:-inset-1.5 after:content-[''] [@media(hover:hover)]:after:hidden flex h-8 w-8 items-center justify-center rounded-full bg-white text-gray-900 transition-colors hover:bg-gray-200 disabled:bg-gray-500 disabled:text-gray-800"
           >
             {working ? <Square size={13} fill="currentColor" /> : <ArrowUp size={16} />}
           </button>
@@ -108,10 +108,10 @@ const CodeView = ({
   const error = startError || code.error;
 
   return (
-    <div className="flex-1 min-w-0 flex flex-col h-screen">
+    <main className="flex-1 min-w-0 flex flex-col h-screen">
       {/* Header — matches the chat header */}
-      <div className="flex-shrink-0 px-4 py-3 bg-chat-bg">
-        <div className="flex items-center gap-2 pl-12 lg:pl-0">
+      <div className="flex-shrink-0 px-4 pt-4 pb-2 lg:py-3 bg-chat-bg">
+        <div className="flex min-h-[40px] lg:min-h-[32px] items-center gap-2 pl-12 lg:pl-0">
           <span className="text-base font-semibold tracking-tight text-white select-none">OpenGPT</span>
           <span className="px-2 py-0.5 rounded-lg bg-gray-700/70 text-xs font-medium text-gray-300">Code</span>
           {sessionId ? (
@@ -140,7 +140,7 @@ const CodeView = ({
                 <Code2 size={24} />
               </div>
               <h1 className="text-2xl font-bold text-gray-100">What should we build?</h1>
-              <p className="mt-2 text-sm text-gray-400 max-w-md mx-auto">
+              <p className="mt-2 text-sm text-gray-400 max-w-md mx-auto text-pretty">
                 The coding agent reads and edits code in your project and runs commands. It asks before changing
                 files or running anything.
               </p>
@@ -171,7 +171,7 @@ const CodeView = ({
           </div>
         </>
       )}
-    </div>
+    </main>
   );
 };
 

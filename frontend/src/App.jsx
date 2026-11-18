@@ -563,11 +563,14 @@ function App() {
         />
       ) : (
       /* Main Chat Area */
-      <div className="flex-1 min-w-0 flex flex-col h-screen relative">
+      <main className="flex-1 min-w-0 flex flex-col h-screen relative">
           {/* Header — spans the full width, above both the chat and the research panel */}
-          <div className="flex-shrink-0 px-4 py-3 bg-chat-bg">
-            <div className="flex items-center justify-between">
-              <span className="text-base font-semibold tracking-tight text-white select-none">
+          <div className="flex-shrink-0 px-4 pt-4 pb-2 lg:py-3 bg-chat-bg">
+            {/* pl-12 and 40px height: beside and centred on the mobile menu button (fixed at top left) */}
+            <div className="flex min-h-[40px] lg:min-h-[32px] items-center justify-between pl-12 lg:pl-0">
+              {/* The sidebar already shows the name on desktop; show it here only when the sidebar is a rail */}
+              <span className={`text-base font-semibold tracking-tight text-white select-none ${
+                isSidebarCollapsed ? '' : 'lg:invisible'}`}>
                 OpenGPT
               </span>
               {/* Temporary chat toggle — only on the New Chat screen.
@@ -684,7 +687,7 @@ function App() {
           </Suspense>
         )}
         </div>
-      </div>
+      </main>
       )}
 
       {/* Error toast (chat and Code page) */}

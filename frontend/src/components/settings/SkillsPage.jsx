@@ -39,7 +39,7 @@ const SkillCard = ({ skill, onToggle, onOpen }) => (
       </button>
       <Toggle label={`${skill.name} on or off`} checked={skill.enabled} onChange={(v) => onToggle(skill, v)} />
     </div>
-    <p className="mt-auto flex items-center gap-1.5 pt-3 text-[11px] text-gray-500">
+    <p className="mt-auto flex items-center gap-1.5 pt-3 text-xs text-gray-500">
       <ShieldCheck size={12} />
       {ORIGIN[skill.origin] || skill.origin}
       {skill.updated_at && <span>· Updated {dateOf(skill.updated_at)}</span>}
@@ -89,7 +89,7 @@ const SkillDetail = ({ id, onClose, onChanged }) => {
               </a>
             )}
           </div>
-          {skill.location && <p className="break-all font-mono text-[11px] text-gray-500">{skill.location}</p>}
+          {skill.location && <p className="break-all font-mono text-xs text-gray-500">{skill.location}</p>}
 
           {editing ? (
             <textarea value={text} onChange={(e) => setText(e.target.value)} rows={18} spellCheck={false}
@@ -105,7 +105,7 @@ const SkillDetail = ({ id, onClose, onChanged }) => {
               <p className="mb-1.5 text-xs font-medium text-gray-300">Files ({skill.files.length})</p>
               <div className="thin-scroll flex max-h-28 flex-wrap gap-1.5 overflow-y-auto">
                 {skill.files.map((f) => (
-                  <span key={f} className="flex items-center gap-1 rounded-md bg-white/5 px-2 py-0.5 font-mono text-[11px] text-gray-400">
+                  <span key={f} className="flex items-center gap-1 rounded-md bg-white/5 px-2 py-0.5 font-mono text-xs text-gray-400">
                     <FileText size={11} /> {f}
                   </span>
                 ))}
@@ -320,7 +320,7 @@ const ExploreModal = ({ onClose, onChanged }) => {
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-gray-100">{s.title}</p>
                 <p className="mt-0.5 text-xs leading-relaxed text-gray-400">{s.description}</p>
-                <p className="mt-1.5 text-[11px] text-gray-500">{s.author} · {s.license}</p>
+                <p className="mt-1.5 text-xs text-gray-500">{s.author} · {s.license}</p>
               </div>
               {s.installed ? (
                 <span className="text-xs text-green-300">Added</span>

@@ -142,7 +142,7 @@ const Sidebar = ({
 
       {/* Single sidebar element: animates width in place on desktop,
           slides as a drawer on mobile. */}
-      <div
+      <nav aria-label="Sidebar"
         className={`
           fixed lg:static inset-y-0 left-0 z-40
           ${isCollapsed ? 'w-[60px] lg:w-[60px]' : 'w-64 lg:w-64'}
@@ -251,7 +251,7 @@ const Sidebar = ({
                 "
               >
                 <SearchIcon size={16} className="text-gray-400 shrink-0" />
-                <span className="w-full text-sm text-gray-500">Search chats</span>
+                <span className="w-full text-sm text-gray-400">Search chats</span>
               </button>
             </div>
 
@@ -303,7 +303,7 @@ const Sidebar = ({
                   overflow-y-auto px-2 py-2 space-y-0.5 thin-scroll
                   transition-[max-height,opacity] duration-300 ease-out
                   ${recentsOpen
-                    ? 'flex-1 min-h-0 max-h-[100vh] opacity-100' /* fill down to the footer, scroll inside */
+                    ? 'flex-1 min-h-0 max-h-[100dvh] opacity-100' /* fill down to the footer, scroll inside */
                     : 'flex-none max-h-0 opacity-0 overflow-hidden'}
                 `}
               >
@@ -368,8 +368,9 @@ const Sidebar = ({
                             onClick={(e) => toggleMenu(e, thread.thread_id)}
                             aria-label="Chat options"
                             className={`
-                              shrink-0 p-1 rounded-md text-gray-300 hover:bg-gray-600 opacity-0
+                              shrink-0 p-1.5 -my-1 rounded-md text-gray-300 hover:bg-gray-600 opacity-0
                               group-hover:opacity-100 focus:opacity-100 transition-opacity
+                              [@media(hover:none)]:opacity-100
                               ${openMenuId === thread.thread_id ? 'opacity-100' : ''}
                             `}
                           >
@@ -418,7 +419,7 @@ const Sidebar = ({
             </div>
           </>
         )}
-      </div>
+      </nav>
 
       {/* Overlay for mobile — fades with the drawer */}
       <div
