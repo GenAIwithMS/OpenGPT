@@ -1,0 +1,57 @@
+name: Bug report
+description: Something in OpenGPT doesn't work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Questions about setup go to [Discussions Q&A](https://github.com/GenAIwithMS/OpenGPT/discussions/categories/q-a).
+        **Never paste `backend/.env`, API keys or tokens.** Remove them from logs before posting.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a new chat
+        2. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Part of OpenGPT
+      options:
+        - Chat
+        - Documents and knowledge
+        - Deep research or blog writer
+        - Connectors
+        - Skills
+        - Code page (coding agent)
+        - Settings
+        - Setup or installation
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Commit hash (`git rev-parse --short HEAD`) or release.
+  - type: input
+    id: system
+    attributes:
+      label: System
+      placeholder: e.g. Ubuntu 24.04, Python 3.12, Node 20, MySQL 8, Chrome
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or error messages
+      description: Backend console output, browser console, or `backend/app/storage/coding-agent/agent.log`. Remove keys and tokens first.
+      render: text

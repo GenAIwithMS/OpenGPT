@@ -4,6 +4,10 @@ Thanks for helping. This guide covers setting up, making a change and
 opening a pull request. Using an AI coding agent? It reads
 [AGENTS.md](AGENTS.md); the rules there apply to people too.
 
+Have a question, or an idea you'd like to discuss first? Use
+[Discussions](https://github.com/GenAIwithMS/OpenGPT/discussions): Q&A for
+questions, Ideas for features. Issues are for bugs and agreed work.
+
 ## Set up
 
 Follow the [Quick Start](README.md#quick-start) in the README: Python 3.11+,

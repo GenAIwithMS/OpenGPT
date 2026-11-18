@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Ask a question
+    url: https://github.com/GenAIwithMS/OpenGPT/discussions/categories/q-a
+    about: Setup, configuration, model providers, connectors or the coding agent. Ask in Discussions.
+  - name: Suggest an idea
+    url: https://github.com/GenAIwithMS/OpenGPT/discussions/categories/ideas
+    about: Discuss a new feature before it becomes an issue.
+  - name: Report a security problem
+    url: https://github.com/GenAIwithMS/OpenGPT/security/advisories/new
+    about: Please report security problems privately, not in a public issue.
