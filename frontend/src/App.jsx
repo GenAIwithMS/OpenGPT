@@ -383,7 +383,7 @@ function App() {
 
   // Returns false when the message was not sent, so the input keeps the prompt.
   const handleSendMessage = async (message, tools = [], attachments = []) => {
-    // ChatGPT-style attachment flow: the user's message (with its attachments)
+    // Attachment flow: the user's message (with its attachments)
     // is shown instantly and the document(s) are uploaded together with the
     // prompt so the backend processes them as one request. Attachments are
     // cleared only after a successful send.

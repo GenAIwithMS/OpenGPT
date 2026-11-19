@@ -170,7 +170,7 @@ const MessageInput = ({
     const ext = name.slice(name.lastIndexOf(".")).toLowerCase();
     const supported = [".pdf", ".md", ".txt"];
     if (file && (file.type === "application/pdf" || supported.includes(ext))) {
-      // Hold the file as a pending attachment (ChatGPT-style chip). It is only
+      // Hold the file as a pending attachment (a chip above the input). It is only
       // uploaded when the message is actually sent, together with the prompt.
       onAddAttachment(file);
     } else {

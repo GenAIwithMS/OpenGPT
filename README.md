@@ -1,8 +1,13 @@
 <div align="center">
 
-# ✦ OpenGPT ✦
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="logo/png/wordmark-white-1024.png" />
+    <img src="logo/png/wordmark-1024.png" alt="OpenGPT" width="320" />
+  </picture>
+</h1>
 
-### An open-source, ChatGPT-style AI assistant powered by LangGraph
+### An open-source AI chat assistant powered by LangGraph
 
 Agentic tool use · Deep Research · Document Q&A (RAG) · Persistent multi-thread chats
 
@@ -24,6 +29,7 @@ Agentic tool use · Deep Research · Document Q&A (RAG) · Persistent multi-thre
   <a href="https://github.com/GenAIwithMS/OpenGPT/network/members"><img src="https://img.shields.io/github/forks/GenAIwithMS/OpenGPT?style=flat-square&color=60a5fa" alt="Forks" /></a>
   <a href="https://github.com/GenAIwithMS/OpenGPT/issues"><img src="https://img.shields.io/github/issues/GenAIwithMS/OpenGPT?style=flat-square&color=f97316" alt="Issues" /></a>
   <img src="https://img.shields.io/github/last-commit/GenAIwithMS/OpenGPT?style=flat-square&color=a78bfa" alt="Last commit" />
+  <a href="https://hub.docker.com/r/genaiwithms/opengpt"><img src="https://img.shields.io/docker/pulls/genaiwithms/opengpt?logo=docker&label=pulls" alt="Docker pulls" /></a>
 </p>
 
 <p>
@@ -53,7 +59,7 @@ Agentic tool use · Deep Research · Document Q&A (RAG) · Persistent multi-thre
 
 ## About
 
-OpenGPT is an open-source, ChatGPT-style assistant built with LangGraph. It has a FastAPI backend and a React frontend. It works with **any model behind an OpenAI- or Anthropic-compatible API**, hosted or self-hosted. Conversations are saved in MySQL.
+OpenGPT is an open-source chat assistant built with LangGraph. It has a FastAPI backend and a React frontend. It works with **any model behind an OpenAI- or Anthropic-compatible API**, hosted or self-hosted. Conversations are saved in MySQL.
 
 ## Features
 
@@ -193,7 +199,7 @@ The **Code** page in the sidebar runs a coding agent on your machine. Pick or cr
 - **Projects are folders on your computer.** Use **Open folder…** in the project menu to browse and pick one (or paste its path), or **New project** to create an empty one in `~/OpenGPT Projects` (`CODE_PROJECTS_ROOT`). Opened folders are remembered in the project menu; removing one from the list never deletes its files. The agent only works inside the chosen folder; anything outside it is refused.
 - **Which folders can be opened**: folders inside your home folder by default (`CODE_ALLOWED_ROOTS` to change), never hidden folders such as `~/.ssh`, and never the home folder itself. Browsing and opening folders only work while the API is local (the default).
 - **Approvals**: the agent asks before editing files, running commands, going online or reading `.env` files. Each request shows the command or the diff, with **Allow once**, **Always allow** (saved for the project; it says exactly what it covers, e.g. "commands starting with `git`") and **Deny** (optionally with a reason for the agent). Saved approvals can be reviewed and revoked from the project menu.
-- **Model**: it uses `LLM_*` like the chat. Its requests are large (about 6–9k tokens of instructions and tool descriptions each), so set `CODING_AGENT_MODEL` to a model or plan with higher limits if requests fail with a "larger than the model allows" or rate-limit message.
+- **Model**: it uses `LLM_*` like the chat. Its requests are large (about 6,000 to 9,000 tokens of instructions and tool descriptions each), so set `CODING_AGENT_MODEL` to a model or plan with higher limits if requests fail with a "larger than the model allows" or rate-limit message.
 - **Stop** ends the current task. If you close the page, the agent keeps working; reopen the session to see the result.
 
 > ⚠️ **The coding agent runs commands and changes files on this computer.** Read approval requests before allowing them, and keep the API local (the default). When `HOST` exposes the API, the coding agent is off unless you set `CODING_AGENT_ENABLED=true`, and `API_TOKEN` is required.
