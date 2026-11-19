@@ -137,5 +137,31 @@ def create_app():
     # without the API token: <img> tags can't send one.
     BLOG_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     app.mount(BLOG_IMAGE_URL, StaticFiles(directory=BLOG_IMAGE_DIR), name="blog-images")
+    _serve_frontend(app)
     return app
+
+
+def _serve_frontend(app: FastAPI) -> None:
+    """Serve the built frontend (FRONTEND_DIST, set in the Docker image) on the
+    same port as the API, so the page calls /api on its own address: no CORS
+    and no token built into the page. Unknown paths get index.html, because
+    the frontend has its own routes (/c/<id>, /code, ...)."""
+    from fastapi.responses import FileResponse
+
+    from app.exceptions import NotFoundError
+
+    dist = os.getenv("FRONTEND_DIST", "").strip()
+    if not dist or not os.path.isfile(os.path.join(dist, "index.html")):
+        return
+    root = os.path.realpath(dist)
+    index = os.path.join(root, "index.html")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def frontend(path: str):
+        if path == "api" or path.startswith("api/"):
+            raise NotFoundError("Not found")
+        file = os.path.realpath(os.path.join(root, path))
+        if path and file.startswith(root + os.sep) and os.path.isfile(file):
+            return FileResponse(file)
+        return FileResponse(index, headers={"Cache-Control": "no-cache"})
 

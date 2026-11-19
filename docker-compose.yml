@@ -1,0 +1,59 @@
+# OpenGPT with MySQL.
+#
+#   cp backend/.env.example backend/.env    # set LLM_* (model provider) at least
+#   docker compose up -d
+#   open http://localhost:8000
+#
+# The database settings below override any MYSQL_* in backend/.env.
+# Data lives in the named volumes, so it survives updates:
+#   docker compose pull && docker compose up -d
+
+services:
+  opengpt:
+    image: docker.io/genaiwithms/opengpt:latest
+    build: .
+    env_file:
+      - path: backend/.env
+        required: false
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_USER: opengpt
+      MYSQL_PASSWORD: ${OPENGPT_DB_PASSWORD:-opengpt}
+      MYSQL_DATABASE: chatbot_db
+    ports:
+      # This computer only. To open it to your network, change to "8000:8000"
+      # and set HOST=0.0.0.0 and API_TOKEN in backend/.env.
+      - "127.0.0.1:${OPENGPT_PORT:-8000}:8000"
+    extra_hosts:
+      # A model server on this computer (Ollama, LM Studio, ...) is reachable
+      # at http://host.docker.internal:<port>/v1 from inside the container.
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - opengpt-storage:/app/backend/app/storage
+      - opengpt-data:/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mysql:
+    image: docker.io/library/mysql:8.4
+    environment:
+      MYSQL_DATABASE: chatbot_db
+      MYSQL_USER: opengpt
+      MYSQL_PASSWORD: ${OPENGPT_DB_PASSWORD:-opengpt}
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u opengpt -p\"$$MYSQL_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+volumes:
+  opengpt-storage:
+  opengpt-data:
+  mysql-data:

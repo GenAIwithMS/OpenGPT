@@ -51,6 +51,8 @@ The database and tables are created at startup.
 |---|---|---|
 | `HOST` | `127.0.0.1` | `0.0.0.0` exposes the API on your network (then `API_TOKEN` is required) |
 | `PORT` | `8000` | The start scripts use the next free port when this one is taken |
+| `BIND_HOST` | `HOST` | Address to listen on when it differs from `HOST`. The Docker image sets `0.0.0.0` (inside the container) and keeps `HOST` local, because its port is published on 127.0.0.1 only |
+| `FRONTEND_DIST` | | Folder with the built frontend; when set, the backend serves it on its own port (the Docker image does this) |
 | `RELOAD` | `false` | Reload on code changes (development) |
 | `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated origins allowed to call the API. When unset, the start scripts use the frontend's actual port |
 | `API_TOKEN` | | When set, every `/api` request needs `Authorization: Bearer <token>`; set the same value as `VITE_API_TOKEN` in `frontend/.env.local` |

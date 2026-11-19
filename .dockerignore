@@ -1,0 +1,27 @@
+# Only what the image needs goes in. Secrets, user data and local builds stay out.
+*
+!backend/
+!frontend/
+!coding-agent/
+!LICENSE
+
+# Secrets and user data: never in the image
+**/.env
+**/.env.*
+!backend/.env.example
+backend/app/storage/
+**/*.db
+**/*.db-shm
+**/*.db-wal
+
+# Rebuilt inside the image
+**/node_modules
+**/__pycache__
+**/*.py[oc]
+frontend/dist
+coding-agent/**/dist
+
+# Not needed to run
+backend/tests/
+**/.ruff_cache
+**/.pytest_cache
