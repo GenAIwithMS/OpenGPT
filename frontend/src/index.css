@@ -99,7 +99,7 @@ code {
   animation: menuIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ChatGPT-like thin scrollbar for scrollable lists */
+/* Thin scrollbar for scrollable lists */
 .thin-scroll {
   scrollbar-width: thin;
   scrollbar-color: #565869 transparent;

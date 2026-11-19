@@ -2,8 +2,8 @@
 
 This folder now has two complementary evaluation paths:
 
-1. **Trace report** — a lightweight JSON summary of the runs already emitted into LangSmith.
-2. **Dataset-backed LangSmith experiment** — snapshots recent traced runs into fresh LangSmith datasets and launches native LangSmith experiments so the results show up cleanly in the LangSmith UI.
+1. **Trace report**: a lightweight JSON summary of the runs already emitted into LangSmith.
+2. **Dataset-backed LangSmith experiment**: snapshots recent traced runs into fresh LangSmith datasets and launches native LangSmith experiments so the results show up cleanly in the LangSmith UI.
 
 ## 1) Trace report
 

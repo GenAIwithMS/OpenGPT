@@ -3,7 +3,7 @@
 Instructions for AI coding agents working in this repository. People: see
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-OpenGPT is an open-source, ChatGPT-style assistant: a FastAPI + LangGraph
+OpenGPT is an open-source chat assistant: a FastAPI + LangGraph
 backend, a React frontend, and a coding agent (a separate Bun service) behind
 the Code page. Data is stored in MySQL.
 
