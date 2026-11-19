@@ -102,6 +102,18 @@ OpenGPT is an open-source, ChatGPT-style assistant built with LangGraph. It has 
 - Optional: API keys for the tools you want (search, weather, stocks, images)
 - Optional: [Bun](https://bun.sh) for the Code page (coding agent); chat works without it
 
+## Run with Docker
+
+The quickest way to try OpenGPT: one image with MySQL alongside, no Python,
+Node or MySQL to install.
+
+```bash
+cp backend/.env.example backend/.env    # set LLM_* (your model provider) at least
+docker compose up -d                    # then open http://localhost:8000
+```
+
+It uses the [`genaiwithms/opengpt`](https://hub.docker.com/r/genaiwithms/opengpt) image. Details, updates, local models and the coding agent in Docker: [Run with Docker](docs/guides/run-with-docker.md).
+
 ## Quick Start
 
 ### 1. Configure

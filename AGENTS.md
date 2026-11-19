@@ -17,6 +17,7 @@ the Code page. Data is stored in MySQL.
 | `coding-agent/` | The coding agent service (TypeScript, Bun), a trimmed fork | [coding-agent/AGENTS.md](coding-agent/AGENTS.md) |
 | `docs/` | Developer docs: architecture, configuration, one page per service, guides, decisions | [docs/README.md](docs/README.md) |
 | `README.md` | What OpenGPT is, quick start, configuration | |
+| `Dockerfile`, `docker-compose.yml`, `.dockerignore` | The `genaiwithms/opengpt` image (backend + built frontend + coding agent) and MySQL | [Run with Docker](docs/guides/run-with-docker.md) |
 
 More specific `AGENTS.md` files override this one for their folder.
 
@@ -52,6 +53,10 @@ finish. Add or update tests with every behaviour change.
   restart them. For manual checks start your own on other ports (e.g. backend
   `PORT=8001`, frontend `vite preview --port 4317`) and stop them afterwards.
   Remove any test data you create.
+- **Docker image.** Nothing secret or user data goes in the image:
+  `.dockerignore` lets in only `backend/`, `frontend/`, `coding-agent/` and
+  `LICENSE`, without `.env` files, storage or databases. A new system
+  dependency or folder the app needs at runtime goes in the `Dockerfile` too.
 - **Keep the licence.** `coding-agent/` is based on an MIT-licensed project;
   keep `coding-agent/LICENSE` and its credits.
 - **Files that stay out of git:** `CODE_REVIEW_REPORT.md`,
