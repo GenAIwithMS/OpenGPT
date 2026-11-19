@@ -20,6 +20,7 @@ Other files:
 | File | Use |
 |---|---|
 | `app-icon.svg` | White symbol on a dark rounded tile (`#202123`) |
+| `banner.svg`, `png/banner.png` | White wordmark centred on a dark rounded strip (4:1, PNG 3200×800). Reads on light and dark pages: Docker Hub overview, social posts |
 | `png/` | App icon 32/512/1024 px; symbol and wordmark 1024 px, black and white |
 | `favicon/` | `favicon.ico`, `favicon.svg`, 16/32/48 px, `apple-touch-icon.png`, 192/512 px, maskable 512 px, `site.webmanifest`, and `head-snippet.html` (the `<link>` tags). Copied into `frontend/public/` |
 
