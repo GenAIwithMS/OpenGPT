@@ -30,7 +30,13 @@ lifespan for background work).
   `NotFoundError`, `ConflictError`, `ForbiddenError`, `UpstreamError`, ...)
   with a message the user can act on. Don't raise `HTTPException`. For an
   unexpected error, log it with `log_error(context, exc)` and show only
-  `public_error(ref)`; never put stack traces, paths or secrets in a response.
+  `public_error(ref, exc)`; never put stack traces, paths or secrets in a
+  response. Passing `exc` lets known model failures (no tool calling, context
+  too long, server not reachable) show a fixed, specific message; add new
+  ones to `_MODEL_ERRORS` in `app/error_handlers.py`, never the raw text.
+- **Local files.** Code that reads the user's own disk (like
+  `services/local_models.py`) reads only known folders, caps what it walks,
+  and runs only while `HOST` is local.
 - **Models.** Get chat models only through `app/llm.py`: `LazyChatModel(role)`
   at module level, `chat_model(...)` / `model_name(role)` inside functions,
   `structured(...)` for structured output. Roles: `model`, `small_model`,

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, ExternalLink, FileCog, Info, Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Check, ExternalLink, FileCog, Info, Loader2, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { Modal, PageHeader, Section, inputClass } from './controls';
+import LocalModels from './LocalModels';
 import ProviderLogo from './ProviderLogo';
 import { providersService } from '../../services/api';
 
@@ -121,6 +122,11 @@ const ProviderForm = ({ presets, existing, onDone }) => {
         <label htmlFor="p-url" className="mb-1.5 block text-sm text-gray-200">Base URL</label>
         <input id="p-url" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} required
           placeholder="https://api.example.com/v1" className={`${inputClass} font-mono text-xs`} />
+        {spec?.local && (
+          <p className="mt-1.5 text-xs leading-relaxed text-gray-500">
+            The server must be running on this computer. Pick a model that supports tool calling.
+          </p>
+        )}
       </div>
       <div>
         <div className="mb-1.5 flex items-center">
@@ -175,6 +181,8 @@ const DeveloperPage = () => {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [confirming, setConfirming] = useState(null);
+  const [findingLocal, setFindingLocal] = useState(false);
+  const [notice, setNotice] = useState(null);
 
   const load = () => providersService.overview().then((d) => {
     setData(d);
@@ -268,15 +276,20 @@ const DeveloperPage = () => {
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">
               {saving ? 'Saving…' : 'Save'}
             </button>
+            {notice && !saved && <span className="flex items-center gap-1 text-xs text-green-300"><Check size={13} /> {notice}</span>}
             {saved && <span className="flex items-center gap-1 text-xs text-green-300"><Check size={13} /> Saved. Chat uses it now; the coding agent restarts.</span>}
-            {!saved && <span className="text-xs text-gray-500">Empty fields use the provider's default model.</span>}
+            {!saved && !notice && <span className="text-xs text-gray-500">Empty fields use the provider's default model.</span>}
           </div>
           {error && <p className="text-sm text-red-300">{error}</p>}
         </div>
       </Section>
 
       <Section title="Providers">
-        <div className="mb-3 flex justify-end">
+        <div className="mb-3 flex flex-wrap justify-end gap-2">
+          <button type="button" onClick={() => setFindingLocal(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-600 px-3 py-2 text-sm text-gray-200 hover:bg-white/5">
+            <Search size={14} /> Find local models
+          </button>
           <button type="button" onClick={() => setAdding(true)}
             className="flex items-center gap-1.5 rounded-lg border border-gray-600 px-3 py-2 text-sm text-gray-200 hover:bg-white/5">
             <Plus size={14} /> Add provider
@@ -350,6 +363,16 @@ const DeveloperPage = () => {
         </p>
       </Section>
 
+      {findingLocal && (
+        <Modal title="Local models" onClose={() => setFindingLocal(false)}>
+          <LocalModels providers={data.providers} onUsed={(message) => {
+            setFindingLocal(false);
+            setNotice(message);
+            setTimeout(() => setNotice(null), 6000);
+            load();
+          }} />
+        </Modal>
+      )}
       {adding && (
         <Modal title="Add a provider" onClose={() => setAdding(false)}>
           <ProviderForm presets={data.presets} onDone={() => { setAdding(false); load(); }} />
