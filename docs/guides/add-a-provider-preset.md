@@ -10,6 +10,9 @@ Users can always use Custom for anything else.
    `id`, `name`, `kind` (`openai` or `anthropic`), `base_url` (for OpenAI
    compatible APIs it usually ends in `/v1`), `keys_url` (where users get a
    key), and `local: True` for servers on this computer that need no key.
+   For a local server, also add it to `SERVERS` in
+   `backend/app/services/local_models.py` (port, command, start and download
+   commands, and its model folder in `_folders`) so Find local models knows it.
 3. **Add its logo** in `frontend/src/components/settings/ProviderLogo.jsx`:
    Simple Icons if available, otherwise the official icon downloaded from the
    company's site into `frontend/src/assets/providers/` with its source in

@@ -284,6 +284,8 @@ export const providersService = {
   // {provider_id} for a saved one ('env' for backend/.env), or {preset, kind, base_url, api_key}
   test: async (body) => (await api.post('/providers/test', body)).data.models,
   setActive: async (active, roles) => (await api.put('/providers/active', { active, roles })).data,
+  // Local model servers and downloaded models: {servers, disk_checked}
+  findLocal: async () => (await api.get('/providers/local')).data,
   // The model menu: {models, chat_default, code_default, auto: {chat, code}}
   models: async () => (await api.get('/providers/models')).data,
 };

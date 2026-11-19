@@ -67,6 +67,10 @@ PRESETS = [
      "local": True, "keys_url": None},
     {"id": "lmstudio", "name": "LM Studio", "kind": "openai", "base_url": "http://localhost:1234/v1",
      "local": True, "keys_url": None},
+    {"id": "llamacpp", "name": "llama.cpp", "kind": "openai", "base_url": "http://localhost:8080/v1",
+     "local": True, "keys_url": None},
+    {"id": "jan", "name": "Jan", "kind": "openai", "base_url": "http://localhost:1337/v1",
+     "local": True, "keys_url": None},
     {"id": "custom", "name": "Custom", "kind": "openai", "base_url": "", "keys_url": None},
 ]
 _PRESETS = {p["id"]: p for p in PRESETS}
@@ -283,8 +287,10 @@ def _list_models(kind: str, base_url: str, api_key: str) -> list[str]:
     try:
         r = httpx.get(url, headers=headers, timeout=TIMEOUT)
     except httpx.HTTPError:
-        raise ValidationError(f"Couldn't reach {urlparse(url).netloc}. Check the base URL "
-                              "(and that a local server is running).") from None
+        from app.services import local_models
+
+        raise ValidationError(local_models.unreachable_message(url)
+                              or f"Couldn't reach {urlparse(url).netloc}. Check the base URL.") from None
     if r.status_code in (401, 403):
         raise ValidationError("The API key was refused")
     if r.status_code == 404:

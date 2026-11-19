@@ -26,7 +26,7 @@ export const SECTIONS = [
     { id: 'skills', label: 'Skills', icon: Sparkles, keywords: 'skill instructions explore upload github' },
   ] },
   { group: 'Developer', items: [
-    { id: 'developer', label: 'Developer', icon: Code2, keywords: 'provider providers api key model models endpoint openai anthropic ollama' },
+    { id: 'developer', label: 'Developer', icon: Code2, keywords: 'provider providers api key model models endpoint openai anthropic ollama lm studio llama.cpp jan local' },
   ] },
 ];
 

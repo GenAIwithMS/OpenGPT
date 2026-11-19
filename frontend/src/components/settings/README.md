@@ -12,6 +12,7 @@ SettingsModal ── navigation (SECTIONS, searchable) + the chosen page
 ├─ ConnectorsPage       added connectors, Browse catalog, Create, sign-in
 ├─ SkillsPage           skills by source, detail, Explore, Add
 └─ DeveloperPage        models in use, providers
+   └─ LocalModels       Find local models: running servers, downloaded models
 UserMenu                footer menu (Account, Settings, help links)
 ```
 
@@ -31,7 +32,7 @@ Every page uses these instead of its own styles: `PageHeader`, `Section`,
 | Knowledge | `/api/settings/knowledge` | `settingsService` |
 | Connectors | `/api/connectors` | `connectorsService` |
 | Skills | `/api/skills` | `skillsService` |
-| Developer | `/api/providers` | `providersService` |
+| Developer | `/api/providers`, `/api/providers/local` | `providersService` |
 
 Pages other than General and Personalization load their own data when they
 open; the popup passes only `settings` and `save`.

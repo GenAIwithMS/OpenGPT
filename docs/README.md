@@ -27,6 +27,7 @@ the page for the part you are changing. To install and run OpenGPT, see the
 
 ## Guides
 
+- [Use a local model](guides/use-a-local-model.md)
 - [Add a chat tool](guides/add-a-chat-tool.md)
 - [Add a settings page](guides/add-a-settings-page.md)
 - [Add a connector to the catalog](guides/add-a-catalog-connector.md)

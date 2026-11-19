@@ -64,12 +64,12 @@ def _valid_thread_id(thread_id: Optional[str]) -> Optional[str]:
 def _internal_error(exc: Exception) -> AppError:
     """Turn an unexpected exception into a generic 500 without internal details."""
     ref = log_error("Request failed", exc)
-    return AppError(public_error(ref), details={"ref": ref})
+    return AppError(public_error(ref, exc), details={"ref": ref})
 
 
 def _stream_error(exc: Exception) -> str:
     """Generic error text for a stream; the details only go to the server log."""
-    return public_error(log_error("Stream failed", exc))
+    return public_error(log_error("Stream failed", exc), exc)
 
 
 def _sse(thread_id: str, make_chunks, done_event: dict):

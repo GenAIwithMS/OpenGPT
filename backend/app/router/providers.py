@@ -60,6 +60,14 @@ def models():
     }
 
 
+@providers_router.get("/local", dependencies=[Depends(rate_limit)])
+def find_local():
+    """Local model servers and downloaded models: {servers, disk_checked}. See app/services/local_models.py."""
+    from app.services import local_models
+
+    return local_models.find()
+
+
 @providers_router.post("", status_code=201, dependencies=[Depends(rate_limit)])
 def create(request: ProviderCreate):
     return providers.create(**request.model_dump())

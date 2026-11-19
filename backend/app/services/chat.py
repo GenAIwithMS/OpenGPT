@@ -147,7 +147,7 @@ class ChatService:
                     error_msg = str(deep_error)
                     logger.warning(f"Error using deep research tool: {error_msg}")
                     return {
-                        "response": f"⚠️ **Deep Research Failed**\n\n{public_error(log_error('Deep research failed', deep_error))}",
+                        "response": f"⚠️ **Deep Research Failed**\n\n{public_error(log_error('Deep research failed', deep_error), deep_error)}",
                         "thread_id": thread_id,
                         "tool_used": "deep_research"
                     }
@@ -597,7 +597,7 @@ class ChatService:
             failed = True
             error_msg = str(deep_error)
             logger.warning(f"Error streaming deep research: {error_msg}")
-            message = public_error(log_error("Deep research stream failed", deep_error))
+            message = public_error(log_error("Deep research stream failed", deep_error), deep_error)
             event = {"id": len(activity), "kind": "error", "text": message}
             activity.append(event)
             yield {"message_type": "research", "event": event}
