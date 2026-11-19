@@ -147,7 +147,7 @@ cd coding-agent && bun install
 
 ### 3. Start
 
-**Start scripts:** `./start.sh` (Linux/macOS) or `start.bat` (Windows). They start the backend on port 8000 and the frontend on port 3000, using `.venv` if present. When Bun is installed they also install the coding agent's dependencies on the first run; the backend then starts the coding agent itself.
+**Start scripts:** `./start.sh` (Linux/macOS) or `start.bat` (Windows). They start the backend on port 8000 (or `PORT` from `backend/.env`) and the frontend on port 3000, using `.venv` if present. If a port is already in use they pick the next free one and print the addresses to open. When Bun is installed they also install the coding agent's dependencies on the first run; the backend then starts the coding agent itself.
 
 **Or manually:**
 ```bash
@@ -261,7 +261,7 @@ The backend logs a reminder at startup if old data is still present.
 - **Tools never used / tool errors**: choose a model that supports tool calling (for llama.cpp, start `llama-server` with `--jinja`).
 - **Local model not found or not answering**: open **Settings > Developer > Find local models**. It says whether the server is running and which models are downloaded. Long chats cut off with Ollama: raise `OLLAMA_CONTEXT_LENGTH`.
 - **"Too many requests"**: raise `RATE_LIMIT_PER_MINUTE` (or set it to 0) for local use.
-- **Frontend can't reach the backend**: make sure the backend is running on port 8000. If you set `API_TOKEN`, set the same value as `VITE_API_TOKEN` in `frontend/.env.local`.
+- **Frontend can't reach the backend**: make sure the backend is running on port 8000 (the start scripts handle other ports themselves; when starting by hand on another port, set `OPENGPT_BACKEND_PORT` for `npm run dev`). If you set `API_TOKEN`, set the same value as `VITE_API_TOKEN` in `frontend/.env.local`.
 - **First document upload is slow**: the embedding model loads on first use (a few seconds, once).
 - **Code page says the coding agent is unavailable**: the notice gives the reason. Usually Bun isn't installed (install it, or set `BUN_PATH`), `bun install` wasn't run in `coding-agent/`, or the API is exposed without `CODING_AGENT_ENABLED=true`. Details are in `backend/app/storage/coding-agent/agent.log`.
 - **Coding tasks fail with "larger than the model allows" or a rate limit**: the agent's requests are bigger than chat's. Use a model or plan with higher limits via `CODING_AGENT_MODEL`.

@@ -50,9 +50,9 @@ The database and tables are created at startup.
 | Variable | Default | Meaning |
 |---|---|---|
 | `HOST` | `127.0.0.1` | `0.0.0.0` exposes the API on your network (then `API_TOKEN` is required) |
-| `PORT` | `8000` | |
+| `PORT` | `8000` | The start scripts use the next free port when this one is taken |
 | `RELOAD` | `false` | Reload on code changes (development) |
-| `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated origins allowed to call the API |
+| `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated origins allowed to call the API. When unset, the start scripts use the frontend's actual port |
 | `API_TOKEN` | | When set, every `/api` request needs `Authorization: Bearer <token>`; set the same value as `VITE_API_TOKEN` in `frontend/.env.local` |
 | `ENABLE_DOCS` | on locally | Interactive API docs at `/docs` |
 | `LOG_LEVEL` | `INFO` | `DEBUG` also logs queries and thread ids |
@@ -117,3 +117,11 @@ The database and tables are created at startup.
 |---|---|
 | `VITE_API_URL` | Backend URL when it isn't proxied at `/api` |
 | `VITE_API_TOKEN` | Same value as the backend's `API_TOKEN` |
+
+The dev server's ports come from the environment of `npm run dev` (the start
+scripts set them to free ports):
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `OPENGPT_FRONTEND_PORT` | `3000` | Port of the dev server |
+| `OPENGPT_BACKEND_PORT` | `8000` | Backend port the dev server forwards `/api` to |

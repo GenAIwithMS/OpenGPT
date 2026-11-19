@@ -14,7 +14,7 @@ Follow the [Quick Start](README.md#quick-start) in the README: Python 3.11+,
 Node.js 18+, MySQL, and optionally Bun for the Code page. Then:
 
 ```bash
-./start.sh          # backend on :8000, frontend on :3000 (start.bat on Windows)
+./start.sh          # backend on :8000, frontend on :3000, or the next free ports (start.bat on Windows)
 ```
 
 Set `RELOAD=true` in `backend/.env` to reload the backend when you edit it.
