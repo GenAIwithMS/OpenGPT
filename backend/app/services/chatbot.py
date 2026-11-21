@@ -316,8 +316,10 @@ def end_temp_session(thread_id: str) -> None:
     with _temp_sessions_lock:
         _forget_temp_session(thread_id)
 
-# Database session factory
-Session = DatabaseConfig.get_session_factory()
+# Database session, looked up on each call so a database set later (tests use
+# SQLite) is used instead of the one configured when this module was imported.
+def Session():
+    return DatabaseConfig.get_session_factory()()
 
 
 # Thread management functions
