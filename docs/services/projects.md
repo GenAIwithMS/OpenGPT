@@ -6,7 +6,7 @@ assistants. Not to be confused with coding projects on the Code page
 
 ## Files
 
-`app/services/projects.py`, the `projects` table and
+`app/services/projects.py`, the `projects` table (with `pinned`) and
 `thread_metadata.project_id` (`app/database/models.py`), `/api/projects`
 (`app/router/projects.py`), `frontend/src/components/projects/ProjectView.jsx`,
 the Projects section (projects, their chats and menu) and "Move to project" in `Sidebar.jsx`,

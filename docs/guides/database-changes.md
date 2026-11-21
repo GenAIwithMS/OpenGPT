@@ -29,8 +29,9 @@ an upgrade step:
 2. In `init_db.py`, add a function that checks the current schema (e.g. with
    SQLAlchemy's `inspect`) and applies the change only when it is missing,
    like `_upgrade_blob_columns()`. Call it from `init_database()` after
-   `create_all()`. It must be safe to run on every start. A new nullable
-   column only needs an entry in `_ADDED_COLUMNS`.
+   `create_all()`. It must be safe to run on every start. A new column
+   that is nullable or has a default (like `thread_metadata.project_id` or
+   `pinned`) only needs an entry in `_ADDED_COLUMNS`.
 3. Test it on a copy of a real MySQL database, from the old schema, and keep
    the SQLite tests passing.
 

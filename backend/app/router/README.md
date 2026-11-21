@@ -7,7 +7,7 @@ returns JSON or a Server-Sent Events stream. Business logic lives in
 
 | File | Prefix | Covers | Service |
 |---|---|---|---|
-| `chat.py` | `/api` | Chat streaming, edit, regenerate, temporary chats, connector approvals, threads, document upload and questions | `services/chat.py`, `rag.py`, `chat_approvals.py` |
+| `chat.py` | `/api` | Chat streaming, edit, regenerate, temporary chats, connector approvals, threads (rename, pin), document upload and questions | `services/chat.py`, `rag.py`, `chat_approvals.py` |
 | `code.py` | `/api/code` | Coding agent status, projects, folder browser, sessions, streaming turns, approvals | `services/coding_agent/` |
 | `connectors.py` | `/api/connectors` | Connector catalog, add / import / update / remove, sign-in (OAuth, device code), token refresh loop | `services/connectors.py`, `connector_oauth.py`, `mcp_tools.py` |
 | `skills.py` | `/api/skills` | Skills list, on/off, create, edit, upload, GitHub import, Explore catalog | `services/skills.py` |
