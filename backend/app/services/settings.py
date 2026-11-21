@@ -7,6 +7,7 @@ table only ever holds known, size-limited values.
 Sections:
     profile   nickname, occupation, about, instructions (Personalization)
     general   temporary_by_default, notify_on_finish, sound_on_finish
+    memory    enabled (saved memories), chat_history (search past chats)
 """
 import json
 import logging
@@ -39,9 +40,15 @@ class GeneralSettings(_Section):
     sound_on_finish: bool = False
 
 
+class MemorySettings(_Section):
+    enabled: bool = True
+    chat_history: bool = True
+
+
 SECTIONS: dict[str, type[_Section]] = {
     "profile": ProfileSettings,
     "general": GeneralSettings,
+    "memory": MemorySettings,
 }
 
 

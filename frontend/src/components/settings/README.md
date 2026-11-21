@@ -8,7 +8,7 @@ SettingsModal ── navigation (SECTIONS, searchable) + the chosen page
 ├─ AccountPage          profile summary
 ├─ GeneralPage          temporary by default, notification, sound
 ├─ ShortcutsPage        lib/shortcuts.js, grouped
-├─ PersonalizationPage  Profile tab, Knowledge tab (documents)
+├─ PersonalizationPage  Profile tab, Memory tab (MemoryTab), Knowledge tab (documents)
 ├─ ConnectorsPage       added connectors, Browse catalog, Create, sign-in
 ├─ SkillsPage           skills by source, detail, Explore, Add
 └─ DeveloperPage        models in use, providers
@@ -30,6 +30,7 @@ Every page uses these instead of its own styles: `PageHeader`, `Section`,
 |---|---|---|
 | General, Personalization profile | `/api/settings` through `useSettings` (saved at once, rolled back if refused) | `settingsService` |
 | Knowledge | `/api/settings/knowledge` | `settingsService` |
+| Memory | `/api/settings/memories`, switches in `/api/settings` (`memory`) | `settingsService` |
 | Connectors | `/api/connectors` | `connectorsService` |
 | Skills | `/api/skills` | `skillsService` |
 | Developer | `/api/providers`, `/api/providers/local` | `providersService` |

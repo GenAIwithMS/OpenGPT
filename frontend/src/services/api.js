@@ -234,6 +234,13 @@ export const settingsService = {
     return (await api.post('/settings/knowledge', form, { headers: { 'Content-Type': 'multipart/form-data' } })).data;
   },
   removeKnowledge: async (id) => { await api.delete(`/settings/knowledge/${enc(id)}`); },
+
+  // Saved memories: {memories: [{id, text, thread_id, created_at}], max, max_chars}
+  listMemories: async () => (await api.get('/settings/memories')).data,
+  addMemory: async (text) => (await api.post('/settings/memories', { text })).data,
+  updateMemory: async (id, text) => (await api.put(`/settings/memories/${enc(id)}`, { text })).data,
+  removeMemory: async (id) => { await api.delete(`/settings/memories/${enc(id)}`); },
+  clearMemories: async () => { await api.delete('/settings/memories'); },
 };
 
 // Connectors (MCP servers). See backend/app/router/connectors.py.

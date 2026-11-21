@@ -13,7 +13,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.memory import MemorySaver
 from app.tools import Search, Weather, Calculator, Stock_price
 from app.services.rag import retrieve_from_document
-from app.services import knowledge, mcp_tools, skills
+from app.services import knowledge, mcp_tools, memory, skills
 from app.services.knowledge import Knowledge
 from app.services.personalization import profile_text
 from app.services.citations import renumber_sources
@@ -32,7 +32,8 @@ model = LazyChatModel("model")
 # starts when the user picks it from the tools menu (see ChatService).
 all_tools = [Search, Weather, Calculator, Stock_price]
 # The Knowledge tool is offered only while the knowledge base has documents.
-graph_tools = all_tools + [Knowledge, skills.Skill]
+graph_tools = all_tools + [Knowledge, skills.Skill, memory.Remember, memory.Update_memory,
+                           memory.Forget, memory.Chat_history]
 
 # Without this, some models invent tools such as "Open_URL" after a search
 # returns links, which the API then rejects.
@@ -194,8 +195,18 @@ def chat_node(state: Chatstate, config=None):
     if profile:
         system_text += "\n\n" + profile
 
-    # Settings > Personalization > Knowledge: documents searchable from any chat.
+    # Settings > Personalization > Memory: saved memories and past chats
+    # (never in temporary chats).
     tools = list(all_tools)
+    memory_text = memory.prompt_text(thread_id)
+    if memory_text:
+        system_text += "\n\n" + memory_text
+        if memory.saved_memories_on():
+            tools += [memory.Remember, memory.Update_memory, memory.Forget]
+        if memory.chat_history_on():
+            tools.append(memory.Chat_history)
+
+    # Settings > Personalization > Knowledge: documents searchable from any chat.
     if knowledge.has_documents():
         tools.append(Knowledge)
         names = ", ".join(knowledge.titles())

@@ -14,8 +14,10 @@ cb = importlib.import_module("app.services.chatbot")
 class _Recorder:
     def __init__(self):
         self.seen = None
+        self.tools = []
 
     def bind_tools(self, tools):
+        self.tools = [getattr(t, "name", None) for t in tools]
         return self
 
     def stream(self, messages):
@@ -52,6 +54,25 @@ class ChatNodeTests(unittest.TestCase):
         self.assertEqual(len(systems), 1)
         self.assertIs(self.model.seen[0], systems[0])
         self.assertIn("web search", systems[0].content)
+
+    def test_memory_in_normal_chats_only(self):
+        from app.services import memory, settings
+        _helpers.use_sqlite()
+        memory.add("Prefers Python")
+        state = {"messages": [HumanMessage("hi")], "has_document": False, "tools": []}
+
+        cb.chat_node({**state, "thread_id": "11111111-1111-4111-8111-111111111111"})
+        self.assertIn("Prefers Python", self.model.seen[0].content)
+        self.assertTrue({"Remember", "Update_memory", "Forget", "Chat_history"} <= set(self.model.tools))
+
+        cb.chat_node({**state, "thread_id": "temp-abc"})
+        self.assertNotIn("Prefers Python", self.model.seen[0].content)
+        self.assertFalse({"Remember", "Chat_history"} & set(self.model.tools))
+
+        settings.update({"memory": {"enabled": False, "chat_history": False}})
+        cb.chat_node({**state, "thread_id": "11111111-1111-4111-8111-111111111111"})
+        self.assertNotIn("Prefers Python", self.model.seen[0].content)
+        self.assertFalse({"Remember", "Chat_history"} & set(self.model.tools))
 
     def test_document_context_goes_in_the_question(self):
         calls = []

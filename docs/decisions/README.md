@@ -13,6 +13,7 @@ replaces the old one rather than rewriting history.
 | [0005](0005-agent-start-thread.md) | Child processes start from one long-lived thread | 2026-11-16 |
 | [0006](0006-auto-model-per-message.md) | Auto picks a model per message without an extra model call | 2026-11-17 |
 | [0007](0007-find-local-models.md) | Find local models by port and by the apps' own folders | 2026-11-19 |
+| [0008](0008-memory.md) | Memory: saved facts plus searching past chats; files stay per chat | 2026-11-21 |
 
 ## Template
 
