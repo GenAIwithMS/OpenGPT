@@ -178,6 +178,7 @@ export const chatService = {
   },
 
   // Move a chat into a project, or out of one (projectId null)
+  pinThread: async (threadId, pinned) => (await api.put(`/threads/${enc(threadId)}/pin`, { pinned })).data,
   moveThread: async (threadId, projectId) => {
     const response = await api.put(`/threads/${enc(threadId)}/project`, { project_id: projectId });
     return response.data;

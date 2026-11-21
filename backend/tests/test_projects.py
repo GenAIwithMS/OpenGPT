@@ -103,6 +103,19 @@ class ProjectServiceTests(unittest.TestCase):
         with self.assertRaises(NotFoundError):
             projects.set_thread_project("22222222-2222-4222-8222-222222222222", p["id"])
 
+    def test_pinned_chats_first(self):
+        old = ChatService.create_new_thread()
+        new = ChatService.create_new_thread()
+        with mock.patch("app.services.chat.retrieve_all_threads", return_value=[old, new]):
+            ChatService.set_thread_pinned(old, True)
+            listed = ChatService.get_all_threads()
+            self.assertEqual(listed[0]["thread_id"], old)
+            self.assertTrue(listed[0]["pinned"])
+            ChatService.set_thread_pinned(old, False)
+            self.assertFalse(next(t for t in ChatService.get_all_threads() if t["thread_id"] == old)["pinned"])
+        with self.assertRaises(NotFoundError):
+            ChatService.set_thread_pinned("33333333-3333-4333-8333-333333333333", True)
+
     def test_delete_removes_chats_and_files(self):
         p = projects.create("Old")
         chat = ChatService.create_new_thread(p["id"])
@@ -212,6 +225,8 @@ class ProjectRouteTests(unittest.TestCase):
             self.assertEqual(c.get("/api/threads").json()["threads"][0]["project_id"], pid)
 
         tid = new["thread_id"]
+        self.assertEqual(c.put(f"/api/threads/{tid}/pin", json={"pinned": True}).json(), {"thread_id": tid, "pinned": True})
+        self.assertEqual(c.put("/api/threads/33333333-3333-4333-8333-333333333333/pin", json={"pinned": True}).status_code, 404)
         self.assertIsNone(c.put(f"/api/threads/{tid}/project", json={"project_id": None}).json()["project_id"])
         self.assertEqual(c.put(f"/api/threads/{tid}/project", json={"project_id": pid}).status_code, 200)
         self.assertEqual(c.put("/api/threads/not-a-uuid/project", json={"project_id": pid}).status_code, 422)

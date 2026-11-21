@@ -70,8 +70,19 @@ the model can act on instead of failing the reply.
 `/chat/regenerate`, `/chat/temp/{id}/end`, `/chat/approvals/{id}`;
 `GET /api/threads`, `GET /api/threads/{id}`, `POST /api/threads/new`
 (optional `{"project_id": ...}`), `PUT /api/threads/{id}/title`,
-`PUT /api/threads/{id}/project`, `DELETE /api/threads/{id}`. Full list at
-`/docs` on a running backend.
+`PUT /api/threads/{id}/project`, `PUT /api/threads/{id}/pin`
+(`{"pinned": true}`), `DELETE /api/threads/{id}`. Full list at `/docs` on a
+running backend.
+
+## The chat menu
+
+Each chat in the sidebar has a menu: **Share** (copies the chat's link; it
+opens for anyone who can already reach this OpenGPT), **Rename**, **Pin
+chat** (pinned chats are listed first, with a pin icon; pinning doesn't change
+a chat's last-used time), **Move to project** (hover to see the projects and
+**New project**; see [projects](projects.md)), **Remove from project** (for a
+chat in one) and **Delete**. `GET /api/threads` returns `pinned` and lists
+pinned chats first.
 
 ## Pitfalls
 

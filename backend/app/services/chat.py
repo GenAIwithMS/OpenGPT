@@ -19,6 +19,7 @@ from app.services import chat_approvals, model_router, projects
 from app.services.memory import HISTORY_TOOL, MEMORY_TOOLS, memory_changed
 from app.services.citations import extract_sources, link_citations, renumber_sources
 from app.error_handlers import log_error, public_error
+from app.exceptions import NotFoundError
 from app.llm import split_content
 
 logger = logging.getLogger(__name__)
@@ -86,10 +87,12 @@ class ChatService:
                 "title": title,
                 "updated_at": updated_at,
                 "project_id": thread_meta.get("project_id") if isinstance(thread_meta, dict) else None,
+                "pinned": bool(thread_meta.get("pinned")) if isinstance(thread_meta, dict) else False,
             })
         
-        # Sort by updated_at descending (most recent first)
+        # Pinned chats first, then most recent first (the second sort is stable).
         threads.sort(key=lambda x: x.get("updated_at") or datetime.min, reverse=True)
+        threads.sort(key=lambda x: not x["pinned"])
         
         return threads
     
@@ -793,6 +796,19 @@ class ChatService:
             logger.warning(f"Error updating title: {e}")
             return False
     
+    @staticmethod
+    def set_thread_pinned(thread_id: str, pinned: bool) -> None:
+        """Pin a chat to the top of the list, or unpin it. Doesn't count as
+        using the chat (updated_at stays)."""
+        from app.database import DatabaseConfig, ThreadMetadata
+        with DatabaseConfig.get_session_factory()() as db:
+            changed = (db.query(ThreadMetadata).filter_by(thread_id=thread_id)
+                       .update({ThreadMetadata.pinned: bool(pinned), ThreadMetadata.updated_at: ThreadMetadata.updated_at},
+                               synchronize_session=False))
+            if not changed:
+                raise NotFoundError("Thread not found")
+            db.commit()
+
     @staticmethod
     def delete_thread(thread_id: str) -> bool:
         """Delete a thread and all its associated data"""

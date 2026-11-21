@@ -401,6 +401,7 @@ def get_all_thread_metadata():
             thread.thread_id: {
                 "title": thread.title,
                 "project_id": thread.project_id,
+                "pinned": bool(thread.pinned),
                 "updated_at": thread.updated_at,
                 "created_at": thread.created_at
             }

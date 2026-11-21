@@ -247,6 +247,15 @@ function App() {
     navigate(`/project/${encodeURIComponent(id)}`, action ? { state: { projectAction: action } } : undefined);
   };
 
+  const handlePinThread = async (threadId, pinned) => {
+    try {
+      await chatService.pinThread(threadId, pinned);
+      await fetchThreads();
+    } catch (e) {
+      setAppError(e.message || 'Could not pin the chat.');
+    }
+  };
+
   const handlePinProject = async (id, pinned) => {
     try {
       await projectService.pin(id, pinned);
@@ -666,6 +675,7 @@ function App() {
         onRenameProject={handleRenameProject}
         onDeleteProject={setProjectToDelete}
         onPinProject={handlePinProject}
+        onPinThread={isCodeView ? null : handlePinThread}
         onMoveThread={isCodeView ? null : handleMoveThread}
       />
 

@@ -21,6 +21,8 @@ class ThreadMetadata(Base):
     title = Column(String(255), nullable=False, default="New Chat")
     # The project this chat belongs to (app/services/projects.py), if any.
     project_id = Column(String(36), nullable=True)
+    # Pinned chats are listed first.
+    pinned = Column(Boolean, nullable=False, default=False, server_default="0")
     created_at = Column(TIMESTAMP, default=func.current_timestamp())
     updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp())
     

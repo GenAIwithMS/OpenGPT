@@ -21,6 +21,7 @@ import {
   Pin,
   PinOff,
   Share,
+  ChevronRight,
 } from 'lucide-react';
 import UserMenu from './settings/UserMenu';
 import Logo, { LogoMark } from './Logo';
@@ -79,6 +80,8 @@ const SquarePenIcon = (props) => (
  * @param {(id: string, name: string) => void} [props.onRenameProject]
  * @param {(project: object) => void} [props.onDeleteProject]  Ask to delete a project.
  * @param {(id: string, pinned: boolean) => void} [props.onPinProject]
+ * @param {(threadId: string, pinned: boolean) => void} [props.onPinThread]
+ *   Pin or unpin a chat. Without it the chat menu has no Pin.
  * @param {(threadId: string, projectId: string|null) => void} [props.onMoveThread]
  *   Move a chat into a project, or out of one. Without it the menu has no "Move to project".
  */
@@ -110,6 +113,7 @@ const Sidebar = ({
   onRenameProject = () => {},
   onDeleteProject = () => {},
   onPinProject = () => {},
+  onPinThread = null,
   onMoveThread = null,
 }) => {
   const [editingThreadId, setEditingThreadId] = useState(null);
@@ -126,8 +130,8 @@ const Sidebar = ({
   // Where the open project menu sits. It floats so the scrolling list can't clip it.
   const [projectMenuPos, setProjectMenuPos] = useState(null);
   const [threadMenuStyle, setThreadMenuStyle] = useState(null);
-  // The project whose link was just copied ("Share project").
-  const [copiedProjectId, setCopiedProjectId] = useState(null);
+  // The project or chat whose link was just copied (Share).
+  const [copiedId, setCopiedId] = useState(null);
 
   // The open project (or the open chat's project) shows its chats.
   useEffect(() => {
@@ -202,10 +206,10 @@ const Sidebar = ({
     action();
   };
 
-  // Share project: copy the project's address. It opens for anyone who can
+  // Share: copy a project's or chat's address. It opens for anyone who can
   // already reach this OpenGPT (other devices, people on the same server).
-  const shareProject = async (id) => {
-    const link = `${window.location.origin}/project/${encodeURIComponent(id)}`;
+  const copyLink = async (id, path) => {
+    const link = `${window.location.origin}${path}`;
     try {
       await navigator.clipboard.writeText(link);
     } catch {
@@ -217,8 +221,8 @@ const Sidebar = ({
       document.execCommand('copy');
       field.remove();
     }
-    setCopiedProjectId(id);
-    setTimeout(() => setCopiedProjectId((current) => (current === id ? null : current)), 2000);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId((current) => (current === id ? null : current)), 2000);
   };
 
   const saveProjectName = (project) => {
@@ -299,6 +303,13 @@ const Sidebar = ({
                           <span className="text-sm text-gray-100 truncate flex-1 min-w-0">
                             {thread.title || 'New Chat'}
                           </span>
+                          {copiedId === thread.thread_id && (
+                            <span role="status" className="shrink-0 text-xs text-gray-400">Link copied</span>
+                          )}
+                          {thread.pinned && copiedId !== thread.thread_id && (
+                            <Pin size={12} aria-label="Pinned"
+                              className={`absolute right-4 text-gray-500 group-hover:hidden ${openMenuId === thread.thread_id ? 'hidden' : ''}`} />
+                          )}
                           <button
                             onClick={(e) => toggleMenu(e, thread.thread_id)}
                             aria-label="Chat options"
@@ -312,87 +323,87 @@ const Sidebar = ({
                             <MoreVertical size={15} />
                           </button>
 
-                          {openMenuId === thread.thread_id && movingThreadId === thread.thread_id && (
+                          {openMenuId === thread.thread_id && (
                             <div
                               style={threadMenuStyle}
-                              className="fixed w-52 max-h-64 overflow-y-auto overflow-x-hidden thin-scroll bg-gray-800 rounded-xl shadow-xl shadow-black/40 z-50 py-1 border border-gray-700/70 animate-menu-in origin-top-right"
+                              className="fixed w-52 bg-gray-800 rounded-xl shadow-xl shadow-black/40 z-50 p-1 border border-gray-700/70 animate-menu-in origin-top-right"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              <p className="px-3 py-1.5 text-xs text-gray-500">Move to project</p>
-                              {(projects || []).filter((p) => p.id !== thread.project_id).map((p) => (
-                                <button
-                                  key={p.id}
-                                  onClick={() => moveThread(thread.thread_id, p.id)}
-                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg mx-1"
-                                >
-                                  <Folder size={14} className="shrink-0" />
-                                  <span className="truncate">{p.name}</span>
+                              {onMoveThread && (
+                                <button onClick={() => { setOpenMenuId(null); copyLink(thread.thread_id, `/chat/${encodeURIComponent(thread.thread_id)}`); }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg">
+                                  <Share size={14} />
+                                  <span>Share</span>
                                 </button>
-                              ))}
-                              {(projects || []).some((p) => p.id !== thread.project_id) && (
-                                <div className="my-1 border-t border-gray-700/70" />
                               )}
-                              <button
-                                onClick={() => {
-                                  setOpenMenuId(null);
-                                  setMovingThreadId(null);
-                                  onNewProject(thread.thread_id);
-                                }}
-                                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg mx-1"
-                              >
-                                <FolderPlus size={14} className="shrink-0" />
-                                <span>New project</span>
-                              </button>
-                            </div>
-                          )}
-
-                          {openMenuId === thread.thread_id && movingThreadId !== thread.thread_id && (
-                            <div
-                              style={threadMenuStyle}
-                              className="fixed w-52 bg-gray-800 rounded-xl shadow-xl shadow-black/40 z-50 py-1 border border-gray-700/70 animate-menu-in origin-top-right"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRename(thread.thread_id, thread.title);
-                                }}
-                                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg mx-1"
-                              >
+                              <button onClick={() => handleRename(thread.thread_id, thread.title)}
+                                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg">
                                 <Edit2 size={14} />
                                 <span>Rename</span>
                               </button>
-                              {onMoveThread && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setMovingThreadId(thread.thread_id);
-                                  }}
-                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg mx-1"
-                                >
-                                  <FolderInput size={14} />
-                                  <span>Move to project</span>
+                              {onPinThread && (
+                                <button onClick={() => { setOpenMenuId(null); onPinThread(thread.thread_id, !thread.pinned); }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg">
+                                  {thread.pinned ? <PinOff size={14} /> : <Pin size={14} />}
+                                  <span>{thread.pinned ? 'Unpin chat' : 'Pin chat'}</span>
                                 </button>
                               )}
-                              {onMoveThread && thread.project_id && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    moveThread(thread.thread_id, null);
-                                  }}
-                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg mx-1"
+                              {onMoveThread && (
+                                /* Hover (or click, on touch screens) opens the project list beside the menu. */
+                                <div
+                                  className="relative"
+                                  onMouseEnter={() => setMovingThreadId(thread.thread_id)}
+                                  onMouseLeave={() => setMovingThreadId(null)}
                                 >
+                                  <button
+                                    onClick={() => setMovingThreadId(movingThreadId === thread.thread_id ? null : thread.thread_id)}
+                                    aria-haspopup="menu"
+                                    aria-expanded={movingThreadId === thread.thread_id}
+                                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg ${movingThreadId === thread.thread_id ? 'bg-gray-700' : ''}`}
+                                  >
+                                    <FolderInput size={14} />
+                                    <span className="flex-1 text-left">Move to project</span>
+                                    <ChevronRight size={14} className="text-gray-400" />
+                                  </button>
+                                  {movingThreadId === thread.thread_id && (
+                                    /* pl-2 bridges the gap so the pointer can cross into the submenu */
+                                    <div className="absolute left-full -top-1 pl-2 z-50">
+                                      <div className="w-52 max-h-64 overflow-y-auto overflow-x-hidden thin-scroll bg-gray-800 rounded-xl shadow-xl shadow-black/40 p-1 border border-gray-700/70 animate-menu-in origin-top-left">
+                                        {(projects || []).filter((p) => p.id !== thread.project_id).map((p) => (
+                                          <button key={p.id} onClick={() => moveThread(thread.thread_id, p.id)}
+                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg">
+                                            <Folder size={14} className="shrink-0" />
+                                            <span className="truncate">{p.name}</span>
+                                          </button>
+                                        ))}
+                                        {(projects || []).some((p) => p.id !== thread.project_id) && (
+                                          <div className="my-1 border-t border-gray-700/70" />
+                                        )}
+                                        <button
+                                          onClick={() => {
+                                            setOpenMenuId(null);
+                                            setMovingThreadId(null);
+                                            onNewProject(thread.thread_id);
+                                          }}
+                                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg"
+                                        >
+                                          <FolderPlus size={14} className="shrink-0" />
+                                          <span>New project</span>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              {onMoveThread && thread.project_id && (
+                                <button onClick={() => moveThread(thread.thread_id, null)}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg">
                                   <FolderMinus size={14} />
                                   <span>Remove from project</span>
                                 </button>
                               )}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDelete(thread.thread_id);
-                                }}
-                                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-400 hover:bg-gray-700 rounded-lg mx-1"
-                              >
+                              <button onClick={() => handleDelete(thread.thread_id)}
+                                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-400 hover:bg-gray-700 rounded-lg">
                                 <Trash2 size={14} />
                                 <span>Delete</span>
                               </button>
@@ -649,10 +660,10 @@ const Sidebar = ({
                               ) : (
                                 <>
                                   <span className="truncate flex-1 min-w-0 text-sm text-gray-100">{project.name}</span>
-                                  {copiedProjectId === project.id && (
+                                  {copiedId === project.id && (
                                     <span role="status" className="shrink-0 text-xs text-gray-400">Link copied</span>
                                   )}
-                                  {project.pinned && copiedProjectId !== project.id && (
+                                  {project.pinned && copiedId !== project.id && (
                                     <Pin size={12} aria-label="Pinned"
                                       className={`absolute right-4 text-gray-500 group-hover:hidden ${isCurrent || openMenuId === menuId ? 'hidden' : ''}`} />
                                   )}
@@ -712,7 +723,7 @@ const Sidebar = ({
                                     <span>{project.pinned ? 'Unpin project' : 'Pin project'}</span>
                                   </button>
                                   <button
-                                    onClick={() => projectAction(() => shareProject(project.id))}
+                                    onClick={() => projectAction(() => copyLink(project.id, `/project/${encodeURIComponent(project.id)}`))}
                                     className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg mx-1"
                                   >
                                     <Share size={14} />

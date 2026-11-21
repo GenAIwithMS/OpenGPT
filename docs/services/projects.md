@@ -57,7 +57,8 @@ connectors work in project chats the same as anywhere else.
 - A chat in a project shows the project's name above it; clicking it opens the
   project.
 - Any chat's sidebar menu, in Recents or under a project, has **Move to
-  project**, which lists the other projects and **New project** (creates a
+  project**. Hovering it (or tapping it on a touch screen) opens a submenu
+  beside the menu with the other projects and **New project** (creates a
   project and moves the chat into it, without leaving the current page). A
   chat in a project also has **Remove from project**, which puts it back in
   Recents. Moving a chat doesn't move its own files: they stay with the chat.

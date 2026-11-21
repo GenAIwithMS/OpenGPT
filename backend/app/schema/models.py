@@ -67,6 +67,7 @@ class ThreadResponse(BaseModel):
     thread_id: str = Field(..., description="Unique thread identifier")
     title: str = Field(..., description="Thread title")
     project_id: Optional[str] = Field(None, description="The project the chat is in, if any")
+    pinned: bool = Field(False, description="Pinned chats are listed first")
 
 
 class ThreadListResponse(BaseModel):
