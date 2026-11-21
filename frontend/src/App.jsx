@@ -195,6 +195,7 @@ function App() {
 
   // Projects: chats grouped with shared instructions and files.
   const { projects, fetchProjects, createProject } = useProjects();
+  // The New project dialog: false, or {moveThreadId} (a chat to move into the new project, or null).
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState(null);
   const [projectSettingsId, setProjectSettingsId] = useState(null);
@@ -265,9 +266,13 @@ function App() {
     }
   };
 
+  // From "Move to project > New project" the chat moves into the new project
+  // and stays open; otherwise the new project's page opens.
   const handleCreateProject = async (name) => {
+    const moveThreadId = newProjectOpen?.moveThreadId;
     const project = await createProject(name);
-    handleOpenProject(project.id);
+    if (moveThreadId) await handleMoveThread(moveThreadId, project.id);
+    else handleOpenProject(project.id);
   };
 
   const handleMoveThread = async (threadId, projectId) => {
@@ -654,7 +659,7 @@ function App() {
         projects={isCodeView ? null : projects}
         currentProjectId={currentProjectId}
         onOpenProject={handleOpenProject}
-        onNewProject={() => { setIsSidebarOpen(false); setNewProjectOpen(true); }}
+        onNewProject={(moveThreadId = null) => { setIsSidebarOpen(false); setNewProjectOpen({ moveThreadId }); }}
         projectThreads={threads.filter((t) => t.project_id)}
         onNewProjectChat={(id) => handleOpenProject(id, 'newChat')}
         onProjectSettings={(id) => { setIsSidebarOpen(false); setProjectSettingsId(id); }}

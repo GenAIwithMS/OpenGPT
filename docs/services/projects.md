@@ -56,9 +56,11 @@ connectors work in project chats the same as anywhere else.
   menu renames the project, edits the instructions or deletes the project.
 - A chat in a project shows the project's name above it; clicking it opens the
   project.
-- Any chat's sidebar menu has **Move to project** (and **Remove from project**
-  for a chat in one). Moving a chat doesn't move its own files: they stay with
-  the chat.
+- Any chat's sidebar menu, in Recents or under a project, has **Move to
+  project**, which lists the other projects and **New project** (creates a
+  project and moves the chat into it, without leaving the current page). A
+  chat in a project also has **Remove from project**, which puts it back in
+  Recents. Moving a chat doesn't move its own files: they stay with the chat.
 - Deleting a project deletes its chats, instructions and files, after a
   confirmation that says how many chats go with it.
 - Temporary chats can't be in a project.

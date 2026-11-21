@@ -15,6 +15,7 @@ import {
   FolderOpen,
   FolderInput,
   FolderMinus,
+  FolderPlus,
   MoreHorizontal,
   Settings2,
   Pin,
@@ -69,7 +70,8 @@ const SquarePenIcon = (props) => (
  * @param {{id: string, name: string}[]} [props.projects]  Projects (not shown on the Code page).
  * @param {string|null} [props.currentProjectId]  The open project, or the open chat's project.
  * @param {(id: string) => void} [props.onOpenProject]
- * @param {() => void} [props.onNewProject]
+ * @param {(moveThreadId?: string) => void} [props.onNewProject]
+ *   Create a project; with a chat id, the chat is moved into the new project.
  * @param {{thread_id: string, title?: string, project_id: string}[]} [props.projectThreads]
  *   Chats that are in a project, listed under their project when it is expanded.
  * @param {(id: string) => void} [props.onNewProjectChat]  Start a new chat in a project.
@@ -327,25 +329,27 @@ const Sidebar = ({
                                   <span className="truncate">{p.name}</span>
                                 </button>
                               ))}
-                              {thread.project_id && (
-                                <button
-                                  onClick={() => moveThread(thread.thread_id, null)}
-                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg mx-1"
-                                >
-                                  <FolderMinus size={14} className="shrink-0" />
-                                  <span>Remove from project</span>
-                                </button>
+                              {(projects || []).some((p) => p.id !== thread.project_id) && (
+                                <div className="my-1 border-t border-gray-700/70" />
                               )}
-                              {!(projects || []).some((p) => p.id !== thread.project_id) && !thread.project_id && (
-                                <p className="px-3 py-2 text-sm text-gray-400">No projects yet. Create one under Projects.</p>
-                              )}
+                              <button
+                                onClick={() => {
+                                  setOpenMenuId(null);
+                                  setMovingThreadId(null);
+                                  onNewProject(thread.thread_id);
+                                }}
+                                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg mx-1"
+                              >
+                                <FolderPlus size={14} className="shrink-0" />
+                                <span>New project</span>
+                              </button>
                             </div>
                           )}
 
                           {openMenuId === thread.thread_id && movingThreadId !== thread.thread_id && (
                             <div
                               style={threadMenuStyle}
-                              className="fixed w-44 bg-gray-800 rounded-xl shadow-xl shadow-black/40 z-50 py-1 border border-gray-700/70 animate-menu-in origin-top-right"
+                              className="fixed w-52 bg-gray-800 rounded-xl shadow-xl shadow-black/40 z-50 py-1 border border-gray-700/70 animate-menu-in origin-top-right"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <button
@@ -368,6 +372,18 @@ const Sidebar = ({
                                 >
                                   <FolderInput size={14} />
                                   <span>Move to project</span>
+                                </button>
+                              )}
+                              {onMoveThread && thread.project_id && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    moveThread(thread.thread_id, null);
+                                  }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg mx-1"
+                                >
+                                  <FolderMinus size={14} />
+                                  <span>Remove from project</span>
                                 </button>
                               )}
                               <button
@@ -572,7 +588,7 @@ const Sidebar = ({
                     </button>
                     <button
                       type="button"
-                      onClick={onNewProject}
+                      onClick={() => onNewProject()}
                       title="New project"
                       aria-label="New project"
                       className="ml-auto p-1 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
