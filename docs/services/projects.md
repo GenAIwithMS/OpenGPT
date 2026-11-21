@@ -37,16 +37,19 @@ connectors work in project chats the same as anywhere else.
 - The sidebar lists projects above Recents; the **+** next to the Projects
   heading creates one. Chats in a project are listed under the project and on
   its page, not in Recents.
-- Clicking a project opens its page and lists its chats under it in the
-  sidebar (the folder icon shows as open). Clicking the open project again
-  hides its chats.
+- Clicking a project shows or hides its chats under it in the sidebar (the
+  folder icon shows as open); it doesn't leave the current page. Clicking a
+  chat opens it, and each chat has the same menu as in Recents (Rename, Move
+  to project or Remove from project, Delete). The open project's chats are
+  shown automatically.
 - Each project has a new chat button, which opens the project's page with the
   cursor in its message box, and a **...** menu: **Project settings** (a popup
   for the instructions and files, without leaving the current page; click or
   drop files on its Files box to add them), **Pin project** (pinned projects
   are listed first, with a pin icon), **Share project** (copies the project's
   link; it opens for anyone who can already reach this OpenGPT),
-  **Rename project** (in the sidebar), **Project home** and
+  **Rename project** (in the sidebar), **Project home** (opens the project's
+  page) and
   **Delete project**.
 - A project's page (`/project/<id>`) has a message box that starts a new chat
   in the project, the instructions and files, and the project's chats. Its
