@@ -171,9 +171,16 @@ export const chatService = {
     return response.data.threads;
   },
 
-  // Create a new thread
-  createThread: async () => {
-    const response = await api.post('/threads/new');
+  // Create a new thread, in a project when `projectId` is given
+  createThread: async (projectId = null) => {
+    const response = await api.post('/threads/new', projectId ? { project_id: projectId } : undefined);
+    return response.data;
+  },
+
+  // Move a chat into a project, or out of one (projectId null)
+  pinThread: async (threadId, pinned) => (await api.put(`/threads/${enc(threadId)}/pin`, { pinned })).data,
+  moveThread: async (threadId, projectId) => {
+    const response = await api.put(`/threads/${enc(threadId)}/project`, { project_id: projectId });
     return response.data;
   },
 
@@ -217,6 +224,26 @@ export const chatService = {
     });
     return response.data;
   },
+};
+
+// Projects: chats grouped with shared instructions and files.
+// See backend/app/services/projects.py.
+export const projectService = {
+  list: async () => (await api.get('/projects')).data.projects,
+  // {id, name, instructions, pinned, chats, threads, files, max_files, max_mb}
+  get: async (id) => (await api.get(`/projects/${enc(id)}`)).data,
+  create: async (name, instructions = '') => (await api.post('/projects', { name, instructions })).data,
+  update: async (id, changes) => (await api.put(`/projects/${enc(id)}`, changes)).data,
+  remove: async (id) => (await api.delete(`/projects/${enc(id)}`)).data,
+  pin: async (id, pinned) => (await api.put(`/projects/${enc(id)}/pin`, { pinned })).data,
+  addFile: async (id, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return (await api.post(`/projects/${enc(id)}/files`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })).data;
+  },
+  removeFile: async (id, fileId) => { await api.delete(`/projects/${enc(id)}/files/${enc(fileId)}`); },
 };
 
 // App settings (the Settings popup). See backend/app/services/settings.py.

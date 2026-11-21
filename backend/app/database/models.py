@@ -19,12 +19,17 @@ class ThreadMetadata(Base):
     
     thread_id = Column(String(191), primary_key=True)
     title = Column(String(255), nullable=False, default="New Chat")
+    # The project this chat belongs to (app/services/projects.py), if any.
+    project_id = Column(String(36), nullable=True)
+    # Pinned chats are listed first.
+    pinned = Column(Boolean, nullable=False, default=False, server_default="0")
     created_at = Column(TIMESTAMP, default=func.current_timestamp())
     updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp())
     
     __table_args__ = (
         Index("idx_created_at", "created_at"),
         Index("idx_updated_at", "updated_at"),
+        Index("idx_thread_project", "project_id"),
     )
 
 
@@ -116,3 +121,17 @@ class Memory(Base):
     updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp())
 
     __table_args__ = (Index("idx_memories_created", "created_at"),)
+
+
+class Project(Base):
+    """Chat projects: a name, instructions and files shared by the project's
+    chats (thread_metadata.project_id). See app/services/projects.py."""
+    __tablename__ = "projects"
+
+    id = Column(String(36), primary_key=True)
+    name = Column(String(100), nullable=False)
+    instructions = Column(Text, nullable=True)
+    # Pinned projects are listed first in the sidebar.
+    pinned = Column(Boolean, nullable=False, default=False, server_default="0")
+    created_at = Column(TIMESTAMP, default=func.current_timestamp())
+    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp())

@@ -54,8 +54,10 @@ the model can act on instead of failing the reply.
 
 - Saved chats are LangGraph checkpoints in MySQL
   (`app/database/mysql_checkpoint.py`); older checkpoints beyond
-  `MAX_CHECKPOINTS_PER_THREAD` are deleted. Titles and timestamps are in
-  `thread_metadata`.
+  `MAX_CHECKPOINTS_PER_THREAD` are deleted. Titles, timestamps and the
+  chat's project (`project_id`) are in `thread_metadata`.
+- A chat in a [project](projects.md) gets the project's instructions in its
+  system prompt and passages from the project's files with each question.
 - Temporary chats run on an in-memory checkpointer (`chatbot_memory`) and are
   never written to the database. They are forgotten when the browser ends
   them, after an hour idle, or on restart.
@@ -66,9 +68,21 @@ the model can act on instead of failing the reply.
 
 `POST /api/chat/stream`, `/chat/edit` (edit a message and regenerate),
 `/chat/regenerate`, `/chat/temp/{id}/end`, `/chat/approvals/{id}`;
-`GET /api/threads`, `GET /api/threads/{id}`, `POST /api/threads/new`,
-`PUT /api/threads/{id}/title`, `DELETE /api/threads/{id}`. Full list at
-`/docs` on a running backend.
+`GET /api/threads`, `GET /api/threads/{id}`, `POST /api/threads/new`
+(optional `{"project_id": ...}`), `PUT /api/threads/{id}/title`,
+`PUT /api/threads/{id}/project`, `PUT /api/threads/{id}/pin`
+(`{"pinned": true}`), `DELETE /api/threads/{id}`. Full list at `/docs` on a
+running backend.
+
+## The chat menu
+
+Each chat in the sidebar has a menu: **Share** (copies the chat's link; it
+opens for anyone who can already reach this OpenGPT), **Rename**, **Pin
+chat** (pinned chats are listed first, with a pin icon; pinning doesn't change
+a chat's last-used time), **Move to project** (hover to see the projects and
+**New project**; see [projects](projects.md)), **Remove from project** (for a
+chat in one) and **Delete**. `GET /api/threads` returns `pinned` and lists
+pinned chats first.
 
 ## Pitfalls
 

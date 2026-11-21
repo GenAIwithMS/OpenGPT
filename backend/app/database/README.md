@@ -15,7 +15,9 @@ MySQL through SQLAlchemy. Tests use SQLite in memory
 | Table | Holds | Used by |
 |---|---|---|
 | `checkpoints`, `checkpoint_writes` | Chat history (LangGraph checkpoints) | `mysql_checkpoint.py` |
-| `thread_metadata` | Thread titles and last-used times | `services/chatbot.py` |
+| `thread_metadata` | Thread titles, last-used times, project and whether pinned | `services/chatbot.py`, `projects.py` |
+| `projects` | Chat projects: name, instructions and whether pinned | `services/projects.py` |
+| `memories` | Saved memories | `services/memory.py` |
 | `app_settings` | One JSON value per key: `profile`, `general`, `skills`, `providers`, OAuth clients | settings, skills, providers, connector sign-in |
 | `connectors` | MCP connectors; secrets encrypted | `services/connectors.py` |
 | `code_projects` | Coding projects (folders) | `services/coding_agent/projects.py` |
@@ -27,6 +29,7 @@ MySQL through SQLAlchemy. Tests use SQLite in memory
 1. connects to MySQL and creates the database if it doesn't exist;
 2. `create_all()` creates missing tables;
 3. runs upgrade steps for existing databases (e.g. `_upgrade_blob_columns`,
+   `_add_missing_columns` for columns added later,
    dropping an old foreign key);
 4. warns if chat history still uses the old pickle format (convert with
    `python -m scripts.migrate_checkpoints`).

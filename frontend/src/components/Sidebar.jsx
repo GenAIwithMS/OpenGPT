@@ -11,6 +11,17 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Code2,
+  Folder,
+  FolderOpen,
+  FolderInput,
+  FolderMinus,
+  FolderPlus,
+  MoreHorizontal,
+  Settings2,
+  Pin,
+  PinOff,
+  Share,
+  ChevronRight,
 } from 'lucide-react';
 import UserMenu from './settings/UserMenu';
 import Logo, { LogoMark } from './Logo';
@@ -57,6 +68,22 @@ const SquarePenIcon = (props) => (
  * @param {string} [props.displayName]  Shown in the user menu.
  * @param {(section?: string) => void} [props.onOpenSettings]
  * @param {() => void} [props.onOpenSearch]  Open the search window.
+ * @param {{id: string, name: string}[]} [props.projects]  Projects (not shown on the Code page).
+ * @param {string|null} [props.currentProjectId]  The open project, or the open chat's project.
+ * @param {(id: string) => void} [props.onOpenProject]
+ * @param {(moveThreadId?: string) => void} [props.onNewProject]
+ *   Create a project; with a chat id, the chat is moved into the new project.
+ * @param {{thread_id: string, title?: string, project_id: string}[]} [props.projectThreads]
+ *   Chats that are in a project, listed under their project when it is expanded.
+ * @param {(id: string) => void} [props.onNewProjectChat]  Start a new chat in a project.
+ * @param {(id: string) => void} [props.onProjectSettings]  Open a project's instructions.
+ * @param {(id: string, name: string) => void} [props.onRenameProject]
+ * @param {(project: object) => void} [props.onDeleteProject]  Ask to delete a project.
+ * @param {(id: string, pinned: boolean) => void} [props.onPinProject]
+ * @param {(threadId: string, pinned: boolean) => void} [props.onPinThread]
+ *   Pin or unpin a chat. Without it the chat menu has no Pin.
+ * @param {(threadId: string, projectId: string|null) => void} [props.onMoveThread]
+ *   Move a chat into a project, or out of one. Without it the menu has no "Move to project".
  */
 const Sidebar = ({
   threads,
@@ -76,11 +103,40 @@ const Sidebar = ({
   displayName = 'Muhammad',
   onOpenSettings = () => {},
   onOpenSearch = () => {},
+  projects = null,
+  currentProjectId = null,
+  onOpenProject = () => {},
+  onNewProject = () => {},
+  projectThreads = [],
+  onNewProjectChat = () => {},
+  onProjectSettings = () => {},
+  onRenameProject = () => {},
+  onDeleteProject = () => {},
+  onPinProject = () => {},
+  onPinThread = null,
+  onMoveThread = null,
 }) => {
   const [editingThreadId, setEditingThreadId] = useState(null);
   const [editTitle, setEditTitle] = useState('');
   const [openMenuId, setOpenMenuId] = useState(null);
   const [recentsOpen, setRecentsOpen] = useState(true);
+  const [projectsOpen, setProjectsOpen] = useState(true);
+  // The chat whose menu shows the project list ("Move to project").
+  const [movingThreadId, setMovingThreadId] = useState(null);
+  // Projects whose chats are listed under them, and the project being renamed.
+  const [expandedProjects, setExpandedProjects] = useState(() => new Set());
+  const [renamingProjectId, setRenamingProjectId] = useState(null);
+  const [projectName, setProjectName] = useState('');
+  // Where the open project menu sits. It floats so the scrolling list can't clip it.
+  const [projectMenuPos, setProjectMenuPos] = useState(null);
+  const [threadMenuStyle, setThreadMenuStyle] = useState(null);
+  // The project or chat whose link was just copied (Share).
+  const [copiedId, setCopiedId] = useState(null);
+
+  // The open project (or the open chat's project) shows its chats.
+  useEffect(() => {
+    if (currentProjectId) setExpandedProjects((s) => (s.has(currentProjectId) ? s : new Set(s).add(currentProjectId)));
+  }, [currentProjectId]);
 
   const handleRename = (threadId, currentTitle) => {
     setEditingThreadId(threadId);
@@ -105,7 +161,74 @@ const Sidebar = ({
 
   const toggleMenu = (e, threadId) => {
     e.stopPropagation();
+    setMovingThreadId(null);
+    // The menu floats (position: fixed, inside the nav) so the scrolling
+    // lists can't clip it.
+    const row = e.currentTarget.closest('[data-thread-menu]').getBoundingClientRect();
+    const nav = e.currentTarget.closest('nav').getBoundingClientRect();
+    setThreadMenuStyle({ top: row.bottom - nav.top + 4, right: nav.right - row.right + 8 });
     setOpenMenuId(openMenuId === threadId ? null : threadId);
+  };
+
+  // Scrolling a list moves the rows away from an open floating menu: close it.
+  const closeMenuOnScroll = () => {
+    if (openMenuId) setOpenMenuId(null);
+  };
+
+  const moveThread = (threadId, projectId) => {
+    setOpenMenuId(null);
+    setMovingThreadId(null);
+    onMoveThread?.(threadId, projectId);
+  };
+
+  const closeOnMobile = () => {
+    if (window.innerWidth < 1024) toggleSidebar();
+  };
+
+  const openProject = (id) => {
+    onOpenProject(id);
+    closeOnMobile();
+  };
+
+  // Clicking a project shows or hides its chats; "Project home" in its menu
+  // opens its page.
+  const clickProject = (id) => {
+    setExpandedProjects((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const projectAction = (action) => {
+    setOpenMenuId(null);
+    action();
+  };
+
+  // Share: copy a project's or chat's address. It opens for anyone who can
+  // already reach this OpenGPT (other devices, people on the same server).
+  const copyLink = async (id, path) => {
+    const link = `${window.location.origin}${path}`;
+    try {
+      await navigator.clipboard.writeText(link);
+    } catch {
+      // No clipboard API (e.g. plain http on another host): copy the old way.
+      const field = document.createElement('textarea');
+      field.value = link;
+      document.body.appendChild(field);
+      field.select();
+      document.execCommand('copy');
+      field.remove();
+    }
+    setCopiedId(id);
+    setTimeout(() => setCopiedId((current) => (current === id ? null : current)), 2000);
+  };
+
+  const saveProjectName = (project) => {
+    const name = projectName.trim();
+    if (name && name !== project.name) onRenameProject(project.id, name);
+    setRenamingProjectId(null);
   };
 
   const openChat = (thread) => {
@@ -125,6 +248,172 @@ const Sidebar = ({
     document.addEventListener('mousedown', handle);
     return () => document.removeEventListener('mousedown', handle);
   }, [openMenuId]);
+
+  // One chat row with its menu (Rename, Move to project, Delete). `nested`
+  // indents it under its project.
+  const renderThread = (thread, nested = false) => {
+                  const isActive = currentThreadId === thread.thread_id;
+                  const isEditing = editingThreadId === thread.thread_id;
+                  return (
+                    <div
+                      key={thread.thread_id}
+                      data-thread-menu
+                      className={`
+                        group relative flex items-center gap-2 ${nested ? 'pl-9 pr-3' : 'px-3'} py-2 rounded-xl cursor-pointer
+                        transition-colors duration-100 outline-none focus-visible:ring-2 focus-visible:ring-white/50
+                        ${isActive ? 'bg-gray-700/90' : 'hover:bg-gray-700/60'}
+                      `}
+                      role={isEditing ? undefined : 'button'}
+                      tabIndex={isEditing ? undefined : 0}
+                      aria-current={isActive ? 'page' : undefined}
+                      onClick={() => {
+                        if (isEditing) return;
+                        openChat(thread);
+                      }}
+                      onKeyDown={(e) => {
+                        // Only the row itself, not the options button inside it
+                        if (isEditing || e.target !== e.currentTarget) return;
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          openChat(thread);
+                        }
+                      }}
+                    >
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          maxLength={100}
+                          aria-label="Chat title"
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          onBlur={() => handleSaveRename(thread.thread_id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveRename(thread.thread_id);
+                            if (e.key === 'Escape') {
+                              setEditingThreadId(null);
+                              setEditTitle('');
+                            }
+                          }}
+                          className="w-full bg-gray-600 px-2 py-1 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-blue-500"
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        <>
+                          <span className="text-sm text-gray-100 truncate flex-1 min-w-0">
+                            {thread.title || 'New Chat'}
+                          </span>
+                          {copiedId === thread.thread_id && (
+                            <span role="status" className="shrink-0 text-xs text-gray-400">Link copied</span>
+                          )}
+                          {thread.pinned && copiedId !== thread.thread_id && (
+                            <Pin size={12} aria-label="Pinned"
+                              className={`absolute right-4 text-gray-500 group-hover:hidden ${openMenuId === thread.thread_id ? 'hidden' : ''}`} />
+                          )}
+                          <button
+                            onClick={(e) => toggleMenu(e, thread.thread_id)}
+                            aria-label="Chat options"
+                            className={`
+                              shrink-0 p-1.5 -my-1 rounded-md text-gray-300 hover:bg-gray-600 opacity-0
+                              group-hover:opacity-100 focus:opacity-100 transition-opacity
+                              [@media(hover:none)]:opacity-100
+                              ${openMenuId === thread.thread_id ? 'opacity-100' : ''}
+                            `}
+                          >
+                            <MoreVertical size={15} />
+                          </button>
+
+                          {openMenuId === thread.thread_id && (
+                            <div
+                              style={threadMenuStyle}
+                              className="fixed w-52 bg-gray-800 rounded-xl shadow-xl shadow-black/40 z-50 p-1 border border-gray-700/70 animate-menu-in origin-top-right"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {onMoveThread && (
+                                <button onClick={() => { setOpenMenuId(null); copyLink(thread.thread_id, `/chat/${encodeURIComponent(thread.thread_id)}`); }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg">
+                                  <Share size={14} />
+                                  <span>Share</span>
+                                </button>
+                              )}
+                              <button onClick={() => handleRename(thread.thread_id, thread.title)}
+                                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg">
+                                <Edit2 size={14} />
+                                <span>Rename</span>
+                              </button>
+                              {onPinThread && (
+                                <button onClick={() => { setOpenMenuId(null); onPinThread(thread.thread_id, !thread.pinned); }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg">
+                                  {thread.pinned ? <PinOff size={14} /> : <Pin size={14} />}
+                                  <span>{thread.pinned ? 'Unpin chat' : 'Pin chat'}</span>
+                                </button>
+                              )}
+                              {onMoveThread && (
+                                /* Hover (or click, on touch screens) opens the project list beside the menu. */
+                                <div
+                                  className="relative"
+                                  onMouseEnter={() => setMovingThreadId(thread.thread_id)}
+                                  onMouseLeave={() => setMovingThreadId(null)}
+                                >
+                                  <button
+                                    onClick={() => setMovingThreadId(movingThreadId === thread.thread_id ? null : thread.thread_id)}
+                                    aria-haspopup="menu"
+                                    aria-expanded={movingThreadId === thread.thread_id}
+                                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg ${movingThreadId === thread.thread_id ? 'bg-gray-700' : ''}`}
+                                  >
+                                    <FolderInput size={14} />
+                                    <span className="flex-1 text-left">Move to project</span>
+                                    <ChevronRight size={14} className="text-gray-400" />
+                                  </button>
+                                  {movingThreadId === thread.thread_id && (
+                                    /* pl-2 bridges the gap so the pointer can cross into the submenu */
+                                    <div className="absolute left-full -top-1 pl-2 z-50">
+                                      <div className="w-52 max-h-64 overflow-y-auto overflow-x-hidden thin-scroll bg-gray-800 rounded-xl shadow-xl shadow-black/40 p-1 border border-gray-700/70 animate-menu-in origin-top-left">
+                                        {(projects || []).filter((p) => p.id !== thread.project_id).map((p) => (
+                                          <button key={p.id} onClick={() => moveThread(thread.thread_id, p.id)}
+                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg">
+                                            <Folder size={14} className="shrink-0" />
+                                            <span className="truncate">{p.name}</span>
+                                          </button>
+                                        ))}
+                                        {(projects || []).some((p) => p.id !== thread.project_id) && (
+                                          <div className="my-1 border-t border-gray-700/70" />
+                                        )}
+                                        <button
+                                          onClick={() => {
+                                            setOpenMenuId(null);
+                                            setMovingThreadId(null);
+                                            onNewProject(thread.thread_id);
+                                          }}
+                                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg"
+                                        >
+                                          <FolderPlus size={14} className="shrink-0" />
+                                          <span>New project</span>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              {onMoveThread && thread.project_id && (
+                                <button onClick={() => moveThread(thread.thread_id, null)}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg">
+                                  <FolderMinus size={14} />
+                                  <span>Remove from project</span>
+                                </button>
+                              )}
+                              <button onClick={() => handleDelete(thread.thread_id)}
+                                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-400 hover:bg-gray-700 rounded-lg">
+                                <Trash2 size={14} />
+                                <span>Delete</span>
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+  };
 
   return (
     <>
@@ -204,6 +493,16 @@ const Sidebar = ({
               <Code2 size={18} />
             </button>
 
+            {projects && (
+              <button
+                onClick={() => onToggleCollapse?.()}
+                title="Projects"
+                className="flex items-center justify-center w-10 h-10 rounded-xl hover:bg-gray-700 transition-colors mt-1"
+              >
+                <Folder size={18} />
+              </button>
+            )}
+
             <div className="mt-auto">
               <UserMenu displayName={displayName} onOpenSettings={onOpenSettings} collapsed />
             </div>
@@ -277,6 +576,193 @@ const Sidebar = ({
                 footer stay pinned (shrink-0) so collapsing Recents doesn't move
                 them. */}
             <div className="flex-1 min-h-0 flex flex-col">
+              {/* Projects: chats grouped with shared instructions and files */}
+              {projects && (
+                <div className="shrink-0">
+                  <div className="flex items-center gap-0.5 px-3 pt-3 pb-1">
+                    <button
+                      type="button"
+                      onClick={() => setProjectsOpen((o) => !o)}
+                      className="group flex items-center gap-1 text-left"
+                    >
+                      <span className="text-sm font-medium text-gray-300 group-hover:text-gray-100 transition-colors">
+                        Projects
+                      </span>
+                      <ChevronDown
+                        size={16}
+                        className={`
+                          text-gray-400 opacity-0 group-hover:opacity-100
+                          transition-transform duration-300 ease-out group-hover:text-gray-200
+                          ${projectsOpen ? 'rotate-0' : '-rotate-90'}
+                        `}
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onNewProject()}
+                      title="New project"
+                      aria-label="New project"
+                      className="ml-auto p-1 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </div>
+                  {projectsOpen && (
+                    <div
+                      onScroll={closeMenuOnScroll}
+                      className="px-2 py-1 space-y-0.5 max-h-[40vh] overflow-y-auto overflow-x-hidden thin-scroll"
+                    >
+                      {projects.length === 0 && (
+                        <p className="px-3 py-1.5 text-xs text-gray-500">No projects yet</p>
+                      )}
+                      {projects.map((project) => {
+                        const expanded = expandedProjects.has(project.id);
+                        const isCurrent = currentProjectId === project.id;
+                        const menuId = `project:${project.id}`;
+                        const chats = expanded ? projectThreads.filter((t) => t.project_id === project.id) : [];
+                        const FolderIcon = expanded ? FolderOpen : Folder;
+                        return (
+                          <div key={project.id}>
+                            <div
+                              data-thread-menu
+                              role={renamingProjectId === project.id ? undefined : 'button'}
+                              tabIndex={renamingProjectId === project.id ? undefined : 0}
+                              aria-expanded={expanded}
+                              aria-current={isCurrent && !currentThreadId ? 'page' : undefined}
+                              onClick={() => { if (renamingProjectId !== project.id) clickProject(project.id); }}
+                              onKeyDown={(e) => {
+                                if (renamingProjectId === project.id || e.target !== e.currentTarget) return;
+                                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); clickProject(project.id); }
+                              }}
+                              className={`
+                                group relative flex items-center gap-2.5 px-3 py-2 rounded-xl cursor-pointer transition-colors
+                                outline-none focus-visible:ring-2 focus-visible:ring-white/50
+                                ${isCurrent && !currentThreadId ? 'bg-gray-700/90' : 'hover:bg-gray-700/60'}
+                              `}
+                            >
+                              <FolderIcon size={16} className="shrink-0 text-gray-400" />
+                              {renamingProjectId === project.id ? (
+                                <input
+                                  type="text"
+                                  maxLength={100}
+                                  aria-label="Project name"
+                                  value={projectName}
+                                  onChange={(e) => setProjectName(e.target.value)}
+                                  onBlur={() => saveProjectName(project)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') saveProjectName(project);
+                                    if (e.key === 'Escape') setRenamingProjectId(null);
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="w-full min-w-0 bg-gray-600 px-2 py-0.5 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-blue-500"
+                                  autoFocus
+                                />
+                              ) : (
+                                <>
+                                  <span className="truncate flex-1 min-w-0 text-sm text-gray-100">{project.name}</span>
+                                  {copiedId === project.id && (
+                                    <span role="status" className="shrink-0 text-xs text-gray-400">Link copied</span>
+                                  )}
+                                  {project.pinned && copiedId !== project.id && (
+                                    <Pin size={12} aria-label="Pinned"
+                                      className={`absolute right-4 text-gray-500 group-hover:hidden ${isCurrent || openMenuId === menuId ? 'hidden' : ''}`} />
+                                  )}
+                                  <span
+                                    className={`
+                                      flex items-center gap-0.5 -my-1 shrink-0 opacity-0 group-hover:opacity-100
+                                      focus-within:opacity-100 transition-opacity [@media(hover:none)]:opacity-100
+                                      ${isCurrent || openMenuId === menuId ? 'opacity-100' : ''}
+                                    `}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setMovingThreadId(null);
+                                        const r = e.currentTarget.getBoundingClientRect();
+                                        const nav = e.currentTarget.closest('nav').getBoundingClientRect();
+                                        setProjectMenuPos({ top: r.bottom - nav.top + 6, left: r.left - nav.left });
+                                        setOpenMenuId(openMenuId === menuId ? null : menuId);
+                                      }}
+                                      aria-label="Project options"
+                                      className="p-1 rounded-md text-gray-300 hover:bg-gray-600"
+                                    >
+                                      <MoreHorizontal size={15} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); onNewProjectChat(project.id); closeOnMobile(); }}
+                                      title={`New chat in ${project.name}`}
+                                      aria-label={`New chat in ${project.name}`}
+                                      className="p-1 rounded-md text-gray-300 hover:bg-gray-600"
+                                    >
+                                      <SquarePenIcon width={15} height={15} />
+                                    </button>
+                                  </span>
+                                </>
+                              )}
+
+                              {openMenuId === menuId && projectMenuPos && (
+                                <div
+                                  style={{ top: projectMenuPos.top, left: projectMenuPos.left }}
+                                  className="fixed w-48 bg-gray-800 rounded-xl shadow-xl shadow-black/40 z-50 py-1 border border-gray-700/70 animate-menu-in origin-top-right"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <button
+                                    onClick={() => projectAction(() => onProjectSettings(project.id))}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg mx-1"
+                                  >
+                                    <Settings2 size={14} />
+                                    <span>Project settings</span>
+                                  </button>
+                                  <button
+                                    onClick={() => projectAction(() => onPinProject(project.id, !project.pinned))}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg mx-1"
+                                  >
+                                    {project.pinned ? <PinOff size={14} /> : <Pin size={14} />}
+                                    <span>{project.pinned ? 'Unpin project' : 'Pin project'}</span>
+                                  </button>
+                                  <button
+                                    onClick={() => projectAction(() => copyLink(project.id, `/project/${encodeURIComponent(project.id)}`))}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg mx-1"
+                                  >
+                                    <Share size={14} />
+                                    <span>Share project</span>
+                                  </button>
+                                  <button
+                                    onClick={() => projectAction(() => { setProjectName(project.name); setRenamingProjectId(project.id); })}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg mx-1"
+                                  >
+                                    <Edit2 size={14} />
+                                    <span>Rename project</span>
+                                  </button>
+                                  <button
+                                    onClick={() => projectAction(() => openProject(project.id))}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg mx-1"
+                                  >
+                                    <Folder size={14} />
+                                    <span>Project home</span>
+                                  </button>
+                                  <button
+                                    onClick={() => projectAction(() => onDeleteProject(project))}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-400 hover:bg-gray-700 rounded-lg mx-1"
+                                  >
+                                    <Trash2 size={14} />
+                                    <span>Delete project</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+
+                            {expanded && chats.map((chat) => renderThread(chat, true))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Recents header — toggles the chat history list visibility */}
               <button
                 type="button"
@@ -298,6 +784,7 @@ const Sidebar = ({
 
               {/* Chat history */}
               <div
+                onScroll={closeMenuOnScroll}
                 className={`
                   overflow-y-auto px-2 py-2 space-y-0.5 thin-scroll
                   transition-[max-height,opacity] duration-300 ease-out
@@ -311,103 +798,7 @@ const Sidebar = ({
                   {emptyText}
                 </div>
               ) : (
-                threads.map((thread) => {
-                  const isActive = currentThreadId === thread.thread_id;
-                  const isEditing = editingThreadId === thread.thread_id;
-                  return (
-                    <div
-                      key={thread.thread_id}
-                      data-thread-menu
-                      className={`
-                        group relative flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer
-                        transition-colors duration-100 outline-none focus-visible:ring-2 focus-visible:ring-white/50
-                        ${isActive ? 'bg-gray-700/90' : 'hover:bg-gray-700/60'}
-                      `}
-                      role={isEditing ? undefined : 'button'}
-                      tabIndex={isEditing ? undefined : 0}
-                      aria-current={isActive ? 'page' : undefined}
-                      onClick={() => {
-                        if (isEditing) return;
-                        openChat(thread);
-                      }}
-                      onKeyDown={(e) => {
-                        // Only the row itself, not the options button inside it
-                        if (isEditing || e.target !== e.currentTarget) return;
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          openChat(thread);
-                        }
-                      }}
-                    >
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          maxLength={100}
-                          aria-label="Chat title"
-                          value={editTitle}
-                          onChange={(e) => setEditTitle(e.target.value)}
-                          onBlur={() => handleSaveRename(thread.thread_id)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleSaveRename(thread.thread_id);
-                            if (e.key === 'Escape') {
-                              setEditingThreadId(null);
-                              setEditTitle('');
-                            }
-                          }}
-                          className="w-full bg-gray-600 px-2 py-1 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-blue-500"
-                          autoFocus
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      ) : (
-                        <>
-                          <span className="text-sm text-gray-100 truncate flex-1 min-w-0">
-                            {thread.title || 'New Chat'}
-                          </span>
-                          <button
-                            onClick={(e) => toggleMenu(e, thread.thread_id)}
-                            aria-label="Chat options"
-                            className={`
-                              shrink-0 p-1.5 -my-1 rounded-md text-gray-300 hover:bg-gray-600 opacity-0
-                              group-hover:opacity-100 focus:opacity-100 transition-opacity
-                              [@media(hover:none)]:opacity-100
-                              ${openMenuId === thread.thread_id ? 'opacity-100' : ''}
-                            `}
-                          >
-                            <MoreVertical size={15} />
-                          </button>
-
-                          {openMenuId === thread.thread_id && (
-                            <div
-                              className="absolute right-2 top-full mt-1 w-36 bg-gray-800 rounded-xl shadow-xl shadow-black/40 z-50 py-1 border border-gray-700/70 animate-menu-in origin-top-right"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRename(thread.thread_id, thread.title);
-                                }}
-                                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg mx-1"
-                              >
-                                <Edit2 size={14} />
-                                <span>Rename</span>
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDelete(thread.thread_id);
-                                }}
-                                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-400 hover:bg-gray-700 rounded-lg mx-1"
-                              >
-                                <Trash2 size={14} />
-                                <span>Delete</span>
-                              </button>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  );
-                })
+                threads.map((thread) => renderThread(thread))
               )}
             </div>
             </div>

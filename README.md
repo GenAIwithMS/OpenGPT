@@ -77,6 +77,9 @@ OpenGPT is an open-source chat assistant built with LangGraph. It has a FastAPI 
 - **Connectors (MCP)**: add GitHub, Notion, Linear and other MCP servers by signing in, or your own by command, URL or JSON; chat and the coding agent can use their tools, and anything that changes data asks first
 - **Skills**: reusable instructions (SKILL.md) that chat and the coding agent load when a task fits; built-in ones, an Explore catalog, or create, upload and import from GitHub
 - **Personalization and knowledge base**: your profile and custom instructions, plus documents every chat can search
+- **Memory**: the assistant remembers facts you share across chats, and can search your past chats when you refer to them
+- **Projects**: group chats with shared instructions and files that every chat in the project uses; pin, share, rename and move chats between projects from the sidebar ([Projects](#projects))
+- **Pinned chats**: pin a chat or a project to keep it at the top of the sidebar
 - **Settings for providers**: add more model providers and choose a model for each job (chat, titles, research, blogs, coding)
 - **Search window** (Ctrl/Cmd+K) for chats, coding projects and sessions
 
@@ -193,6 +196,16 @@ Then set `LLM_API_KEY` and `LLM_MODEL` (the model name your endpoint uses).
 - Use a model that supports **tool calling**: chat tools, deep research and the blog writer depend on it.
 - Optional per-task models, each defaulting to `LLM_MODEL`: `LLM_SMALL_MODEL` (titles, summaries), `BLOG_MODEL`, `RESEARCH_MODEL`. `LLM_MAX_TOKENS` sets the output limit (default 8192).
 
+## Projects
+
+A project groups chats that share instructions and files. Every chat in it gets the project's instructions in its system prompt and searches the project's files on each message.
+
+- **Create** a project with the **+** next to **Projects** in the sidebar. Click a project to show or hide its chats; its **...** menu has **Project settings** (instructions and files, in a popup), **Pin project**, **Share project** (copies its link), **Rename project**, **Project home** (its page) and **Delete project** (deletes its chats too). The pencil icon starts a new chat in the project.
+- **Chat menu**: every chat in the sidebar has **Share** (copies its link), **Rename**, **Pin chat**, **Move to project** (hover to pick a project or create one), **Remove from project** and **Delete**.
+- **Pinned** chats and projects stay at the top of their list, with a pin icon. Pinning doesn't change when they were last used.
+
+Shared links open for anyone who can already reach your OpenGPT (your other devices, or others on the same server); there are no public links. See [docs/services/projects.md](docs/services/projects.md).
+
 ## Coding agent
 
 The **Code** page in the sidebar runs a coding agent on your machine. Pick or create a project, describe a task, and watch it work: its reply, its thinking, and a card for each command it runs or file it reads or edits.
@@ -272,6 +285,8 @@ cd backend && python -m scripts.migrate_checkpoints
 ```
 
 The backend logs a reminder at startup if old data is still present.
+
+New tables and columns (for example projects and pinned chats) are added automatically when the backend starts; restart it after updating.
 
 ## Troubleshooting
 

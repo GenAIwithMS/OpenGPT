@@ -7,7 +7,13 @@ Chat UI and the pieces shared by the whole app. The Code page is in
 
 ```
 App
-├─ Sidebar ─────────────── new chat, Search chats (button), Code, chat list, UserMenu
+├─ Sidebar ─────────────── new chat, Search chats (button), Code, Projects (each
+│                          with its chats and menu), chat list; chat menu: Share,
+│                          Rename, Pin, Move to project (hover submenu), Remove
+│                          from project, Delete; UserMenu
+├─ projects/ProjectView ── a project's page (/project/<id>): new chat box,
+│                          instructions, files, chats; NewProjectDialog,
+│                          ProjectSettingsDialog (sidebar "Project settings")
 ├─ MessageList ─────────── messages (memoized MessageItem)
 │   ├─ ThinkingIndicator   live status and reasoning while the model works
 │   ├─ ResearchCard / ReportCard ─► ResearchPanel (side panel: activity or report)
@@ -36,6 +42,16 @@ lifted to the middle of the screen (`slideUp`, measured with a
 `ResizeObserver`); with messages it sits at the bottom. The move is a CSS
 transform, animated only after the first measurement so returning from the
 Code page doesn't slide.
+
+## ProjectView
+
+- The page at `/project/<id>`. It loads the project (with its chats and
+  files) and saves the name, instructions and files itself through
+  `projectService`; App passes the message box handlers and deletes the
+  project after a confirmation.
+- Sending the first message: App creates the chat in the project
+  (`chatService.createThread(projectId)`), opens it and sends, so the reply
+  streams on the chat page.
 
 ## SearchPalette
 

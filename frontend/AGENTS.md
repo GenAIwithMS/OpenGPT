@@ -12,7 +12,7 @@ npm run build    # the check to run before you finish (there is no lint step)
 
 | Path | Role |
 |---|---|
-| `src/App.jsx` | Reads the URL (`/chat`, `/chat/<id>`, `/code`, `/code/<id>`, `?temporary-chat=true`) and lays out the sidebar, chat or Code page, settings popup, search window and keyboard shortcuts. |
+| `src/App.jsx` | Reads the URL (`/chat`, `/chat/<id>`, `/project/<id>`, `/code`, `/code/<id>`, `?temporary-chat=true`) and lays out the sidebar, chat, project or Code page, settings popup, search window and keyboard shortcuts. |
 | `src/services/api.js` | Every backend call. One `xxxService` object per area (chat, settings, connectors, skills, providers, code). |
 | `src/hooks/` | State per screen: chat streaming (`useChat`), threads, coding sessions and workspace, settings. |
 | `src/components/` | Chat UI, sidebar, search window, message rendering. |

@@ -66,6 +66,8 @@ class ThreadResponse(BaseModel):
 
     thread_id: str = Field(..., description="Unique thread identifier")
     title: str = Field(..., description="Thread title")
+    project_id: Optional[str] = Field(None, description="The project the chat is in, if any")
+    pinned: bool = Field(False, description="Pinned chats are listed first")
 
 
 class ThreadListResponse(BaseModel):
@@ -109,6 +111,13 @@ class NewThreadResponse(BaseModel):
 
     thread_id: str = Field(..., description="Newly created thread ID")
     title: str = Field(default="New Chat", description="Thread title")
+    project_id: Optional[str] = Field(None, description="The project the chat was created in")
+
+
+class NewThreadRequest(BaseModel):
+    """Optional body for creating a thread"""
+
+    project_id: Optional[str] = Field(None, max_length=ID_MAX_CHARS, description="Create the chat in this project")
 
 
 class PDFUploadResponse(BaseModel):

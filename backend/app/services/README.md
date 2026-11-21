@@ -16,6 +16,7 @@ open with a docstring explaining how they work; the feature pages in
 | `knowledge.py` | The knowledge base and its `Knowledge` tool | [documents](../../../docs/services/documents-and-knowledge.md) |
 | `personalization.py` | Profile text for the system prompt and the coding agent | [settings](../../../docs/services/settings.md) |
 | `memory.py` | Saved memories, the memory tools and chat history search | [memory](../../../docs/services/memory.md) |
+| `projects.py` | Projects: chats with shared instructions and files | [projects](../../../docs/services/projects.md) |
 | `settings.py` | Profile, general and memory settings in `app_settings` | [settings](../../../docs/services/settings.md) |
 | `providers.py` | Model providers, job models, the model menu's list | [providers](../../../docs/services/providers.md) |
 | `model_router.py` | Auto: a model per message | [providers](../../../docs/services/providers.md) |

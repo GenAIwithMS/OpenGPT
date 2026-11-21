@@ -30,6 +30,7 @@ import ModelPicker from "./ModelPicker";
  * @param {boolean} props.disabled  A reply is being written (Send turns into Stop).
  * @param {object[]} [props.pendingAttachments]  Files waiting to be sent with the next message.
  * @param {boolean} [props.uploadingAttachment]
+ * @param {string} [props.placeholder]  Text shown in the empty box.
  */
 const MessageInput = ({
   onSendMessage,
@@ -39,6 +40,7 @@ const MessageInput = ({
   disabled,
   pendingAttachments = [],
   uploadingAttachment = false,
+  placeholder = "Send a message...",
 }) => {
   const [message, setMessage] = useState("");
   const [isDragging, setIsDragging] = useState(false);
@@ -261,7 +263,7 @@ const MessageInput = ({
 
         <PromptInputTextarea
           aria-label="Message"
-          placeholder={isDragging ? "Drop document here..." : "Send a message..."}
+          placeholder={isDragging ? "Drop document here..." : placeholder}
           disabled={inputDisabled}
         />
 

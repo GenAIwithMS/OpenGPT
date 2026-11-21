@@ -13,11 +13,13 @@ import { getPreferences } from './lib/preferences';
 import { useShortcuts } from './lib/shortcuts';
 import { notifyFinished } from './lib/notify';
 import { useThreads } from './hooks/useThreads';
+import { useProjects } from './hooks/useProjects';
+import ProjectView, { NewProjectDialog, ProjectSettingsDialog } from './components/projects/ProjectView';
 import { useChat } from './hooks/useChat';
 import { useCodeWorkspace } from './hooks/useCodeWorkspace';
-import { chatService } from './services/api';
+import { chatService, projectService } from './services/api';
 import { buildAttachmentPreview, removeThreadAttachments } from './lib/attachmentPreview';
-import { X } from 'lucide-react';
+import { Folder, X } from 'lucide-react';
 import Logo from './components/Logo';
 
 // Only needed for deep research, so it loads on first use.
@@ -39,6 +41,17 @@ function threadIdFromPath(pathname) {
     return decodeURIComponent(m[1]);
   } catch {
     // Malformed escape like /chat/%E0: treat it as a new chat.
+    return null;
+  }
+}
+
+// /project/<id> -> that project's page (its chats, instructions and files).
+function projectIdFromPath(pathname) {
+  const m = pathname.replace(/\/+$/, '').match(/^\/project\/([^/]+)$/);
+  if (!m) return null;
+  try {
+    return decodeURIComponent(m[1]);
+  } catch {
     return null;
   }
 }
@@ -128,8 +141,8 @@ const randomGreeting = (current) => {
 };
 
 /**
- * The whole app: reads the URL (`/chat`, `/chat/<id>`, `/code`, `/code/<id>`,
- * `?temporary-chat=true`) and lays out the sidebar, the chat or Code page, the
+ * The whole app: reads the URL (`/chat`, `/chat/<id>`, `/project/<id>`, `/code`,
+ * `/code/<id>`, `?temporary-chat=true`) and lays out the sidebar, the chat, project or Code page, the
  * settings popup, the search window and the keyboard shortcuts. Chat state
  * comes from `useChat`, the thread list from `useThreads`, the Code page's
  * workspace from `useCodeWorkspace`, and settings from `useSettings`.
@@ -139,6 +152,7 @@ function App() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const urlThreadId = threadIdFromPath(location.pathname);
+  const urlProjectId = projectIdFromPath(location.pathname);
   const isCodeView = isCodePath(location.pathname);
   const codeSessionId = isCodeView ? codeSessionIdFromPath(location.pathname) : null;
   const code = useCodeWorkspace(isCodeView);
@@ -179,6 +193,15 @@ function App() {
     clearError: clearThreadsError,
   } = useThreads();
 
+  // Projects: chats grouped with shared instructions and files.
+  const { projects, fetchProjects, createProject } = useProjects();
+  // The New project dialog: false, or {moveThreadId} (a chat to move into the new project, or null).
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState(null);
+  const [projectSettingsId, setProjectSettingsId] = useState(null);
+  // Bumped when a project's chats change, so its open page reloads.
+  const [projectRefresh, setProjectRefresh] = useState(0);
+
   // Keep the active thread in sync with the URL (deep links, back/forward).
   useEffect(() => {
     const id = urlThreadId || null;
@@ -210,6 +233,116 @@ function App() {
     streamingProgress,
     stop,
   } = useChat(currentThreadId, handleThreadCreated, skipLoadRef, isTempChat);
+
+  // The open project: its page, or the project of the open chat.
+  const currentThread = threads.find((t) => t.thread_id === currentThreadId);
+  const currentProjectId = urlProjectId || currentThread?.project_id || null;
+  const currentProject = projects.find((p) => p.id === currentProjectId) || null;
+
+  // `action` 'newChat' puts the cursor in the project page's message box.
+  const handleOpenProject = (id, action = null) => {
+    setIsSidebarOpen(false);
+    setPendingAttachments([]);
+    setResearchPanel(null);
+    navigate(`/project/${encodeURIComponent(id)}`, action ? { state: { projectAction: action } } : undefined);
+  };
+
+  const handlePinThread = async (threadId, pinned) => {
+    try {
+      await chatService.pinThread(threadId, pinned);
+      await fetchThreads();
+    } catch (e) {
+      setAppError(e.message || 'Could not pin the chat.');
+    }
+  };
+
+  const handlePinProject = async (id, pinned) => {
+    try {
+      await projectService.pin(id, pinned);
+      await fetchProjects();
+    } catch (e) {
+      setAppError(e.message || 'Could not pin the project.');
+    }
+  };
+
+  const handleRenameProject = async (id, name) => {
+    try {
+      await projectService.update(id, { name });
+      await fetchProjects();
+      setProjectRefresh((n) => n + 1);
+    } catch (e) {
+      setAppError(e.message || 'Could not rename the project.');
+    }
+  };
+
+  // From "Move to project > New project" the chat moves into the new project
+  // and stays open; otherwise the new project's page opens.
+  const handleCreateProject = async (name) => {
+    const moveThreadId = newProjectOpen?.moveThreadId;
+    const project = await createProject(name);
+    if (moveThreadId) await handleMoveThread(moveThreadId, project.id);
+    else handleOpenProject(project.id);
+  };
+
+  const handleMoveThread = async (threadId, projectId) => {
+    try {
+      await chatService.moveThread(threadId, projectId);
+      await Promise.all([fetchThreads(), fetchProjects()]);
+      setProjectRefresh((n) => n + 1);
+    } catch (e) {
+      setAppError(e.message || 'Could not move the chat.');
+    }
+  };
+
+  const confirmDeleteProject = async () => {
+    const project = projectToDelete;
+    try {
+      await projectService.remove(project.id);
+      threads.filter((t) => t.project_id === project.id).forEach((t) => removeThreadAttachments(t.thread_id));
+      setProjectToDelete(null);
+      if (currentProjectId === project.id) {
+        setCurrentThreadId(null);
+        navigate('/chat');
+      }
+      await Promise.all([fetchThreads(), fetchProjects()]);
+    } catch (e) {
+      setProjectToDelete(null);
+      setAppError(e.message || 'Could not delete the project.');
+    }
+  };
+
+  // The first message on a project's page: create the chat in the project,
+  // open it and send. Returns false when nothing was sent.
+  const handleProjectSend = async (message, tools = [], attachments = []) => {
+    let created;
+    try {
+      created = await chatService.createThread(urlProjectId);
+    } catch (e) {
+      setAppError(e.message || 'Could not start the chat.');
+      return false;
+    }
+    const id = created.thread_id;
+    setUploadingAttachment(true);
+    setPendingAttachments([]);
+    try {
+      const sending = sendMessage(message, tools, id, attachments);
+      // The chat already shows the message: don't reload it from the server.
+      skipLoadRef.current = true;
+      setIsTempChat(false);
+      setCurrentThreadId(id);
+      navigate(`/chat/${encodeURIComponent(id)}`);
+      const sent = await sending;
+      fetchThreads();
+      fetchProjects();
+      return sent !== false;
+    } catch (error) {
+      console.error('Error sending message with attachments:', error);
+      setPendingAttachments(error.remainingAttachments || attachments);
+      return false;
+    } finally {
+      setUploadingAttachment(false);
+    }
+  };
 
   // Deep research side panel: which message it shows and which view
   // ('activity' while the agent works, 'report' to review the result). It
@@ -303,7 +436,11 @@ function App() {
   // A reply finished while OpenGPT was in another tab: notify (General settings).
   const wasLoadingRef = useRef(false);
   useEffect(() => {
-    if (wasLoadingRef.current && !chatLoading) notifyFinished('OpenGPT', 'Your reply is ready.');
+    if (wasLoadingRef.current && !chatLoading) {
+      notifyFinished('OpenGPT', 'Your reply is ready.');
+      // A chat started on a project page is listed once its first reply is saved.
+      if (currentThreadId && !isTempChat && !threads.some((t) => t.thread_id === currentThreadId)) fetchThreads();
+    }
     wasLoadingRef.current = chatLoading;
   }, [chatLoading]);
 
@@ -362,8 +499,10 @@ function App() {
         }
       }
       
-      // Refresh threads list
+      // Refresh threads list (and project chat counts)
       await fetchThreads();
+      fetchProjects();
+      setProjectRefresh((n) => n + 1);
       
       // Close modal and reset state
       setDeleteModalOpen(false);
@@ -503,7 +642,9 @@ function App() {
       {/* Sidebar */}
       {/* On the Code page the sidebar lists the project's coding sessions. */}
       <Sidebar
-        threads={isCodeView ? code.sessions.map((s) => ({ thread_id: s.id, title: s.title })) : threads}
+        threads={isCodeView
+          ? code.sessions.map((s) => ({ thread_id: s.id, title: s.title }))
+          : threads.filter((t) => !t.project_id)}
         currentThreadId={isCodeView ? codeSessionId : currentThreadId}
         onThreadSelect={isCodeView
           ? (id) => { setIsSidebarOpen(false); navigate(`/code/${encodeURIComponent(id)}`); }
@@ -524,7 +665,31 @@ function App() {
         displayName={appSettings.displayName}
         onOpenSettings={(section) => { setIsSidebarOpen(false); setSettingsSection(section); }}
         onOpenSearch={() => { setIsSidebarOpen(false); setSearchOpen(true); }}
+        projects={isCodeView ? null : projects}
+        currentProjectId={currentProjectId}
+        onOpenProject={handleOpenProject}
+        onNewProject={(moveThreadId = null) => { setIsSidebarOpen(false); setNewProjectOpen({ moveThreadId }); }}
+        projectThreads={threads.filter((t) => t.project_id)}
+        onNewProjectChat={(id) => handleOpenProject(id, 'newChat')}
+        onProjectSettings={(id) => { setIsSidebarOpen(false); setProjectSettingsId(id); }}
+        onRenameProject={handleRenameProject}
+        onDeleteProject={setProjectToDelete}
+        onPinProject={handlePinProject}
+        onPinThread={isCodeView ? null : handlePinThread}
+        onMoveThread={isCodeView ? null : handleMoveThread}
       />
+
+      {projectSettingsId && (
+        <ProjectSettingsDialog
+          projectId={projectSettingsId}
+          onClose={() => setProjectSettingsId(null)}
+          onChanged={() => { fetchProjects(); setProjectRefresh((n) => n + 1); }}
+        />
+      )}
+
+      {newProjectOpen && (
+        <NewProjectDialog onClose={() => setNewProjectOpen(false)} onCreate={handleCreateProject} />
+      )}
 
       {searchOpen && (
         <SearchPalette
@@ -562,6 +727,24 @@ function App() {
           workspace={code}
           onSessionCreated={(id) => { navigate(`/code/${encodeURIComponent(id)}`); code.refreshSessions(); }}
         />
+      ) : urlProjectId ? (
+        <main className="flex-1 min-w-0 flex flex-col h-screen relative pt-14 lg:pt-0">
+          <ProjectView
+            projectId={urlProjectId}
+            onSendMessage={handleProjectSend}
+            onAddAttachment={handleAddAttachment}
+            onRemoveAttachment={handleRemoveAttachment}
+            pendingAttachments={pendingAttachments}
+            uploadingAttachment={uploadingAttachment}
+            disabled={uploadingAttachment}
+            onOpenChat={handleThreadSelect}
+            onChanged={fetchProjects}
+            onDelete={setProjectToDelete}
+            refreshKey={projectRefresh}
+            action={location.state?.projectAction}
+            actionKey={location.key}
+          />
+        </main>
       ) : (
       /* Main Chat Area */
       <main className="flex-1 min-w-0 flex flex-col h-screen relative">
@@ -570,7 +753,20 @@ function App() {
             {/* pl-12 and 40px height: beside and centred on the mobile menu button (fixed at top left) */}
             <div className="flex min-h-[40px] lg:min-h-[32px] items-center justify-between pl-12 lg:pl-0">
               {/* The sidebar already shows the name on desktop; show it here only when the sidebar is a rail */}
-              <Logo className={`h-5 text-white ${isSidebarCollapsed ? '' : 'lg:invisible'}`} />
+              <div className="flex min-w-0 items-center gap-3">
+                <Logo className={`h-5 shrink-0 text-white ${isSidebarCollapsed ? '' : 'lg:hidden'}`} />
+                {/* A chat in a project: the project's name, back to its page */}
+                {currentProject && currentThreadId && (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenProject(currentProject.id)}
+                    className="flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-gray-300 hover:bg-gray-700/70 hover:text-white"
+                  >
+                    <Folder size={15} className="shrink-0" />
+                    <span className="truncate">{currentProject.name}</span>
+                  </button>
+                )}
+              </div>
               {/* Temporary chat toggle — only on the New Chat screen.
                   Once a temp chat has messages, it can't be toggled off
                   (start a new chat to leave temp mode). */}
@@ -723,6 +919,20 @@ function App() {
         }}
         title="Delete Session"
         message="Delete this coding session and its history? Files the agent changed in the project stay as they are."
+        confirmText="Delete"
+        cancelText="Cancel"
+        danger={true}
+      />
+
+      {/* Delete a project */}
+      <ConfirmationModal
+        isOpen={Boolean(projectToDelete)}
+        onClose={() => setProjectToDelete(null)}
+        onConfirm={confirmDeleteProject}
+        title="Delete Project"
+        message={projectToDelete
+          ? `Delete "${projectToDelete.name}"? Its ${projectToDelete.threads?.length ?? projectToDelete.chats ?? 0} chat(s), instructions and files are deleted too. This can't be undone.`
+          : ''}
         confirmText="Delete"
         cancelText="Cancel"
         danger={true}

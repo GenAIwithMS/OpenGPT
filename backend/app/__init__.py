@@ -16,6 +16,7 @@ from app.router.chat import chat_router
 from app.router.health import health_router
 from app.router.code import code_router
 from app.router.settings import settings_router
+from app.router.projects import projects_router
 from app.router.skills import skills_router
 from app.router.providers import providers_router
 from app.router.connectors import connectors_callback_router, connectors_router
@@ -118,6 +119,9 @@ def create_app():
     )
     app.include_router(
         settings_router, prefix="/api", tags=["settings"], dependencies=[Depends(require_api_token)]
+    )
+    app.include_router(
+        projects_router, prefix="/api", tags=["projects"], dependencies=[Depends(require_api_token)]
     )
     app.include_router(
         connectors_router, prefix="/api", tags=["connectors"], dependencies=[Depends(require_api_token)]

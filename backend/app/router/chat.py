@@ -16,6 +16,7 @@ from app.schema.models import (
     UpdateTitleRequest,
     UpdateReportRequest,
     NewThreadResponse,
+    NewThreadRequest,
     PDFUploadResponse,
     MessageResponse,
     ThreadResponse,
@@ -261,7 +262,8 @@ def get_threads():
         threads = ChatService.get_all_threads()
 
         thread_responses = [
-            ThreadResponse(thread_id=t["thread_id"], title=t["title"])
+            ThreadResponse(thread_id=t["thread_id"], title=t["title"], project_id=t.get("project_id"),
+                           pinned=t.get("pinned", False))
             for t in threads
         ]
 
@@ -310,10 +312,11 @@ def get_thread_history(thread_id: str):
 
 
 @chat_router.post("/threads/new", response_model=NewThreadResponse)
-def create_new_thread():
+def create_new_thread(request: Optional[NewThreadRequest] = None):
     try:
-        thread_id = ChatService.create_new_thread()
-        return NewThreadResponse(thread_id=thread_id, title="New Chat")
+        project_id = request.project_id if request else None
+        thread_id = ChatService.create_new_thread(project_id)
+        return NewThreadResponse(thread_id=thread_id, title="New Chat", project_id=project_id)
 
     except AppError:
         raise
@@ -339,6 +342,18 @@ def update_thread_title(thread_id: str, request: UpdateTitleRequest):
         raise
     except Exception as e:
         raise _internal_error(e) from e
+
+
+class PinRequest(BaseModel):
+    pinned: bool
+
+
+@chat_router.put("/threads/{thread_id}/pin")
+def pin_thread(thread_id: str, request: PinRequest):
+    """Pin a chat to the top of the list, or unpin it."""
+    thread_id = _require_thread_id(thread_id)
+    ChatService.set_thread_pinned(thread_id, request.pinned)
+    return {"thread_id": thread_id, "pinned": request.pinned}
 
 
 @chat_router.put("/threads/{thread_id}/reports/{report_index}")
