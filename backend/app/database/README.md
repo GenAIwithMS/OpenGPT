@@ -16,7 +16,7 @@ MySQL through SQLAlchemy. Tests use SQLite in memory
 |---|---|---|
 | `checkpoints`, `checkpoint_writes` | Chat history (LangGraph checkpoints) | `mysql_checkpoint.py` |
 | `thread_metadata` | Thread titles, last-used times and project | `services/chatbot.py`, `projects.py` |
-| `projects` | Chat projects: name and instructions | `services/projects.py` |
+| `projects` | Chat projects: name, instructions and whether pinned | `services/projects.py` |
 | `memories` | Saved memories | `services/memory.py` |
 | `app_settings` | One JSON value per key: `profile`, `general`, `skills`, `providers`, OAuth clients | settings, skills, providers, connector sign-in |
 | `connectors` | MCP connectors; secrets encrypted | `services/connectors.py` |

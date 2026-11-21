@@ -229,11 +229,12 @@ export const chatService = {
 // See backend/app/services/projects.py.
 export const projectService = {
   list: async () => (await api.get('/projects')).data.projects,
-  // {id, name, instructions, chats, threads, files, max_files, max_mb}
+  // {id, name, instructions, pinned, chats, threads, files, max_files, max_mb}
   get: async (id) => (await api.get(`/projects/${enc(id)}`)).data,
   create: async (name, instructions = '') => (await api.post('/projects', { name, instructions })).data,
   update: async (id, changes) => (await api.put(`/projects/${enc(id)}`, changes)).data,
   remove: async (id) => (await api.delete(`/projects/${enc(id)}`)).data,
+  pin: async (id, pinned) => (await api.put(`/projects/${enc(id)}/pin`, { pinned })).data,
   addFile: async (id, file) => {
     const formData = new FormData();
     formData.append('file', file);

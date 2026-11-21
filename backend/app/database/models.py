@@ -129,5 +129,7 @@ class Project(Base):
     id = Column(String(36), primary_key=True)
     name = Column(String(100), nullable=False)
     instructions = Column(Text, nullable=True)
+    # Pinned projects are listed first in the sidebar.
+    pinned = Column(Boolean, nullable=False, default=False, server_default="0")
     created_at = Column(TIMESTAMP, default=func.current_timestamp())
     updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp())

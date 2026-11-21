@@ -246,6 +246,15 @@ function App() {
     navigate(`/project/${encodeURIComponent(id)}`, action ? { state: { projectAction: action } } : undefined);
   };
 
+  const handlePinProject = async (id, pinned) => {
+    try {
+      await projectService.pin(id, pinned);
+      await fetchProjects();
+    } catch (e) {
+      setAppError(e.message || 'Could not pin the project.');
+    }
+  };
+
   const handleRenameProject = async (id, name) => {
     try {
       await projectService.update(id, { name });
@@ -651,6 +660,7 @@ function App() {
         onProjectSettings={(id) => { setIsSidebarOpen(false); setProjectSettingsId(id); }}
         onRenameProject={handleRenameProject}
         onDeleteProject={setProjectToDelete}
+        onPinProject={handlePinProject}
         onMoveThread={isCodeView ? null : handleMoveThread}
       />
 

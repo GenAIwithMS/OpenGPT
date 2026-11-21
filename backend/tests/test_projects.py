@@ -53,6 +53,20 @@ class ProjectServiceTests(unittest.TestCase):
         self.assertEqual(projects.update(p["id"], name="Thesis")["name"], "Thesis")
         self.assertEqual([x["name"] for x in projects.list_projects()], ["Thesis"])
 
+    def test_pinned_first(self):
+        a = projects.create("A")
+        b = projects.create("B")
+        self.assertFalse(a["pinned"])
+        before = projects.get(a["id"])["updated_at"]
+        self.assertTrue(projects.set_pinned(a["id"], True)["pinned"])
+        self.assertEqual(projects.get(a["id"])["updated_at"], before)  # pinning isn't using it
+        self.assertEqual([p["name"] for p in projects.list_projects()][0], "A")
+        projects.set_pinned(a["id"], False)
+        self.assertFalse(projects.get(a["id"])["pinned"])
+        with self.assertRaises(NotFoundError):
+            projects.set_pinned("11111111-1111-4111-8111-111111111111", True)
+        self.assertEqual({p["id"] for p in projects.list_projects()}, {a["id"], b["id"]})
+
     def test_validation_and_missing(self):
         for bad in ("", "   ", "x" * (projects.MAX_NAME_CHARS + 1)):
             with self.assertRaises(ValidationError):
@@ -180,6 +194,8 @@ class ProjectRouteTests(unittest.TestCase):
         self.assertEqual(c.post("/api/projects", json={"name": ""}).status_code, 422)
         self.assertEqual(c.get("/api/projects").json()["projects"][0]["name"], "Launch")
         self.assertEqual(c.put(f"/api/projects/{pid}", json={"name": "Launch v2"}).json()["name"], "Launch v2")
+        self.assertTrue(c.put(f"/api/projects/{pid}/pin", json={"pinned": True}).json()["pinned"])
+        self.assertEqual(c.put(f"/api/projects/{pid}/pin", json={}).status_code, 422)
 
         new = c.post("/api/threads/new", json={"project_id": pid}).json()
         self.assertEqual(new["project_id"], pid)

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, FileText, FolderOpen, Loader2, MessageSquare, MoreVertical, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Check, FileText, FolderOpen, Loader2, MessageSquare, MoreVertical, Pencil, Plus, Trash2, Upload, X } from 'lucide-react';
 import MessageInput from '../MessageInput';
 import { Modal, inputClass } from '../settings/controls';
 import { projectService } from '../../services/api';
@@ -331,6 +331,7 @@ export const ProjectSettingsDialog = ({ projectId, onClose, onChanged }) => {
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(null);
   const [fileError, setFileError] = useState(null);
   const fileInputRef = useRef(null);
@@ -420,22 +421,33 @@ export const ProjectSettingsDialog = ({ projectId, onClose, onChanged }) => {
           </form>
 
           <section>
-            <div className="mb-1 flex items-center">
-              <h3 className="flex-1 text-sm font-medium text-gray-200">
-                Files <span className="font-normal text-gray-500">· {project.files.length}/{project.max_files}</span>
-              </h3>
-              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={Boolean(uploading) || full}
-                title={full ? 'The project is full' : 'Add files'}
-                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-gray-200 hover:bg-white/5 disabled:opacity-50">
-                {uploading ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Add files
-              </button>
-              <input ref={fileInputRef} type="file" accept=".pdf,.md,.txt" multiple className="hidden"
-                onChange={(e) => { const files = [...e.target.files]; e.target.value = ''; if (files.length) upload(files); }} />
-            </div>
-            <p className="mb-2 text-sm text-gray-400">
-              PDF, Markdown or text, up to {project.max_mb} MB each. Every chat in the project can use them.
-            </p>
-            {uploading && <p className="mb-1 truncate text-xs text-gray-400">Adding {uploading}…</p>}
+            <h3 className="mb-2 text-sm font-medium text-gray-200">
+              Files <span className="font-normal text-gray-500">· {project.files.length}/{project.max_files}</span>
+            </h3>
+            {/* The whole box adds files: click it, or drop files on it. */}
+            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={Boolean(uploading) || full}
+              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setDragging(false);
+                const files = [...e.dataTransfer.files];
+                if (files.length && !uploading && !full) upload(files);
+              }}
+              className={`mb-2 flex w-full flex-col items-center gap-1 rounded-xl border border-dashed px-4 py-5 text-center transition-colors
+                disabled:cursor-not-allowed disabled:opacity-60
+                ${dragging ? 'border-blue-400 bg-blue-500/10' : 'border-gray-600 hover:border-gray-400 hover:bg-white/5'}`}>
+              {uploading ? <Loader2 size={18} className="animate-spin text-gray-300" /> : <Upload size={18} className="text-gray-300" />}
+              <span className="text-sm font-medium text-gray-200">
+                {full ? 'The project is full' : uploading ? `Adding ${uploading}…` : 'Add files'}
+              </span>
+              <span className="text-xs text-gray-400">
+                Click or drop files here. PDF, Markdown or text, up to {project.max_mb} MB each. Every chat in the project can use them.
+              </span>
+            </button>
+            <input ref={fileInputRef} type="file" accept=".pdf,.md,.txt" multiple className="hidden"
+              onChange={(e) => { const files = [...e.target.files]; e.target.value = ''; if (files.length) upload(files); }} />
             {fileError && <p role="alert" className="mb-1 text-xs text-red-300">{fileError}</p>}
             {project.files.length ? (
               <ul className="space-y-0.5">

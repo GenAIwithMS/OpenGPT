@@ -63,6 +63,7 @@ def _as_dict(p: Project, chats: int = 0, last_active=None) -> dict:
         "id": p.id,
         "name": p.name,
         "instructions": p.instructions or "",
+        "pinned": bool(p.pinned),
         "chats": chats,
         "updated_at": updated.isoformat() if updated else None,
     }
@@ -71,7 +72,8 @@ def _as_dict(p: Project, chats: int = 0, last_active=None) -> dict:
 # ----- projects -----
 
 def list_projects() -> list[dict]:
-    """All projects, most recently used first (a chat's activity counts)."""
+    """All projects: pinned ones first, then most recently used first (a
+    chat's activity counts)."""
     with _session() as db:
         stats = dict(
             (row[0], (row[1], row[2]))
@@ -80,7 +82,8 @@ def list_projects() -> list[dict]:
             .group_by(ThreadMetadata.project_id)
         )
         items = [_as_dict(p, *stats.get(p.id, (0, None))) for p in db.query(Project).all()]
-    return sorted(items, key=lambda p: p["updated_at"] or "", reverse=True)
+    items.sort(key=lambda p: p["updated_at"] or "", reverse=True)
+    return sorted(items, key=lambda p: not p["pinned"])  # stable: keeps recency within each group
 
 
 def get(project_id: str) -> dict:
@@ -112,6 +115,19 @@ def update(project_id: str, name: Optional[str] = None, instructions: Optional[s
             p.name = _clean_name(name)
         if instructions is not None:
             p.instructions = _clean_instructions(instructions)
+        db.commit()
+    return get(project_id)
+
+
+def set_pinned(project_id: str, pinned: bool) -> dict:
+    """Pin or unpin a project. Doesn't count as using it (updated_at stays)."""
+    project_id = _valid_id(project_id)
+    with _session() as db:
+        changed = (db.query(Project).filter_by(id=project_id)
+                   .update({Project.pinned: bool(pinned), Project.updated_at: Project.updated_at},
+                           synchronize_session=False))
+        if not changed:
+            raise NotFoundError("Project not found")
         db.commit()
     return get(project_id)
 

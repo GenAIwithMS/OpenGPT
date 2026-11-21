@@ -42,6 +42,7 @@ def _upgrade_blob_columns():
 # first created: create_all() never adds columns to existing tables.
 _ADDED_COLUMNS = [
     ("thread_metadata", "project_id", "VARCHAR(36) NULL", "idx_thread_project"),
+    ("projects", "pinned", "TINYINT(1) NOT NULL DEFAULT 0", None),
 ]
 
 

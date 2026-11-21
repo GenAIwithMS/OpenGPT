@@ -42,7 +42,10 @@ connectors work in project chats the same as anywhere else.
   hides its chats.
 - Each project has a new chat button, which opens the project's page with the
   cursor in its message box, and a **...** menu: **Project settings** (a popup
-  for the instructions and files, without leaving the current page),
+  for the instructions and files, without leaving the current page; click or
+  drop files on its Files box to add them), **Pin project** (pinned projects
+  are listed first, with a pin icon), **Share project** (copies the project's
+  link; it opens for anyone who can already reach this OpenGPT),
   **Rename project** (in the sidebar), **Project home** and
   **Delete project**.
 - A project's page (`/project/<id>`) has a message box that starts a new chat
@@ -69,10 +72,11 @@ takes effect on its next message.
 
 | Route | Does |
 |---|---|
-| `GET /api/projects` | All projects, most recently used first (a chat's activity counts) |
+| `GET /api/projects` | All projects: pinned first, then most recently used first (a chat's activity counts) |
 | `POST /api/projects` | Create `{name, instructions}` |
 | `GET /api/projects/{id}` | The project with `threads` (chats that have messages), `files`, `max_files`, `max_mb` |
 | `PUT /api/projects/{id}` | Change `name` and/or `instructions` |
+| `PUT /api/projects/{id}/pin` | Pin `{"pinned": true}` or unpin a project (doesn't change its last-used time) |
 | `DELETE /api/projects/{id}` | Delete it with its chats and files; returns `{deleted_chats}` |
 | `POST /api/projects/{id}/files` | Add a file (multipart `file`) |
 | `DELETE /api/projects/{id}/files/{file_id}` | Remove a file |
@@ -83,7 +87,8 @@ takes effect on its next message.
 ## Database
 
 The `projects` table is created at startup like any new table. Older
-databases get `thread_metadata.project_id` (and its index) from
+databases get `thread_metadata.project_id` (and its index) and
+`projects.pinned` from
 `_add_missing_columns()` in `app/database/init_db.py`.
 
 ## Not covered yet

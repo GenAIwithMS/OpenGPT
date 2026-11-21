@@ -26,6 +26,10 @@ class ProjectChanges(BaseModel):
     instructions: Optional[str] = Field(None, max_length=projects.MAX_INSTRUCTIONS_CHARS)
 
 
+class ProjectPin(BaseModel):
+    pinned: bool
+
+
 class ThreadProject(BaseModel):
     project_id: Optional[str] = Field(None, max_length=ID_MAX_CHARS, description="null takes the chat out of its project")
 
@@ -52,6 +56,12 @@ def get_project(project_id: str):
 @projects_router.put("/projects/{project_id}")
 def update_project(project_id: str, body: ProjectChanges):
     return projects.update(project_id, name=body.name, instructions=body.instructions)
+
+
+@projects_router.put("/projects/{project_id}/pin")
+def pin_project(project_id: str, body: ProjectPin):
+    """Pin a project to the top of the list, or unpin it."""
+    return projects.set_pinned(project_id, body.pinned)
 
 
 @projects_router.delete("/projects/{project_id}")

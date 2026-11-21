@@ -17,6 +17,9 @@ import {
   FolderMinus,
   MoreHorizontal,
   Settings2,
+  Pin,
+  PinOff,
+  Share,
 } from 'lucide-react';
 import UserMenu from './settings/UserMenu';
 import Logo, { LogoMark } from './Logo';
@@ -73,6 +76,7 @@ const SquarePenIcon = (props) => (
  * @param {(id: string) => void} [props.onProjectSettings]  Open a project's instructions.
  * @param {(id: string, name: string) => void} [props.onRenameProject]
  * @param {(project: object) => void} [props.onDeleteProject]  Ask to delete a project.
+ * @param {(id: string, pinned: boolean) => void} [props.onPinProject]
  * @param {(threadId: string, projectId: string|null) => void} [props.onMoveThread]
  *   Move a chat into a project, or out of one. Without it the menu has no "Move to project".
  */
@@ -103,6 +107,7 @@ const Sidebar = ({
   onProjectSettings = () => {},
   onRenameProject = () => {},
   onDeleteProject = () => {},
+  onPinProject = () => {},
   onMoveThread = null,
 }) => {
   const [editingThreadId, setEditingThreadId] = useState(null);
@@ -118,6 +123,8 @@ const Sidebar = ({
   const [projectName, setProjectName] = useState('');
   // Where the open project menu sits. It floats so the scrolling list can't clip it.
   const [projectMenuPos, setProjectMenuPos] = useState(null);
+  // The project whose link was just copied ("Share project").
+  const [copiedProjectId, setCopiedProjectId] = useState(null);
 
   // The open project (or the open chat's project) shows its chats.
   useEffect(() => {
@@ -182,6 +189,25 @@ const Sidebar = ({
   const projectAction = (action) => {
     setOpenMenuId(null);
     action();
+  };
+
+  // Share project: copy the project's address. It opens for anyone who can
+  // already reach this OpenGPT (other devices, people on the same server).
+  const shareProject = async (id) => {
+    const link = `${window.location.origin}/project/${encodeURIComponent(id)}`;
+    try {
+      await navigator.clipboard.writeText(link);
+    } catch {
+      // No clipboard API (e.g. plain http on another host): copy the old way.
+      const field = document.createElement('textarea');
+      field.value = link;
+      document.body.appendChild(field);
+      field.select();
+      document.execCommand('copy');
+      field.remove();
+    }
+    setCopiedProjectId(id);
+    setTimeout(() => setCopiedProjectId((current) => (current === id ? null : current)), 2000);
   };
 
   const saveProjectName = (project) => {
@@ -453,6 +479,13 @@ const Sidebar = ({
                               ) : (
                                 <>
                                   <span className="truncate flex-1 min-w-0 text-sm text-gray-100">{project.name}</span>
+                                  {copiedProjectId === project.id && (
+                                    <span role="status" className="shrink-0 text-xs text-gray-400">Link copied</span>
+                                  )}
+                                  {project.pinned && copiedProjectId !== project.id && (
+                                    <Pin size={12} aria-label="Pinned"
+                                      className={`absolute right-4 text-gray-500 group-hover:hidden ${isCurrent || openMenuId === menuId ? 'hidden' : ''}`} />
+                                  )}
                                   <span
                                     className={`
                                       flex items-center gap-0.5 -my-1 shrink-0 opacity-0 group-hover:opacity-100
@@ -500,6 +533,20 @@ const Sidebar = ({
                                   >
                                     <Settings2 size={14} />
                                     <span>Project settings</span>
+                                  </button>
+                                  <button
+                                    onClick={() => projectAction(() => onPinProject(project.id, !project.pinned))}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg mx-1"
+                                  >
+                                    {project.pinned ? <PinOff size={14} /> : <Pin size={14} />}
+                                    <span>{project.pinned ? 'Unpin project' : 'Pin project'}</span>
+                                  </button>
+                                  <button
+                                    onClick={() => projectAction(() => shareProject(project.id))}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg mx-1"
+                                  >
+                                    <Share size={14} />
+                                    <span>Share project</span>
                                   </button>
                                   <button
                                     onClick={() => projectAction(() => { setProjectName(project.name); setRenamingProjectId(project.id); })}
