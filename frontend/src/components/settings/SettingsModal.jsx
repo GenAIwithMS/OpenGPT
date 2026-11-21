@@ -62,7 +62,9 @@ const SettingsModal = ({ section, onSectionChange, onClose, settings, save, disp
       .filter((g) => g.items.length);
   }, [query]);
 
-  const current = SECTIONS.flatMap((g) => g.items).find((i) => i.id === section) || SECTIONS[0].items[0];
+  // A section can name a tab too, e.g. "personalization:memory".
+  const [sectionId, sectionTab] = String(section || '').split(':');
+  const current = SECTIONS.flatMap((g) => g.items).find((i) => i.id === sectionId) || SECTIONS[0].items[0];
 
   let page;
   if (current.id === 'account') {
@@ -72,7 +74,7 @@ const SettingsModal = ({ section, onSectionChange, onClose, settings, save, disp
   } else if (current.id === 'shortcuts') {
     page = <ShortcutsPage />;
   } else if (current.id === 'personalization') {
-    page = <PersonalizationPage settings={settings} save={save} />;
+    page = <PersonalizationPage settings={settings} save={save} initialTab={sectionTab || 'profile'} />;
   } else if (current.id === 'connectors') {
     page = <ConnectorsPage />;
   } else if (current.id === 'skills') {

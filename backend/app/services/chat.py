@@ -16,6 +16,7 @@ from app.services.chatbot import (
 from app.services.thread import generate_thread_id, generate_id_name
 from app.services.rag import has_document
 from app.services import chat_approvals, model_router
+from app.services.memory import HISTORY_TOOL, MEMORY_TOOLS, memory_changed
 from app.services.citations import extract_sources, link_citations, renumber_sources
 from app.error_handlers import log_error, public_error
 from app.llm import split_content
@@ -85,9 +86,15 @@ class ChatService:
             messages = state.values.get("messages", [])
             
             formatted_messages = []
+            memory_updated = False   # a memory tool changed something since the last answer
             for message in messages:
                 extra = message.additional_kwargs or {}
+                if isinstance(message, ToolMessage):
+                    if message.name in MEMORY_TOOLS and memory_changed(message.content):
+                        memory_updated = True
+                    continue
                 if isinstance(message, HumanMessage):
+                    memory_updated = False
                     formatted_messages.append({
                         "content": message.content,
                         "type": "human",
@@ -100,7 +107,9 @@ class ChatService:
                             "type": "ai",
                             "tool_used": extra.get("tool_used"),
                             "research": extra.get("research_activity"),
+                            "memory_updated": memory_updated,
                         })
+                        memory_updated = False
             
             return formatted_messages
         except Exception as e:
@@ -404,6 +413,8 @@ class ChatService:
                 name = getattr(message_chunk, "name", None) or "tool"
                 if isinstance(message_chunk.content, str):
                     tool_outputs.append(message_chunk.content)
+                    if name in MEMORY_TOOLS and memory_changed(message_chunk.content):
+                        yield {"message_type": "memory"}
                 yield {
                     "content": f"Finished using {name}.",
                     "message_type": "thinking",
@@ -421,6 +432,10 @@ class ChatService:
                             label = "Searching your knowledge base..."
                         elif name == "Skill":
                             label = "Using a skill..."
+                        elif name in MEMORY_TOOLS:
+                            label = "Updating memory..."
+                        elif name == HISTORY_TOOL:
+                            label = "Searching your past chats..."
                         elif "__" in name:  # connector tool: server__tool
                             server, tool = name.split("__", 1)
                             label = f"Using {tool} ({server})..."
@@ -788,6 +803,10 @@ class ChatService:
             except Exception as e:
                 # Don't fail the whole operation if file cleanup fails
                 logger.warning(f"Failed to delete storage files for thread {thread_id}: {e}")
+
+            # Saved memories stay (they are about the user); the search cache forgets the chat.
+            from app.services import memory
+            memory.forget_chat(thread_id)
 
             logger.info(f"Successfully deleted thread: {thread_id}")
             return True

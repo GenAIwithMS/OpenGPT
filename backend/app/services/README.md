@@ -15,7 +15,8 @@ open with a docstring explaining how they work; the feature pages in
 | `rag.py` | Document storage, chunking, local embeddings, FAISS search | [documents](../../../docs/services/documents-and-knowledge.md) |
 | `knowledge.py` | The knowledge base and its `Knowledge` tool | [documents](../../../docs/services/documents-and-knowledge.md) |
 | `personalization.py` | Profile text for the system prompt and the coding agent | [settings](../../../docs/services/settings.md) |
-| `settings.py` | Profile and general settings in `app_settings` | [settings](../../../docs/services/settings.md) |
+| `memory.py` | Saved memories, the memory tools and chat history search | [memory](../../../docs/services/memory.md) |
+| `settings.py` | Profile, general and memory settings in `app_settings` | [settings](../../../docs/services/settings.md) |
 | `providers.py` | Model providers, job models, the model menu's list | [providers](../../../docs/services/providers.md) |
 | `model_router.py` | Auto: a model per message | [providers](../../../docs/services/providers.md) |
 | `connectors.py` | MCP connectors: catalog, storage, specs for chat and the agent | [connectors](../../../docs/services/connectors.md) |
@@ -28,7 +29,7 @@ open with a docstring explaining how they work; the feature pages in
 ## How services depend on each other
 
 ```
-router ─► chat ─► chatbot ─► llm, knowledge, skills, mcp_tools, personalization
+router ─► chat ─► chatbot ─► llm, knowledge, skills, mcp_tools, personalization, memory
                     └─► model_router ─► llm
 router ─► connectors ◄─ connector_oauth          mcp_tools ─► connectors, chat_approvals
 router ─► providers ─► llm (reload), coding_agent.process (restart)

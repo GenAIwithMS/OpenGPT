@@ -132,9 +132,11 @@ def _config(thread_id: str, checkpoint_ns: str, checkpoint_id: str) -> dict:
 class MySQLCheckpointSaver(BaseCheckpointSaver):
     """SQLAlchemy-based checkpoint saver for LangGraph."""
 
-    def __init__(self):
-        super().__init__()
-        self.session_factory = DatabaseConfig.get_session_factory()
+    @property
+    def session_factory(self):
+        # Looked up on each use, so a database set after this saver was
+        # created (tests use SQLite) is the one used.
+        return DatabaseConfig.get_session_factory()
 
     # -- helpers ------------------------------------------------------------
 

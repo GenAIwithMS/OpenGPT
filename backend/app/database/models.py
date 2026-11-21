@@ -101,3 +101,18 @@ class CodeProject(Base):
     last_opened_at = Column(TIMESTAMP, default=func.current_timestamp())
 
     __table_args__ = (Index("idx_code_projects_last_opened", "last_opened_at"),)
+
+
+class Memory(Base):
+    """Saved memories: short facts about the user used in every chat (Settings >
+    Personalization > Memory). See app/services/memory.py."""
+    __tablename__ = "memories"
+
+    id = Column(String(36), primary_key=True)
+    text = Column(String(500), nullable=False)
+    # The chat it was saved in (empty when added in Settings).
+    thread_id = Column(String(191), nullable=True)
+    created_at = Column(TIMESTAMP, default=func.current_timestamp())
+    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp())
+
+    __table_args__ = (Index("idx_memories_created", "created_at"),)

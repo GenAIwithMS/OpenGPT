@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, FileText, Loader2, Trash2, Upload } from 'lucide-react';
 import { PageHeader } from './controls';
+import MemoryTab from './MemoryTab';
 import { settingsService } from '../../services/api';
 
 const LIMITS = { nickname: 50, occupation: 100, about: 2000, instructions: 4000 };
@@ -188,15 +189,18 @@ const KnowledgeTab = () => {
 
 /**
  * Settings > Personalization: the Profile tab (nickname, occupation, about
- * you, custom instructions) and the Knowledge tab (documents every chat can search).
+ * you, custom instructions), the Memory tab (saved memories, chat history)
+ * and the Knowledge tab (documents every chat can search).
  *
  * @param {object} props
  * @param {object} props.settings  All settings from `useSettings`.
  * @param {(changes: object) => Promise} props.save  Save a partial update, e.g. `{profile: {...}}`.
+ * @param {string} [props.initialTab]  `profile` (default), `memory` or `knowledge`.
  */
-const PersonalizationPage = ({ settings, save }) => {
-  const [tab, setTab] = useState('profile');
-  const tabs = [{ id: 'profile', label: 'Profile' }, { id: 'knowledge', label: 'Knowledge' }];
+const PersonalizationPage = ({ settings, save, initialTab = 'profile' }) => {
+  const [tab, setTab] = useState(initialTab);
+  useEffect(() => { setTab(initialTab); }, [initialTab]);
+  const tabs = [{ id: 'profile', label: 'Profile' }, { id: 'memory', label: 'Memory' }, { id: 'knowledge', label: 'Knowledge' }];
 
   return (
     <div>
@@ -211,7 +215,9 @@ const PersonalizationPage = ({ settings, save }) => {
           </button>
         ))}
       </div>
-      {tab === 'profile' ? <ProfileTab settings={settings} save={save} /> : <KnowledgeTab />}
+      {tab === 'profile' && <ProfileTab settings={settings} save={save} />}
+      {tab === 'memory' && <MemoryTab settings={settings} save={save} />}
+      {tab === 'knowledge' && <KnowledgeTab />}
     </div>
   );
 };

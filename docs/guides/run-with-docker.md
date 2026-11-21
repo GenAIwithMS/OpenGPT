@@ -38,6 +38,10 @@ in one of the two.
 docker compose pull && docker compose up -d
 ```
 
+A new image is published for every change to `main` that passes the tests:
+`genaiwithms/opengpt:latest`, and `genaiwithms/opengpt:sha-<commit>` to pin
+an exact version (set `image:` in `docker-compose.yml`).
+
 ## Local models
 
 Inside the container, `localhost` is the container itself. A model server on
@@ -87,6 +91,15 @@ your network".
 docker build -t opengpt .
 ```
 
-How the image works: [Dockerfile](../../Dockerfile). The backend serves the
+How the image works: [Dockerfile](../../Dockerfile).
+
+## How the published image is built
+
+[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) runs the backend
+tests, the frontend build and the coding agent type check on every push to
+`main` and every pull request. After a push to `main` passes, it builds the
+image (linux/amd64) and pushes it to Docker Hub as `latest` and
+`sha-<commit>`. It needs two repository secrets: `DOCKERHUB_USERNAME` and
+`DOCKERHUB_TOKEN` (a Docker Hub access token with read and write access). The backend serves the
 built frontend itself when `FRONTEND_DIST` is set, and listens on
 `BIND_HOST` (0.0.0.0) inside the container while `HOST` stays local.

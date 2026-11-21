@@ -293,6 +293,7 @@ def get_thread_history(thread_id: str):
                 tools=m.get("tools"),
                 tool_used=m.get("tool_used"),
                 research=m.get("research"),
+                memory_updated=bool(m.get("memory_updated")),
             )
             for m in messages
         ]

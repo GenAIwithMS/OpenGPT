@@ -14,8 +14,8 @@ calls tools when it needs them.
 3. The graph (`app/services/chatbot.py`) has two nodes:
    - `chat_node` builds one system message (base prompt, a search
      instruction if the user turned search on, the
-     [personalization](settings.md) profile, the
-     [knowledge base](documents-and-knowledge.md) list, enabled
+     [personalization](settings.md) profile, saved [memories](memory.md),
+     the [knowledge base](documents-and-knowledge.md) list, enabled
      [skills](skills.md), [connector](connectors.md) tools), adds document
      context for the question when the thread has files, binds the tools and
      streams the model.
@@ -45,6 +45,8 @@ calls tools when it needs them.
 Always offered: `Search` (Parallel, falling back to Brave), `Weather`,
 `Calculator`, `Stock_price` (`app/tools/`). Offered when relevant:
 `Knowledge` (the knowledge base has documents), `Skill` (skills are on),
+`Remember`, `Update_memory`, `Forget` and `Chat_history` ([memory](memory.md)
+is on, never in temporary chats),
 connector tools named `server__tool`. A tool error becomes a short message
 the model can act on instead of failing the reply.
 

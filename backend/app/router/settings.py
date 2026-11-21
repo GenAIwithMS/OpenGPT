@@ -4,11 +4,12 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, Body, Depends, File, UploadFile
 from fastapi.concurrency import run_in_threadpool
+from pydantic import BaseModel, Field
 
 from app.exceptions import ValidationError
 from app.rate_limit import rate_limit
 from app.router.chat import MAX_UPLOAD_BYTES, _check_file_content
-from app.services import knowledge
+from app.services import knowledge, memory
 from app.services import settings as app_settings
 from app.services.rag import SUPPORTED_EXTENSIONS
 
@@ -57,3 +58,37 @@ async def add_knowledge(file: UploadFile = File(...)):
 def remove_knowledge(file_id: str):
     """Remove a document from the knowledge base."""
     knowledge.remove(file_id)
+
+
+# ----- memory (Personalization > Memory) -----
+
+class MemoryText(BaseModel):
+    text: str = Field(..., max_length=memory.MAX_MEMORY_CHARS)
+
+
+@settings_router.get("/memories")
+def list_memories():
+    """Saved memories, newest first."""
+    return {"memories": memory.list_memories(), "max": memory.MAX_MEMORIES,
+            "max_chars": memory.MAX_MEMORY_CHARS}
+
+
+@settings_router.post("/memories", status_code=201)
+def add_memory(body: MemoryText):
+    return memory.add(body.text)
+
+
+@settings_router.put("/memories/{memory_id}")
+def update_memory(memory_id: str, body: MemoryText):
+    return memory.update(memory_id[:36], body.text)
+
+
+@settings_router.delete("/memories/{memory_id}", status_code=204)
+def delete_memory(memory_id: str):
+    memory.delete(memory_id[:36])
+
+
+@settings_router.delete("/memories", status_code=204)
+def clear_memories():
+    """Delete every saved memory."""
+    memory.clear()

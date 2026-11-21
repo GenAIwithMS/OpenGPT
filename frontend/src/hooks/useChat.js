@@ -222,6 +222,9 @@ export const useChat = (threadId, onThreadCreated, skipLoadRef, isTempChat = fal
         // Deep research activity (planning, searches, sources, ...) is kept on
         // the message so it stays with the conversation.
         updateMessage(placeholderId, m => ({ ...m, research: [...(m.research || []), data.event] }));
+      } else if (data.message_type === 'memory') {
+        // The reply saved, changed or deleted a memory ("Memory updated").
+        updateMessage(placeholderId, m => ({ ...m, memory_updated: true }));
       } else if (data.message_type === 'model') {
         // Which model answers this reply (picked in the menu, or by Auto).
         updateMessage(placeholderId, m => ({ ...m, model: data.model, autoModel: Boolean(data.auto) }));

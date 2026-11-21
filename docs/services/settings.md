@@ -9,7 +9,7 @@ need no storage.
 | Account | | Local profile summary |
 | General | `app/services/settings.py`, section `general` | New chats temporary by default; notification and sound when a reply or coding task finishes in a background tab |
 | Shortcuts | `frontend/src/lib/shortcuts.js` | Defined once, listed on the page |
-| Personalization | `settings.py` section `profile`; knowledge in [documents](documents-and-knowledge.md) | Nickname, occupation, about you, custom instructions |
+| Personalization | `settings.py` section `profile`; [memory](memory.md) (section `memory` and the `memories` table); knowledge in [documents](documents-and-knowledge.md) | Profile tab: nickname, occupation, about you, custom instructions. Memory tab. Knowledge tab |
 | Connectors | [connectors](connectors.md) | |
 | Skills | [skills](skills.md) | |
 | Developer | [providers](providers.md) | |

@@ -3,7 +3,9 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
-import { Loader2, Copy, Check, ThumbsUp, ThumbsDown, RotateCcw, Pencil } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Loader2, Copy, Check, ThumbsUp, ThumbsDown, RotateCcw, Pencil, BookmarkCheck } from 'lucide-react';
+import { OPEN_SETTINGS_EVENT } from './ModelPicker';
 import AttachmentCard from './AttachmentCard';
 import ThinkingIndicator from './ThinkingIndicator';
 import ResearchCard from './ResearchCard';
@@ -135,6 +137,10 @@ const isCitation = (el) => React.isValidElement(el) && el.type === MarkdownLink 
 const MarkdownLink = ({ href, title, children }) => {
   if (title) {
     return <CitationChip sources={[parseCitation({ href, title, label: nodeToString(children) })]} />;
+  }
+  // A link to another chat (from chat history search) opens it in the app.
+  if (typeof href === 'string' && /^\/chat\/[\w-]+$/.test(href)) {
+    return <Link to={href} className="text-blue-400 hover:text-blue-300 underline break-words">{children}</Link>;
   }
   return (
     <a
@@ -553,6 +559,13 @@ const MessageItem = memo(function MessageItem({
       <div className="max-w-3xl mx-auto flex justify-start">
         <div className="w-full min-w-0 px-4 py-1 rounded-lg text-gray-100">
           {bubbleInner}
+          {message.memory_updated && !message.streaming && (
+            <button type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent(OPEN_SETTINGS_EVENT, { detail: 'personalization:memory' }))}
+              className="mt-2 flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-200">
+              <BookmarkCheck size={13} aria-hidden="true" /> Memory updated
+            </button>
+          )}
           <MessageActions
             content={message.content}
             onRegenerate={canRegenerate ? onRegenerate : undefined}
@@ -571,7 +584,7 @@ const MessageItem = memo(function MessageItem({
  * actions (copy, edit, regenerate). Scrolls to the newest message.
  *
  * @param {object} props
- * @param {object[]} props.messages  From `useChat`: `{id, type: 'human'|'ai', content, streaming?, research?, approvals?, model?, autoModel?}`.
+ * @param {object[]} props.messages  From `useChat`: `{id, type: 'human'|'ai', content, streaming?, research?, approvals?, model?, autoModel?, memory_updated?}`.
  * @param {boolean} props.loading  Loading a thread's history.
  * @param {boolean} props.streaming  A reply is being written.
  * @param {object|null} props.streamingProgress  The live status for the message being written (thinking, steps).

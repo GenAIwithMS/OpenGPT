@@ -4,7 +4,8 @@ Two ways to give the assistant documents, built on the same code
 (`app/services/rag.py`):
 
 - **Chat documents**: files attached to one chat. Every question in that
-  chat gets the most relevant passages added to it.
+  chat gets the most relevant passages added to it. Other chats don't see
+  them, except through [chat history](memory.md) when the user refers to them.
 - **Knowledge base** (Settings > Personalization > Knowledge,
   `app/services/knowledge.py`): files every chat can search. The model gets a
   `Knowledge` tool and the list of document names, and calls the tool when a

@@ -82,6 +82,7 @@ class MessageResponse(BaseModel):
     tools: Optional[List[str]] = Field(None, description="Tools selected for a human message")
     tool_used: Optional[str] = Field(None, description="Tool that produced an AI message")
     research: Optional[List[Dict[str, Any]]] = Field(None, description="Deep research activity log")
+    memory_updated: bool = Field(False, description="This answer saved, changed or deleted a memory")
 
 
 class ThreadHistoryResponse(BaseModel):
