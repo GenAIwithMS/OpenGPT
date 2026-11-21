@@ -7,6 +7,7 @@ hooks call `services/api.js`.
 |---|---|---|
 | `useChat` | The open chat's messages, sending, streaming, edit, regenerate, stop | App ─► MessageList, MessageInput |
 | `useThreads` | The chat list and renaming (App deletes chats through `chatService`) | App ─► Sidebar, SearchPalette |
+| `useProjects` | The project list and creating a project | App ─► Sidebar |
 | `useCodeWorkspace` | Coding agent status, projects, chosen project, its sessions (only while the Code page is open) | App ─► Sidebar, CodeView |
 | `useCodeSession` | One coding session: messages, streaming, approvals, stop | CodeView |
 | `useSettings` | Settings from the backend, saved optimistically | App ─► SettingsModal |
@@ -26,6 +27,7 @@ sendMessage(text, tools, attachments)
          approval       connector tool asks ─► message.approvals[]
          approval_done  the answer ─► approval.decision
          research       deep research activity ─► message.research[]
+         memory         the answer changed a saved memory ─► message.memory_updated
          progress       blog writer steps ─► streamingProgress.steps
          done           finish; a new chat gets its thread id (URL updated quietly)
          error          keep partial text, show the error

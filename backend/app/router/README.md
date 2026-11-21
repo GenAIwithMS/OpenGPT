@@ -12,7 +12,8 @@ returns JSON or a Server-Sent Events stream. Business logic lives in
 | `connectors.py` | `/api/connectors` | Connector catalog, add / import / update / remove, sign-in (OAuth, device code), token refresh loop | `services/connectors.py`, `connector_oauth.py`, `mcp_tools.py` |
 | `skills.py` | `/api/skills` | Skills list, on/off, create, edit, upload, GitHub import, Explore catalog | `services/skills.py` |
 | `providers.py` | `/api/providers` | Model providers, testing, active provider and job models, the model menu (`/models`) | `services/providers.py`, `model_router.py` |
-| `settings.py` | `/api/settings` | Profile and general settings, knowledge base files | `services/settings.py`, `knowledge.py` |
+| `settings.py` | `/api/settings` | Profile and general settings, knowledge base files, saved memories | `services/settings.py`, `knowledge.py`, `memory.py` |
+| `projects.py` | `/api` | Projects (`/projects`), their files, moving a chat (`/threads/{id}/project`) | `services/projects.py` |
 | `health.py` | `/api` | `GET /api/health` | |
 
 ## Conventions

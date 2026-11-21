@@ -54,8 +54,10 @@ the model can act on instead of failing the reply.
 
 - Saved chats are LangGraph checkpoints in MySQL
   (`app/database/mysql_checkpoint.py`); older checkpoints beyond
-  `MAX_CHECKPOINTS_PER_THREAD` are deleted. Titles and timestamps are in
-  `thread_metadata`.
+  `MAX_CHECKPOINTS_PER_THREAD` are deleted. Titles, timestamps and the
+  chat's project (`project_id`) are in `thread_metadata`.
+- A chat in a [project](projects.md) gets the project's instructions in its
+  system prompt and passages from the project's files with each question.
 - Temporary chats run on an in-memory checkpointer (`chatbot_memory`) and are
   never written to the database. They are forgotten when the browser ends
   them, after an hour idle, or on restart.
@@ -66,8 +68,9 @@ the model can act on instead of failing the reply.
 
 `POST /api/chat/stream`, `/chat/edit` (edit a message and regenerate),
 `/chat/regenerate`, `/chat/temp/{id}/end`, `/chat/approvals/{id}`;
-`GET /api/threads`, `GET /api/threads/{id}`, `POST /api/threads/new`,
-`PUT /api/threads/{id}/title`, `DELETE /api/threads/{id}`. Full list at
+`GET /api/threads`, `GET /api/threads/{id}`, `POST /api/threads/new`
+(optional `{"project_id": ...}`), `PUT /api/threads/{id}/title`,
+`PUT /api/threads/{id}/project`, `DELETE /api/threads/{id}`. Full list at
 `/docs` on a running backend.
 
 ## Pitfalls

@@ -24,6 +24,7 @@ the page for the part you are changing. To install and run OpenGPT, see the
 | [Skills](services/skills.md) | SKILL.md instructions for chat and the coding agent |
 | [Providers](services/providers.md) | Model providers and the model used for each job |
 | [Memory](services/memory.md) | Saved memories and searching past chats (and their files) |
+| [Projects](services/projects.md) | Chats grouped with shared instructions and files |
 | [Settings](services/settings.md) | The settings popup's storage: profile, general, personalization |
 
 ## Guides

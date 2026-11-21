@@ -38,6 +38,32 @@ def _upgrade_blob_columns():
                 logger.info(f"Upgraded {table}.{column} to LONGBLOB")
 
 
+# (table, column, definition, index) for columns added after the table was
+# first created: create_all() never adds columns to existing tables.
+_ADDED_COLUMNS = [
+    ("thread_metadata", "project_id", "VARCHAR(36) NULL", "idx_thread_project"),
+]
+
+
+def _add_missing_columns():
+    """Add newer columns (and their index) to tables from older versions."""
+    with DatabaseConfig.get_engine().begin() as conn:
+        for table, column, definition, index in _ADDED_COLUMNS:
+            exists = conn.execute(
+                text(
+                    "SELECT COUNT(*) FROM information_schema.COLUMNS "
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c"
+                ),
+                {"t": table, "c": column},
+            ).scalar()
+            if exists:
+                continue
+            conn.execute(text(f"ALTER TABLE `{table}` ADD COLUMN `{column}` {definition}"))
+            if index:
+                conn.execute(text(f"CREATE INDEX `{index}` ON `{table}` (`{column}`)"))
+            logger.info("Added %s.%s", table, column)
+
+
 def _drop_checkpoint_writes_foreign_key():
     """Older databases have a foreign key from checkpoint_writes to checkpoints."""
     with DatabaseConfig.get_engine().begin() as conn:
@@ -105,6 +131,7 @@ def init_database():
         # Create tables
         Base.metadata.create_all(DatabaseConfig.get_engine())
         _upgrade_blob_columns()
+        _add_missing_columns()
         _drop_checkpoint_writes_foreign_key()
         _warn_about_pickled_checkpoints()
         return True

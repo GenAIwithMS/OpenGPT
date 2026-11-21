@@ -41,7 +41,8 @@ switch in Settings > Personalization > Memory (settings section `memory`).
   best matches first, at most two excerpts per chat and eight in all. A
   chat's text is cached until it changes.
 - Files: each chat's files stay private to that chat; this tool is the only
-  way another chat reaches them. It searches up to three chats with files:
+  way another chat reaches them (files meant for several chats go in a
+  [project](projects.md) or the knowledge base). It searches up to three chats with files:
   those whose file names or titles match the words, or, when no message
   matched, the most recent ones. It uses the same document search a chat uses
   for its own files.

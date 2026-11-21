@@ -77,6 +77,8 @@ OpenGPT is an open-source chat assistant built with LangGraph. It has a FastAPI 
 - **Connectors (MCP)**: add GitHub, Notion, Linear and other MCP servers by signing in, or your own by command, URL or JSON; chat and the coding agent can use their tools, and anything that changes data asks first
 - **Skills**: reusable instructions (SKILL.md) that chat and the coding agent load when a task fits; built-in ones, an Explore catalog, or create, upload and import from GitHub
 - **Personalization and knowledge base**: your profile and custom instructions, plus documents every chat can search
+- **Memory**: the assistant remembers facts you share across chats, and can search your past chats when you refer to them
+- **Projects**: group chats with shared instructions and files that every chat in the project uses
 - **Settings for providers**: add more model providers and choose a model for each job (chat, titles, research, blogs, coding)
 - **Search window** (Ctrl/Cmd+K) for chats, coding projects and sessions
 

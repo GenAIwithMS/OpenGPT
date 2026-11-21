@@ -11,6 +11,10 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Code2,
+  Folder,
+  FolderInput,
+  FolderMinus,
+  FolderPlus,
 } from 'lucide-react';
 import UserMenu from './settings/UserMenu';
 import Logo, { LogoMark } from './Logo';
@@ -57,6 +61,12 @@ const SquarePenIcon = (props) => (
  * @param {string} [props.displayName]  Shown in the user menu.
  * @param {(section?: string) => void} [props.onOpenSettings]
  * @param {() => void} [props.onOpenSearch]  Open the search window.
+ * @param {{id: string, name: string}[]} [props.projects]  Projects (not shown on the Code page).
+ * @param {string|null} [props.currentProjectId]  The open project, or the open chat's project.
+ * @param {(id: string) => void} [props.onOpenProject]
+ * @param {() => void} [props.onNewProject]
+ * @param {(threadId: string, projectId: string|null) => void} [props.onMoveThread]
+ *   Move a chat into a project, or out of one. Without it the menu has no "Move to project".
  */
 const Sidebar = ({
   threads,
@@ -76,11 +86,19 @@ const Sidebar = ({
   displayName = 'Muhammad',
   onOpenSettings = () => {},
   onOpenSearch = () => {},
+  projects = null,
+  currentProjectId = null,
+  onOpenProject = () => {},
+  onNewProject = () => {},
+  onMoveThread = null,
 }) => {
   const [editingThreadId, setEditingThreadId] = useState(null);
   const [editTitle, setEditTitle] = useState('');
   const [openMenuId, setOpenMenuId] = useState(null);
   const [recentsOpen, setRecentsOpen] = useState(true);
+  const [projectsOpen, setProjectsOpen] = useState(true);
+  // The chat whose menu shows the project list ("Move to project").
+  const [movingThreadId, setMovingThreadId] = useState(null);
 
   const handleRename = (threadId, currentTitle) => {
     setEditingThreadId(threadId);
@@ -105,7 +123,19 @@ const Sidebar = ({
 
   const toggleMenu = (e, threadId) => {
     e.stopPropagation();
+    setMovingThreadId(null);
     setOpenMenuId(openMenuId === threadId ? null : threadId);
+  };
+
+  const moveThread = (threadId, projectId) => {
+    setOpenMenuId(null);
+    setMovingThreadId(null);
+    onMoveThread?.(threadId, projectId);
+  };
+
+  const openProject = (id) => {
+    onOpenProject(id);
+    if (window.innerWidth < 1024) toggleSidebar();
   };
 
   const openChat = (thread) => {
@@ -204,6 +234,16 @@ const Sidebar = ({
               <Code2 size={18} />
             </button>
 
+            {projects && (
+              <button
+                onClick={() => onToggleCollapse?.()}
+                title="Projects"
+                className="flex items-center justify-center w-10 h-10 rounded-xl hover:bg-gray-700 transition-colors mt-1"
+              >
+                <Folder size={18} />
+              </button>
+            )}
+
             <div className="mt-auto">
               <UserMenu displayName={displayName} onOpenSettings={onOpenSettings} collapsed />
             </div>
@@ -277,6 +317,56 @@ const Sidebar = ({
                 footer stay pinned (shrink-0) so collapsing Recents doesn't move
                 them. */}
             <div className="flex-1 min-h-0 flex flex-col">
+              {/* Projects: chats grouped with shared instructions and files */}
+              {projects && (
+                <div className="shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setProjectsOpen((o) => !o)}
+                    className="group flex items-center gap-1 px-3 pt-3 pb-1 text-left"
+                  >
+                    <span className="text-sm font-medium text-gray-300 group-hover:text-gray-100 transition-colors">
+                      Projects
+                    </span>
+                    <ChevronDown
+                      size={16}
+                      className={`
+                        text-gray-400 opacity-0 group-hover:opacity-100
+                        transition-transform duration-300 ease-out group-hover:text-gray-200
+                        ${projectsOpen ? 'rotate-0' : '-rotate-90'}
+                      `}
+                    />
+                  </button>
+                  {projectsOpen && (
+                    <div className="px-2 py-1 space-y-0.5 max-h-[30vh] overflow-y-auto thin-scroll">
+                      <button
+                        type="button"
+                        onClick={onNewProject}
+                        className="flex w-full items-center gap-2.5 px-3 py-2 rounded-xl text-left text-sm text-gray-200 hover:bg-gray-700/60 transition-colors"
+                      >
+                        <FolderPlus size={16} className="shrink-0 text-gray-400" />
+                        <span>New project</span>
+                      </button>
+                      {projects.map((project) => (
+                        <button
+                          key={project.id}
+                          type="button"
+                          onClick={() => openProject(project.id)}
+                          aria-current={currentProjectId === project.id ? 'page' : undefined}
+                          className={`
+                            flex w-full items-center gap-2.5 px-3 py-2 rounded-xl text-left transition-colors
+                            ${currentProjectId === project.id ? 'bg-gray-700/90' : 'hover:bg-gray-700/60'}
+                          `}
+                        >
+                          <Folder size={16} className="shrink-0 text-gray-400" />
+                          <span className="truncate text-sm text-gray-100">{project.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Recents header — toggles the chat history list visibility */}
               <button
                 type="button"
@@ -376,9 +466,40 @@ const Sidebar = ({
                             <MoreVertical size={15} />
                           </button>
 
-                          {openMenuId === thread.thread_id && (
+                          {openMenuId === thread.thread_id && movingThreadId === thread.thread_id && (
                             <div
-                              className="absolute right-2 top-full mt-1 w-36 bg-gray-800 rounded-xl shadow-xl shadow-black/40 z-50 py-1 border border-gray-700/70 animate-menu-in origin-top-right"
+                              className="absolute right-2 top-full mt-1 w-52 max-h-64 overflow-y-auto overflow-x-hidden thin-scroll bg-gray-800 rounded-xl shadow-xl shadow-black/40 z-50 py-1 border border-gray-700/70 animate-menu-in origin-top-right"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <p className="px-3 py-1.5 text-xs text-gray-500">Move to project</p>
+                              {(projects || []).filter((p) => p.id !== thread.project_id).map((p) => (
+                                <button
+                                  key={p.id}
+                                  onClick={() => moveThread(thread.thread_id, p.id)}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg mx-1"
+                                >
+                                  <Folder size={14} className="shrink-0" />
+                                  <span className="truncate">{p.name}</span>
+                                </button>
+                              ))}
+                              {thread.project_id && (
+                                <button
+                                  onClick={() => moveThread(thread.thread_id, null)}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg mx-1"
+                                >
+                                  <FolderMinus size={14} className="shrink-0" />
+                                  <span>Remove from project</span>
+                                </button>
+                              )}
+                              {!(projects || []).some((p) => p.id !== thread.project_id) && !thread.project_id && (
+                                <p className="px-3 py-2 text-sm text-gray-400">No projects yet. Create one under Projects.</p>
+                              )}
+                            </div>
+                          )}
+
+                          {openMenuId === thread.thread_id && movingThreadId !== thread.thread_id && (
+                            <div
+                              className="absolute right-2 top-full mt-1 w-44 bg-gray-800 rounded-xl shadow-xl shadow-black/40 z-50 py-1 border border-gray-700/70 animate-menu-in origin-top-right"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <button
@@ -391,6 +512,18 @@ const Sidebar = ({
                                 <Edit2 size={14} />
                                 <span>Rename</span>
                               </button>
+                              {onMoveThread && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setMovingThreadId(thread.thread_id);
+                                  }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg mx-1"
+                                >
+                                  <FolderInput size={14} />
+                                  <span>Move to project</span>
+                                </button>
+                              )}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();

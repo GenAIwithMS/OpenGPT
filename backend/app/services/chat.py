@@ -15,7 +15,7 @@ from app.services.chatbot import (
 )
 from app.services.thread import generate_thread_id, generate_id_name
 from app.services.rag import has_document
-from app.services import chat_approvals, model_router
+from app.services import chat_approvals, model_router, projects
 from app.services.memory import HISTORY_TOOL, MEMORY_TOOLS, memory_changed
 from app.services.citations import extract_sources, link_citations, renumber_sources
 from app.error_handlers import log_error, public_error
@@ -28,14 +28,27 @@ DEEP_RESEARCH_HISTORY_MESSAGES = 6
 DEEP_RESEARCH_HISTORY_CHARS = 4000
 
 
+def _uses_files(thread_id: str, doc_exists: bool) -> bool:
+    """Whether this reply gets document context: the chat's files or its project's
+    (Auto picks a stronger model for those)."""
+    if doc_exists:
+        return True
+    project = projects.project_for_thread(thread_id)
+    return bool(project) and has_document(project["id"])
+
+
 class ChatService:
     """Service class to handle chat-related business logic"""
     
     @staticmethod
-    def create_new_thread() -> str:
-        """Create a new thread and return its ID"""
+    def create_new_thread(project_id: Optional[str] = None) -> str:
+        """Create a new thread (in a project, if given) and return its ID"""
+        if project_id:
+            projects.get(project_id)  # raises NotFoundError
         thread_id = generate_thread_id()
         save_thread_title(thread_id, "New Chat")
+        if project_id:
+            projects.set_thread_project(thread_id, project_id)
         return thread_id
     
     @staticmethod
@@ -71,7 +84,8 @@ class ChatService:
             threads.append({
                 "thread_id": tid,
                 "title": title,
-                "updated_at": updated_at
+                "updated_at": updated_at,
+                "project_id": thread_meta.get("project_id") if isinstance(thread_meta, dict) else None,
             })
         
         # Sort by updated_at descending (most recent first)
@@ -248,7 +262,7 @@ class ChatService:
 
             doc_exists = has_document(thread_id)
             question = messages[last_human].content if isinstance(messages[last_human].content, str) else ""
-            name, _ = model_router.choose(question, model, has_document=doc_exists)
+            name, _ = model_router.choose(question, model, has_document=_uses_files(thread_id, doc_exists))
             final_state = chatbot.invoke(
                 {
                     "messages": [],
@@ -320,7 +334,8 @@ class ChatService:
         # The model for this reply: the one picked in the menu, or Auto's choice
         # (see model_router). The UI shows which one answered.
         name, auto = model_router.choose(
-            human_message if human_message is not None else (route_text or ""), model, has_document=doc_exists)
+            human_message if human_message is not None else (route_text or ""), model,
+            has_document=_uses_files(config["configurable"]["thread_id"], doc_exists))
         yield {"message_type": "model", "model": name, "auto": auto}
 
         # can_ask: connector tools may pause and ask the user (see chat_approvals);

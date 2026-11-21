@@ -69,6 +69,7 @@ The database and tables are created at startup.
 | `MAX_MESSAGE_CHARS` | `20000` | Longest chat message |
 | `MAX_UPLOAD_MB` | `20` | Largest uploaded document |
 | `MAX_KNOWLEDGE_FILES` | `50` | Documents in the knowledge base |
+| `MAX_PROJECT_FILES` | `50` | Files in one project |
 | `MAX_REPORT_CHARS` | `200000` | Longest edited research report |
 | `MAX_BLOG_SECTIONS` | `10` | Sections per blog post |
 | `MAX_CACHED_RETRIEVERS` | `32` | Document indexes kept in memory |
