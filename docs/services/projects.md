@@ -9,7 +9,7 @@ assistants. Not to be confused with coding projects on the Code page
 `app/services/projects.py`, the `projects` table and
 `thread_metadata.project_id` (`app/database/models.py`), `/api/projects`
 (`app/router/projects.py`), `frontend/src/components/projects/ProjectView.jsx`,
-the Projects section and "Move to project" in `Sidebar.jsx`,
+the Projects section (projects, their chats and menu) and "Move to project" in `Sidebar.jsx`,
 `hooks/useProjects.js`.
 
 ## What a project has
@@ -34,8 +34,17 @@ connectors work in project chats the same as anywhere else.
 
 ## In the app
 
-- The sidebar lists projects above Recents, with **New project**. Chats in a
-  project are listed on the project's page, not in Recents.
+- The sidebar lists projects above Recents; the **+** next to the Projects
+  heading creates one. Chats in a project are listed under the project and on
+  its page, not in Recents.
+- Clicking a project opens its page and lists its chats under it in the
+  sidebar (the folder icon shows as open). Clicking the open project again
+  hides its chats.
+- Each project has a new chat button, which opens the project's page with the
+  cursor in its message box, and a **...** menu: **Project settings** (a popup
+  for the instructions and files, without leaving the current page),
+  **Rename project** (in the sidebar), **Project home** and
+  **Delete project**.
 - A project's page (`/project/<id>`) has a message box that starts a new chat
   in the project, the instructions and files, and the project's chats. Its
   menu renames the project, edits the instructions or deletes the project.

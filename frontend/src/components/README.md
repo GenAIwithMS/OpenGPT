@@ -10,7 +10,8 @@ App
 ├─ Sidebar ─────────────── new chat, Search chats (button), Code, Projects, chat list
 │                          (Move to project), UserMenu
 ├─ projects/ProjectView ── a project's page (/project/<id>): new chat box,
-│                          instructions, files, chats; NewProjectDialog
+│                          instructions, files, chats; NewProjectDialog,
+│                          ProjectSettingsDialog (sidebar "Project settings")
 ├─ MessageList ─────────── messages (memoized MessageItem)
 │   ├─ ThinkingIndicator   live status and reasoning while the model works
 │   ├─ ResearchCard / ReportCard ─► ResearchPanel (side panel: activity or report)

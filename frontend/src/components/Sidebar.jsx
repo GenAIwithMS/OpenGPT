@@ -12,9 +12,11 @@ import {
   PanelLeftOpen,
   Code2,
   Folder,
+  FolderOpen,
   FolderInput,
   FolderMinus,
-  FolderPlus,
+  MoreHorizontal,
+  Settings2,
 } from 'lucide-react';
 import UserMenu from './settings/UserMenu';
 import Logo, { LogoMark } from './Logo';
@@ -65,6 +67,12 @@ const SquarePenIcon = (props) => (
  * @param {string|null} [props.currentProjectId]  The open project, or the open chat's project.
  * @param {(id: string) => void} [props.onOpenProject]
  * @param {() => void} [props.onNewProject]
+ * @param {{thread_id: string, title?: string, project_id: string}[]} [props.projectThreads]
+ *   Chats that are in a project, listed under their project when it is expanded.
+ * @param {(id: string) => void} [props.onNewProjectChat]  Start a new chat in a project.
+ * @param {(id: string) => void} [props.onProjectSettings]  Open a project's instructions.
+ * @param {(id: string, name: string) => void} [props.onRenameProject]
+ * @param {(project: object) => void} [props.onDeleteProject]  Ask to delete a project.
  * @param {(threadId: string, projectId: string|null) => void} [props.onMoveThread]
  *   Move a chat into a project, or out of one. Without it the menu has no "Move to project".
  */
@@ -90,6 +98,11 @@ const Sidebar = ({
   currentProjectId = null,
   onOpenProject = () => {},
   onNewProject = () => {},
+  projectThreads = [],
+  onNewProjectChat = () => {},
+  onProjectSettings = () => {},
+  onRenameProject = () => {},
+  onDeleteProject = () => {},
   onMoveThread = null,
 }) => {
   const [editingThreadId, setEditingThreadId] = useState(null);
@@ -99,6 +112,17 @@ const Sidebar = ({
   const [projectsOpen, setProjectsOpen] = useState(true);
   // The chat whose menu shows the project list ("Move to project").
   const [movingThreadId, setMovingThreadId] = useState(null);
+  // Projects whose chats are listed under them, and the project being renamed.
+  const [expandedProjects, setExpandedProjects] = useState(() => new Set());
+  const [renamingProjectId, setRenamingProjectId] = useState(null);
+  const [projectName, setProjectName] = useState('');
+  // Where the open project menu sits. It floats so the scrolling list can't clip it.
+  const [projectMenuPos, setProjectMenuPos] = useState(null);
+
+  // The open project (or the open chat's project) shows its chats.
+  useEffect(() => {
+    if (currentProjectId) setExpandedProjects((s) => (s.has(currentProjectId) ? s : new Set(s).add(currentProjectId)));
+  }, [currentProjectId]);
 
   const handleRename = (threadId, currentTitle) => {
     setEditingThreadId(threadId);
@@ -133,9 +157,37 @@ const Sidebar = ({
     onMoveThread?.(threadId, projectId);
   };
 
+  const closeOnMobile = () => {
+    if (window.innerWidth < 1024) toggleSidebar();
+  };
+
   const openProject = (id) => {
     onOpenProject(id);
-    if (window.innerWidth < 1024) toggleSidebar();
+    closeOnMobile();
+  };
+
+  // Clicking a project opens it and lists its chats; clicking the open,
+  // expanded project again hides its chats.
+  const clickProject = (id) => {
+    const expanded = expandedProjects.has(id);
+    setExpandedProjects((s) => {
+      const next = new Set(s);
+      if (expanded && currentProjectId === id) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    if (currentProjectId !== id) openProject(id);
+  };
+
+  const projectAction = (action) => {
+    setOpenMenuId(null);
+    action();
+  };
+
+  const saveProjectName = (project) => {
+    const name = projectName.trim();
+    if (name && name !== project.name) onRenameProject(project.id, name);
+    setRenamingProjectId(null);
   };
 
   const openChat = (thread) => {
@@ -320,48 +372,177 @@ const Sidebar = ({
               {/* Projects: chats grouped with shared instructions and files */}
               {projects && (
                 <div className="shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setProjectsOpen((o) => !o)}
-                    className="group flex items-center gap-1 px-3 pt-3 pb-1 text-left"
-                  >
-                    <span className="text-sm font-medium text-gray-300 group-hover:text-gray-100 transition-colors">
-                      Projects
-                    </span>
-                    <ChevronDown
-                      size={16}
-                      className={`
-                        text-gray-400 opacity-0 group-hover:opacity-100
-                        transition-transform duration-300 ease-out group-hover:text-gray-200
-                        ${projectsOpen ? 'rotate-0' : '-rotate-90'}
-                      `}
-                    />
-                  </button>
+                  <div className="flex items-center gap-0.5 px-3 pt-3 pb-1">
+                    <button
+                      type="button"
+                      onClick={() => setProjectsOpen((o) => !o)}
+                      className="group flex items-center gap-1 text-left"
+                    >
+                      <span className="text-sm font-medium text-gray-300 group-hover:text-gray-100 transition-colors">
+                        Projects
+                      </span>
+                      <ChevronDown
+                        size={16}
+                        className={`
+                          text-gray-400 opacity-0 group-hover:opacity-100
+                          transition-transform duration-300 ease-out group-hover:text-gray-200
+                          ${projectsOpen ? 'rotate-0' : '-rotate-90'}
+                        `}
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onNewProject}
+                      title="New project"
+                      aria-label="New project"
+                      className="ml-auto p-1 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </div>
                   {projectsOpen && (
-                    <div className="px-2 py-1 space-y-0.5 max-h-[30vh] overflow-y-auto thin-scroll">
-                      <button
-                        type="button"
-                        onClick={onNewProject}
-                        className="flex w-full items-center gap-2.5 px-3 py-2 rounded-xl text-left text-sm text-gray-200 hover:bg-gray-700/60 transition-colors"
-                      >
-                        <FolderPlus size={16} className="shrink-0 text-gray-400" />
-                        <span>New project</span>
-                      </button>
-                      {projects.map((project) => (
-                        <button
-                          key={project.id}
-                          type="button"
-                          onClick={() => openProject(project.id)}
-                          aria-current={currentProjectId === project.id ? 'page' : undefined}
-                          className={`
-                            flex w-full items-center gap-2.5 px-3 py-2 rounded-xl text-left transition-colors
-                            ${currentProjectId === project.id ? 'bg-gray-700/90' : 'hover:bg-gray-700/60'}
-                          `}
-                        >
-                          <Folder size={16} className="shrink-0 text-gray-400" />
-                          <span className="truncate text-sm text-gray-100">{project.name}</span>
-                        </button>
-                      ))}
+                    <div
+                      onScroll={() => { if (openMenuId?.startsWith('project:')) setOpenMenuId(null); }}
+                      className="px-2 py-1 space-y-0.5 max-h-[40vh] overflow-y-auto overflow-x-hidden thin-scroll"
+                    >
+                      {projects.length === 0 && (
+                        <p className="px-3 py-1.5 text-xs text-gray-500">No projects yet</p>
+                      )}
+                      {projects.map((project) => {
+                        const expanded = expandedProjects.has(project.id);
+                        const isCurrent = currentProjectId === project.id;
+                        const menuId = `project:${project.id}`;
+                        const chats = expanded ? projectThreads.filter((t) => t.project_id === project.id) : [];
+                        const FolderIcon = expanded ? FolderOpen : Folder;
+                        return (
+                          <div key={project.id}>
+                            <div
+                              data-thread-menu
+                              role={renamingProjectId === project.id ? undefined : 'button'}
+                              tabIndex={renamingProjectId === project.id ? undefined : 0}
+                              aria-expanded={expanded}
+                              aria-current={isCurrent && !currentThreadId ? 'page' : undefined}
+                              onClick={() => { if (renamingProjectId !== project.id) clickProject(project.id); }}
+                              onKeyDown={(e) => {
+                                if (renamingProjectId === project.id || e.target !== e.currentTarget) return;
+                                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); clickProject(project.id); }
+                              }}
+                              className={`
+                                group relative flex items-center gap-2.5 px-3 py-2 rounded-xl cursor-pointer transition-colors
+                                outline-none focus-visible:ring-2 focus-visible:ring-white/50
+                                ${isCurrent && !currentThreadId ? 'bg-gray-700/90' : 'hover:bg-gray-700/60'}
+                              `}
+                            >
+                              <FolderIcon size={16} className="shrink-0 text-gray-400" />
+                              {renamingProjectId === project.id ? (
+                                <input
+                                  type="text"
+                                  maxLength={100}
+                                  aria-label="Project name"
+                                  value={projectName}
+                                  onChange={(e) => setProjectName(e.target.value)}
+                                  onBlur={() => saveProjectName(project)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') saveProjectName(project);
+                                    if (e.key === 'Escape') setRenamingProjectId(null);
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="w-full min-w-0 bg-gray-600 px-2 py-0.5 rounded-lg text-sm text-white outline-none focus:ring-2 focus:ring-blue-500"
+                                  autoFocus
+                                />
+                              ) : (
+                                <>
+                                  <span className="truncate flex-1 min-w-0 text-sm text-gray-100">{project.name}</span>
+                                  <span
+                                    className={`
+                                      flex items-center gap-0.5 -my-1 shrink-0 opacity-0 group-hover:opacity-100
+                                      focus-within:opacity-100 transition-opacity [@media(hover:none)]:opacity-100
+                                      ${isCurrent || openMenuId === menuId ? 'opacity-100' : ''}
+                                    `}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setMovingThreadId(null);
+                                        const r = e.currentTarget.getBoundingClientRect();
+                                        const nav = e.currentTarget.closest('nav').getBoundingClientRect();
+                                        setProjectMenuPos({ top: r.bottom - nav.top + 6, left: r.left - nav.left });
+                                        setOpenMenuId(openMenuId === menuId ? null : menuId);
+                                      }}
+                                      aria-label="Project options"
+                                      className="p-1 rounded-md text-gray-300 hover:bg-gray-600"
+                                    >
+                                      <MoreHorizontal size={15} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); onNewProjectChat(project.id); closeOnMobile(); }}
+                                      title={`New chat in ${project.name}`}
+                                      aria-label={`New chat in ${project.name}`}
+                                      className="p-1 rounded-md text-gray-300 hover:bg-gray-600"
+                                    >
+                                      <SquarePenIcon width={15} height={15} />
+                                    </button>
+                                  </span>
+                                </>
+                              )}
+
+                              {openMenuId === menuId && projectMenuPos && (
+                                <div
+                                  style={{ top: projectMenuPos.top, left: projectMenuPos.left }}
+                                  className="fixed w-48 bg-gray-800 rounded-xl shadow-xl shadow-black/40 z-50 py-1 border border-gray-700/70 animate-menu-in origin-top-right"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <button
+                                    onClick={() => projectAction(() => onProjectSettings(project.id))}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg mx-1"
+                                  >
+                                    <Settings2 size={14} />
+                                    <span>Project settings</span>
+                                  </button>
+                                  <button
+                                    onClick={() => projectAction(() => { setProjectName(project.name); setRenamingProjectId(project.id); })}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg mx-1"
+                                  >
+                                    <Edit2 size={14} />
+                                    <span>Rename project</span>
+                                  </button>
+                                  <button
+                                    onClick={() => projectAction(() => openProject(project.id))}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 rounded-lg mx-1"
+                                  >
+                                    <Folder size={14} />
+                                    <span>Project home</span>
+                                  </button>
+                                  <button
+                                    onClick={() => projectAction(() => onDeleteProject(project))}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-400 hover:bg-gray-700 rounded-lg mx-1"
+                                  >
+                                    <Trash2 size={14} />
+                                    <span>Delete project</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+
+                            {expanded && chats.map((chat) => (
+                              <button
+                                key={chat.thread_id}
+                                type="button"
+                                onClick={() => openChat(chat)}
+                                aria-current={currentThreadId === chat.thread_id ? 'page' : undefined}
+                                className={`
+                                  flex w-full items-center pl-9 pr-3 py-2 rounded-xl text-left transition-colors
+                                  ${currentThreadId === chat.thread_id ? 'bg-gray-700/90' : 'hover:bg-gray-700/60'}
+                                `}
+                              >
+                                <span className="truncate text-sm text-gray-200">{chat.title || 'New Chat'}</span>
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

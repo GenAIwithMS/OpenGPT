@@ -14,7 +14,7 @@ import { useShortcuts } from './lib/shortcuts';
 import { notifyFinished } from './lib/notify';
 import { useThreads } from './hooks/useThreads';
 import { useProjects } from './hooks/useProjects';
-import ProjectView, { NewProjectDialog } from './components/projects/ProjectView';
+import ProjectView, { NewProjectDialog, ProjectSettingsDialog } from './components/projects/ProjectView';
 import { useChat } from './hooks/useChat';
 import { useCodeWorkspace } from './hooks/useCodeWorkspace';
 import { chatService, projectService } from './services/api';
@@ -197,6 +197,7 @@ function App() {
   const { projects, fetchProjects, createProject } = useProjects();
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState(null);
+  const [projectSettingsId, setProjectSettingsId] = useState(null);
   // Bumped when a project's chats change, so its open page reloads.
   const [projectRefresh, setProjectRefresh] = useState(0);
 
@@ -237,11 +238,22 @@ function App() {
   const currentProjectId = urlProjectId || currentThread?.project_id || null;
   const currentProject = projects.find((p) => p.id === currentProjectId) || null;
 
-  const handleOpenProject = (id) => {
+  // `action` 'newChat' puts the cursor in the project page's message box.
+  const handleOpenProject = (id, action = null) => {
     setIsSidebarOpen(false);
     setPendingAttachments([]);
     setResearchPanel(null);
-    navigate(`/project/${encodeURIComponent(id)}`);
+    navigate(`/project/${encodeURIComponent(id)}`, action ? { state: { projectAction: action } } : undefined);
+  };
+
+  const handleRenameProject = async (id, name) => {
+    try {
+      await projectService.update(id, { name });
+      await fetchProjects();
+      setProjectRefresh((n) => n + 1);
+    } catch (e) {
+      setAppError(e.message || 'Could not rename the project.');
+    }
   };
 
   const handleCreateProject = async (name) => {
@@ -634,8 +646,21 @@ function App() {
         currentProjectId={currentProjectId}
         onOpenProject={handleOpenProject}
         onNewProject={() => { setIsSidebarOpen(false); setNewProjectOpen(true); }}
+        projectThreads={threads.filter((t) => t.project_id)}
+        onNewProjectChat={(id) => handleOpenProject(id, 'newChat')}
+        onProjectSettings={(id) => { setIsSidebarOpen(false); setProjectSettingsId(id); }}
+        onRenameProject={handleRenameProject}
+        onDeleteProject={setProjectToDelete}
         onMoveThread={isCodeView ? null : handleMoveThread}
       />
+
+      {projectSettingsId && (
+        <ProjectSettingsDialog
+          projectId={projectSettingsId}
+          onClose={() => setProjectSettingsId(null)}
+          onChanged={() => { fetchProjects(); setProjectRefresh((n) => n + 1); }}
+        />
+      )}
 
       {newProjectOpen && (
         <NewProjectDialog onClose={() => setNewProjectOpen(false)} onCreate={handleCreateProject} />
@@ -691,6 +716,8 @@ function App() {
             onChanged={fetchProjects}
             onDelete={setProjectToDelete}
             refreshKey={projectRefresh}
+            action={location.state?.projectAction}
+            actionKey={location.key}
           />
         </main>
       ) : (

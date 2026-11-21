@@ -71,6 +71,8 @@ const InstructionsDialog = ({ project, onClose, onSaved }) => {
  * @param {() => void} props.onChanged  The project was renamed or changed (refresh the sidebar).
  * @param {(project: object) => void} props.onDelete  Ask to delete the project.
  * @param {number} [props.refreshKey]  Bumped when the project's chats change elsewhere.
+ * @param {'newChat'} [props.action]  Put the cursor in the message box.
+ * @param {string} [props.actionKey]  Changes with each request, so the same action can repeat.
  */
 const ProjectView = ({
   projectId,
@@ -84,6 +86,8 @@ const ProjectView = ({
   onChanged,
   onDelete,
   refreshKey = 0,
+  action = null,
+  actionKey = null,
 }) => {
   const [project, setProject] = useState(null);
   const [error, setError] = useState(null);
@@ -94,6 +98,15 @@ const ProjectView = ({
   const [uploading, setUploading] = useState(null);
   const [fileError, setFileError] = useState(null);
   const fileInputRef = useRef(null);
+  const composerRef = useRef(null);
+  const handledActionRef = useRef(null);
+
+  // The sidebar's new chat button.
+  useEffect(() => {
+    if (!action || !project || handledActionRef.current === actionKey) return;
+    handledActionRef.current = actionKey;
+    if (action === 'newChat') composerRef.current?.querySelector('textarea')?.focus();
+  }, [action, actionKey, project]);
 
   const load = () => projectService.get(projectId)
     .then((p) => { setProject(p); setError(null); })
@@ -204,6 +217,7 @@ const ProjectView = ({
         {error && <p role="alert" className="mb-3 text-sm text-red-300">{error}</p>}
 
         {/* New chat in this project */}
+        <div ref={composerRef}>
         <MessageInput
           onSendMessage={onSendMessage}
           onAddAttachment={onAddAttachment}
@@ -214,6 +228,7 @@ const ProjectView = ({
           uploadingAttachment={uploadingAttachment}
           placeholder={`New chat in ${project.name}`}
         />
+        </div>
 
         {/* Instructions and files */}
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -300,6 +315,150 @@ const ProjectView = ({
 };
 
 export default ProjectView;
+
+/**
+ * Project settings, opened from the sidebar without leaving the current page:
+ * the project's instructions and files.
+ *
+ * @param {object} props
+ * @param {string} props.projectId
+ * @param {() => void} props.onClose
+ * @param {() => void} props.onChanged  The instructions or files changed (refresh the sidebar and page).
+ */
+export const ProjectSettingsDialog = ({ projectId, onClose, onChanged }) => {
+  const [project, setProject] = useState(null);
+  const [text, setText] = useState('');
+  const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [uploading, setUploading] = useState(null);
+  const [fileError, setFileError] = useState(null);
+  const fileInputRef = useRef(null);
+
+  const load = () => projectService.get(projectId)
+    .then((p) => { setProject(p); setError(null); return p; })
+    .catch((e) => setError(e.message));
+
+  useEffect(() => {
+    load().then((p) => { if (p) setText(p.instructions || ''); });
+  }, [projectId]);
+
+  const saveInstructions = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      const next = await projectService.update(projectId, { instructions: text });
+      setProject((p) => ({ ...p, ...next }));
+      setSaved(true);
+      onChanged();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const upload = async (files) => {
+    setFileError(null);
+    for (const file of files) {
+      setUploading(file.name);
+      try {
+        await projectService.addFile(projectId, file);
+      } catch (e) {
+        setFileError(`${file.name}: ${e.message || 'could not be added'}`);
+        break;
+      }
+    }
+    setUploading(null);
+    await load();
+    onChanged();
+  };
+
+  const removeFile = async (fileId) => {
+    setFileError(null);
+    try {
+      await projectService.removeFile(projectId, fileId);
+      setProject((p) => ({ ...p, files: p.files.filter((f) => f.id !== fileId) }));
+      onChanged();
+    } catch (e) {
+      setFileError(e.message);
+    }
+  };
+
+  const full = project ? project.files.length >= project.max_files : false;
+  const changed = project ? text !== (project.instructions || '') : false;
+
+  return (
+    <Modal title={project ? `${project.name}: settings` : 'Project settings'} onClose={onClose}>
+      {!project ? (
+        error
+          ? <p role="alert" className="text-sm text-red-300">{error}</p>
+          : <div className="flex justify-center py-8"><Loader2 size={20} className="animate-spin text-gray-400" /></div>
+      ) : (
+        <div className="space-y-6">
+          <form onSubmit={saveInstructions} className="space-y-2">
+            <label htmlFor="project-settings-instructions" className="block text-sm font-medium text-gray-200">
+              Instructions
+            </label>
+            <p className="text-sm text-gray-400">
+              How the assistant should answer in this project&apos;s chats. They are added to your custom
+              instructions and win where the two disagree.
+            </p>
+            <textarea id="project-settings-instructions" value={text} rows={7} maxLength={8000}
+              onChange={(e) => { setText(e.target.value); setSaved(false); }}
+              placeholder="Answer as a senior reviewer. Keep replies short and cite the spec."
+              className={`${inputClass} thin-scroll resize-y`} />
+            {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
+            <div className="flex items-center justify-end gap-3">
+              {saved && !changed && <span className="text-sm text-gray-400">Saved</span>}
+              <button type="submit" disabled={saving || !changed}
+                className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">
+                {saving && <Loader2 size={14} className="animate-spin" />} Save
+              </button>
+            </div>
+          </form>
+
+          <section>
+            <div className="mb-1 flex items-center">
+              <h3 className="flex-1 text-sm font-medium text-gray-200">
+                Files <span className="font-normal text-gray-500">· {project.files.length}/{project.max_files}</span>
+              </h3>
+              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={Boolean(uploading) || full}
+                title={full ? 'The project is full' : 'Add files'}
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-gray-200 hover:bg-white/5 disabled:opacity-50">
+                {uploading ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Add files
+              </button>
+              <input ref={fileInputRef} type="file" accept=".pdf,.md,.txt" multiple className="hidden"
+                onChange={(e) => { const files = [...e.target.files]; e.target.value = ''; if (files.length) upload(files); }} />
+            </div>
+            <p className="mb-2 text-sm text-gray-400">
+              PDF, Markdown or text, up to {project.max_mb} MB each. Every chat in the project can use them.
+            </p>
+            {uploading && <p className="mb-1 truncate text-xs text-gray-400">Adding {uploading}…</p>}
+            {fileError && <p role="alert" className="mb-1 text-xs text-red-300">{fileError}</p>}
+            {project.files.length ? (
+              <ul className="space-y-0.5">
+                {project.files.map((f) => (
+                  <li key={f.id} className="group flex items-center gap-2 rounded-lg px-1 py-1 text-sm text-gray-300 hover:bg-white/5">
+                    <FileText size={14} className="shrink-0 text-gray-500" />
+                    <span className="min-w-0 flex-1 truncate">{f.filename}</span>
+                    <button type="button" onClick={() => removeFile(f.id)} aria-label={`Remove ${f.filename}`}
+                      className="rounded p-1 text-gray-500 opacity-0 hover:text-red-300 focus:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100">
+                      <X size={13} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-gray-500">No files yet.</p>
+            )}
+          </section>
+        </div>
+      )}
+    </Modal>
+  );
+};
 
 /**
  * Ask for a new project's name.
