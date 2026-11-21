@@ -18,6 +18,7 @@ the Code page. Data is stored in MySQL.
 | `docs/` | Developer docs: architecture, configuration, one page per service, guides, decisions | [docs/README.md](docs/README.md) |
 | `README.md` | What OpenGPT is, quick start, configuration | |
 | `Dockerfile`, `docker-compose.yml`, `.dockerignore` | The `genaiwithms/opengpt` image (backend + built frontend + coding agent) and MySQL | [Run with Docker](docs/guides/run-with-docker.md) |
+| `.github/workflows/ci.yml` | CI: tests, frontend build and coding agent type check on pushes to `main` and pull requests; then builds and pushes the image to Docker Hub | [Run with Docker](docs/guides/run-with-docker.md#how-the-published-image-is-built) |
 
 More specific `AGENTS.md` files override this one for their folder.
 

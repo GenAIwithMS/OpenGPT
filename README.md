@@ -29,6 +29,7 @@ Agentic tool use · Deep Research · Document Q&A (RAG) · Persistent multi-thre
   <a href="https://github.com/GenAIwithMS/OpenGPT/network/members"><img src="https://img.shields.io/github/forks/GenAIwithMS/OpenGPT?style=flat-square&color=60a5fa" alt="Forks" /></a>
   <a href="https://github.com/GenAIwithMS/OpenGPT/issues"><img src="https://img.shields.io/github/issues/GenAIwithMS/OpenGPT?style=flat-square&color=f97316" alt="Issues" /></a>
   <img src="https://img.shields.io/github/last-commit/GenAIwithMS/OpenGPT?style=flat-square&color=a78bfa" alt="Last commit" />
+  <a href="https://github.com/GenAIwithMS/OpenGPT/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/GenAIwithMS/OpenGPT/ci.yml?branch=main&style=flat-square&label=CI" alt="CI" /></a>
   <a href="https://hub.docker.com/r/genaiwithms/opengpt"><img src="https://img.shields.io/docker/pulls/genaiwithms/opengpt?logo=docker&label=pulls" alt="Docker pulls" /></a>
 </p>
 

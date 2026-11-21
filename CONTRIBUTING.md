@@ -36,6 +36,8 @@ cd frontend && npm run build                              # builds cleanly
 cd coding-agent && bun run typecheck:tsc                  # only if you changed coding-agent/
 ```
 
+- The same checks run on GitHub for every pull request
+  ([CI](.github/workflows/ci.yml)); a pull request needs them to pass.
 - Add or update tests for what you changed. Backend tests need no MySQL, API
   keys or network.
 - Try the change in the browser, including what happens when something fails.
