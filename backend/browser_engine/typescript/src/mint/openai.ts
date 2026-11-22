@@ -1,3 +1,4 @@
+import { wrapModel } from "../models/wrap-model.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { MintRecoveryFactory } from "./recovery-contracts.js";
 import { failureDetail, failureRootCause } from "../runtime/failure-detail.js";
@@ -22,6 +23,7 @@ import {
   mintIdleCompactionTokens,
 } from "./idle-compaction.js";
 import { solModel } from "../models/models.js";
+import { scaledTokens } from "../models/context-window.js";
 import { providerQuotaExhausted } from "../models/provider-quota.js";
 import { transientTransportFailure } from "../models/transport-failure.js";
 import { MaxTurnsExceededError, RunContext, RunState, Runner, Usage, tool } from "@openai/agents";
@@ -1376,8 +1378,8 @@ const openAIMinter = (
             const idle = turn.effectQuestion
               ? undefined
               : makeIdleCompaction({
-                  watermarkTokens: mintIdleCompactionTokens,
-                  limitTokens: mintCompactionLimitTokens,
+                  watermarkTokens: scaledTokens(mintIdleCompactionTokens),
+                  limitTokens: scaledTokens(mintCompactionLimitTokens),
                   note: skillsReadNote,
                   report: (event) =>
                     turn
@@ -1416,18 +1418,17 @@ const openAIMinter = (
             const cacheLayout: ModelProvider = {
               getModel: async (name) => {
                 const model = await sdkProvider.getModel(name);
-                return {
+                return wrapModel(model, {
                   getResponse: (request) => model.getResponse(layout(request)),
                   getStreamedResponse: (request) => model.getStreamedResponse(layout(request)),
-                };
+                });
               },
             };
             const provider = diagnostics?.provider(cacheLayout) ?? cacheLayout;
             runner.config.modelProvider = {
               getModel: async (name) => {
                 const model = await provider.getModel(name);
-                return {
-                  ...model,
+                return wrapModel(model, {
                   getResponse: async (request) => {
                     // The SDK model opens its span in the runner's AsyncLocalStorage trace
                     // context and throws without one. An Effect fiber resumes in the async
@@ -1550,7 +1551,7 @@ const openAIMinter = (
                       ),
                     ).then(noteCalls);
                   },
-                };
+                });
               },
             };
             diagnostics?.attach(runner);

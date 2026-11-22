@@ -1,3 +1,4 @@
+import { wrapModel } from "./wrap-model.js";
 import type {
   AgentInputItem,
   ModelProvider,
@@ -68,11 +69,10 @@ export const instructionsAsMessages = (
   return {
     getModel: async (name?: string) => {
       const model = await provider.getModel(name);
-      return {
-        ...model,
+      return wrapModel(model, {
         getResponse: (request: ModelRequest) => model.getResponse(sent(request)),
         getStreamedResponse: (request: ModelRequest) => model.getStreamedResponse(sent(request)),
-      };
+      });
     },
   };
 };
@@ -159,13 +159,12 @@ export const prewarmInstructions = async (
         usage = response.usage;
         throw new PrewarmSent();
       };
-      return {
-        ...model,
+      return wrapModel(model, {
         getResponse: send,
         getStreamedResponse: () => {
           throw new Error("A prewarm sends no streamed request");
         },
-      };
+      });
     },
   };
   try {
@@ -271,8 +270,7 @@ export const collectingCacheDiagnostics = (provider: ModelProvider) => {
     provider: {
       getModel: async (name?: string) => {
         const model = await provider.getModel(name);
-        return {
-          ...model,
+        return wrapModel(model, {
           getResponse: async (request: ModelRequest) => {
             const response = await model.getResponse(request);
             const diagnostic = promptCacheDiagnosticOf(response);
@@ -280,7 +278,7 @@ export const collectingCacheDiagnostics = (provider: ModelProvider) => {
             return response;
           },
           getStreamedResponse: (request: ModelRequest) => model.getStreamedResponse(request),
-        };
+        });
       },
     } satisfies ModelProvider,
   };

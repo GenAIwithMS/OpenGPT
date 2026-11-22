@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { modelOptions, readModelConfig } from "../models/provider-config.js";
 import { realpathSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
@@ -138,4 +139,5 @@ const isEntrypoint = (path: string | undefined) => {
   }
 };
 
-if (isEntrypoint(process.argv[1])) startMcpCli();
+// The backend passes its model provider on a pipe (see models/provider-config.ts).
+if (isEntrypoint(process.argv[1])) startMcpCli(process.argv.slice(2), modelOptions(readModelConfig()));

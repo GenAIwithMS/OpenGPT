@@ -27,6 +27,7 @@ open with a docstring explaining how they work; the feature pages in
 | `skills.py` | Skills: sources, install, the `Skill` tool | [skills](../../../docs/services/skills.md) |
 | `coding_agent/` | The coding agent integration | [README](coding_agent/README.md) |
 | `agent/` | Agent sessions: background tasks with tools, questions and approvals | [agent](../../../docs/services/agent.md) |
+| `browser_engine.py` | Starts the browser engine (Node) with the model configuration on a pipe | [browser engine](../../../docs/services/browser-engine.md) |
 
 ## How services depend on each other
 

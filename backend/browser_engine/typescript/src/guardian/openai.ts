@@ -1,3 +1,4 @@
+import { wrapModel } from "../models/wrap-model.js";
 import { randomUUID } from "node:crypto";
 import { answerSecurityExceptions } from "./answer-exceptions.js";
 import { guardianExecutionPolicy } from "./execution-policy.js";
@@ -391,11 +392,10 @@ const withheldFromObserver = (
   const through = (provider: ModelProvider, change: (request: ModelRequest) => ModelRequest) => ({
     getModel: async (name?: string) => {
       const model = await provider.getModel(name);
-      return {
-        ...model,
+      return wrapModel(model, {
         getResponse: (request: ModelRequest) => model.getResponse(change(request)),
         getStreamedResponse: (request: ModelRequest) => model.getStreamedResponse(change(request)),
-      };
+      });
     },
   });
   return through(observe(through(base, restore)), hide);
@@ -432,8 +432,7 @@ const boundedModelCalls = (
 ): ModelProvider => ({
   getModel: async (name?: string) => {
     const model = await provider.getModel(name);
-    return {
-      ...model,
+    return wrapModel(model, {
       getResponse: async (request: ModelRequest): Promise<ModelResponse> => {
         for (let attempt = 1; ; attempt++) {
           const call = new AbortController();
@@ -464,7 +463,7 @@ const boundedModelCalls = (
         }
       },
       getStreamedResponse: (request: ModelRequest) => model.getStreamedResponse(request),
-    };
+    });
   },
 });
 

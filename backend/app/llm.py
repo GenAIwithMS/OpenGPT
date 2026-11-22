@@ -18,6 +18,8 @@ Settings (backend/.env):
     LLM_MAX_TOKENS      max output tokens per call (default: 8192)
     CODING_AGENT_MODEL  the coding agent (default: LLM_MODEL)
     AGENT_MODEL         the agent on the Agent page (default: LLM_MODEL)
+    BROWSER_BUILD_MODEL   builds website tools in the browser (default: LLM_MODEL)
+    BROWSER_REVIEW_MODEL  reviews them (default: BROWSER_BUILD_MODEL)
 
 Settings > Developer can add more providers and choose the active one and a
 model per job (app/services/providers.py); that choice overrides the above.
@@ -50,7 +52,8 @@ def env(name: str) -> Optional[str]:
     return value
 
 
-ROLES = ("model", "small_model", "research_model", "blog_model", "coding_model", "agent_model")
+ROLES = ("model", "small_model", "research_model", "blog_model", "coding_model", "agent_model",
+         "browser_build_model", "browser_review_model")
 
 
 def env_settings() -> dict:
@@ -81,6 +84,8 @@ def env_settings() -> dict:
         "research_model": env("RESEARCH_MODEL") or model,
         "coding_model": env("CODING_AGENT_MODEL") or model,
         "agent_model": env("AGENT_MODEL") or model,
+        "browser_build_model": env("BROWSER_BUILD_MODEL") or model,
+        "browser_review_model": env("BROWSER_REVIEW_MODEL") or env("BROWSER_BUILD_MODEL") or model,
         "max_tokens": int(env("LLM_MAX_TOKENS") or 8192),
     }
 
@@ -113,6 +118,9 @@ def settings() -> dict:
     for role in ROLES:
         if roles.get(role):
             cfg[role] = roles[role]
+    # The browser review model defaults to the build model chosen in Settings.
+    if roles.get("browser_build_model") and not roles.get("browser_review_model"):
+        cfg["browser_review_model"] = cfg["browser_build_model"]
     return cfg
 
 

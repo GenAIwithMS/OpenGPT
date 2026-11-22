@@ -1,3 +1,5 @@
+import { scaledTokens } from "../models/context-window.js";
+import { wrapModel } from "../models/wrap-model.js";
 import type {
   AgentInputItem,
   Model,
@@ -212,8 +214,7 @@ const continuationProvider = ({
     Effect.runPromise(
       Effect.gen(function* () {
         const model = yield* Effect.promise(async () => provider.getModel(name));
-        return {
-          ...model,
+        return wrapModel(model, {
           getStreamedResponse: model.getStreamedResponse.bind(model),
           getResponse: (request: ModelRequest) =>
             Effect.runPromise(
@@ -274,7 +275,7 @@ const continuationProvider = ({
               }),
               { signal: signal() },
             ),
-        };
+        });
       }),
     ),
 });
@@ -404,7 +405,7 @@ export const makeGuardianSession = (options: GuardianSessionOptions) => {
       const carried = prefix + previous.outputs;
       if (
         input.length <= carried ||
-        previous.tokens + estimatedTokens(input.slice(carried)) < guardianCompactionTokens ||
+        previous.tokens + estimatedTokens(input.slice(carried)) < scaledTokens(guardianCompactionTokens) ||
         key(input.slice(0, prefix)) !== key(previous.request.input)
       )
         return { sent };
@@ -495,7 +496,7 @@ export const makeGuardianSession = (options: GuardianSessionOptions) => {
     const inForce = latestConfigurationEffort(items.input);
     if (inForce === undefined) return request;
     const effort = reasoningEfforts.find((known) => known === inForce);
-    if (effort === undefined || requestTokens(items) < guardianCompactionTokens)
+    if (effort === undefined || requestTokens(items) < scaledTokens(guardianCompactionTokens))
       return withoutAutomaticCompaction(request);
     backstopEffort = effort;
     return {

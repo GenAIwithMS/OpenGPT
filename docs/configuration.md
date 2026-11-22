@@ -18,6 +18,8 @@ Skills) are stored in the database instead and apply at once.
 | `BLOG_MODEL` | `LLM_MODEL` | Blog writer |
 | `CODING_AGENT_MODEL` | `LLM_MODEL` | Coding agent |
 | `AGENT_MODEL` | `LLM_MODEL` | The agent on the Agent page. Needs good tool calling |
+| `BROWSER_BUILD_MODEL` | `LLM_MODEL` | Builds website tools in the browser engine |
+| `BROWSER_REVIEW_MODEL` | `BROWSER_BUILD_MODEL` | Reviews every browser step and the finished tool |
 | `LLM_MAX_TOKENS` | `8192` | Max output tokens per call |
 
 A provider chosen in Settings > Developer overrides these (see
@@ -94,6 +96,18 @@ The Agent page ([agent](services/agent.md)).
 |---|---|---|
 | `AGENT_MAX_STEPS` | `50` | Model calls per run; then the session stops and **Continue** goes on |
 | `AGENT_MAX_MINUTES` | `30` | Minutes per run; then the session stops the same way |
+
+## Browser engine
+
+[Browser engine](services/browser-engine.md): builds use the active provider and
+the two browser models above.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `BROWSER_ENGINE_NODE` | `node` on PATH | The Node.js 24 binary that runs the engine |
+| `BROWSER_CONTEXT_TOKENS` | `128000` (OpenAI: as tuned) | The browser models' context window; compaction thresholds scale to it |
+| `BROWSER_REASONING_EFFORT` | `false` | Send a reasoning effort on chat APIs (only for models that accept it) |
+| `BROWSER_ENGINE_LOG_MODEL_ERRORS` | | `1`: the engine logs why a provider refused a model call (status and message, never the request) |
 
 ## Coding agent
 

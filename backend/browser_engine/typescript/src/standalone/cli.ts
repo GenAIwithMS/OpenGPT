@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { modelOptions, readModelConfig } from "../models/provider-config.js";
 import { realpathSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { mkdir } from "node:fs/promises";
@@ -22,7 +23,8 @@ Options
   --effect read|write|ask  Mint authority (default ask)
   --timeout-seconds N      Session budget (default 1200)
 
-Set OPENAI_API_KEY before minting. A run makes no model request and needs no key.
+Minting uses the model provider OpenGPT passes on a pipe (BROWSER_ENGINE_CONFIG_FD); start it
+with: python -m app.services.browser_engine (from backend/). A run makes no model request.
 A run ignores --intent and --effect. Questions are asked in this terminal.
 `;
 
@@ -193,4 +195,5 @@ const isEntrypoint = (path: string | undefined) => {
   }
 };
 
-if (isEntrypoint(process.argv[1])) startCli();
+// The backend passes its model provider on a pipe (see models/provider-config.ts).
+if (isEntrypoint(process.argv[1])) startCli(process.argv.slice(2), modelOptions(readModelConfig()));
