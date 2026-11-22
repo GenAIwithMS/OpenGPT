@@ -255,9 +255,23 @@ export const agentService = {
   rename: async (id, title) => (await api.put(`/agent/sessions/${enc(id)}`, { title })).data,
   answer: async (id, text) => (await api.post(`/agent/sessions/${enc(id)}/answer`, { text })).data,
   decide: async (id, decision) => (await api.post(`/agent/sessions/${enc(id)}/approval`, { decision })).data,
+  // Answers to the browser's questions (logins, codes, choices): they go to the browser engine only.
+  browserInput: async (id, requestId, answers) => {
+    await api.post(`/agent/sessions/${enc(id)}/browser-input`, { request_id: requestId, answers });
+  },
   stop: async (id) => (await api.post(`/agent/sessions/${enc(id)}/stop`)).data,
   continue: async (id, message = null) => (await api.post(`/agent/sessions/${enc(id)}/continue`, { message })).data,
   remove: async (id) => { await api.delete(`/agent/sessions/${enc(id)}`); },
+};
+
+// The agent's browser: availability, site permissions, saved website tools.
+export const browserService = {
+  status: async () => (await api.get('/browser/status')).data,
+  sites: async () => (await api.get('/browser/sites')).data.sites,
+  setSite: async (url, access) => (await api.put('/browser/sites', { url, access })).data.sites,
+  removeSite: async (url) => (await api.delete('/browser/sites', { params: { url } })).data.sites,
+  tools: async () => (await api.get('/browser/tools')).data.tools,
+  deleteTool: async (name) => { await api.delete(`/browser/tools/${enc(name)}`); },
 };
 
 // App settings (the Settings popup). See backend/app/services/settings.py.

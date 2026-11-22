@@ -215,7 +215,9 @@ The **Agent** page runs a task in the background, step by step: it writes a plan
 - **Close the page any time.** It keeps working; after a restart, an interrupted session continues with **Continue**.
 - **Stop** at any time. Limits: `AGENT_MAX_STEPS` (50 model calls) and `AGENT_MAX_MINUTES` (30) per run, then **Continue** goes on. Choose its model in Settings > Models (**Agent**).
 
-See [docs/services/agent.md](docs/services/agent.md). Using websites in a browser and scheduled tasks are coming next.
+- **Websites.** For sites you have no connector for, the agent can use a browser (needs Node.js 24 and the built browser engine; Settings > Browser says what is missing). It asks before it uses a site and before any change, and when a site needs a login it asks you for it on the page: the login goes only to the browser, is typed only on that site and is never saved. Each website task leaves a saved tool that runs again quickly.
+
+See [docs/services/agent.md](docs/services/agent.md). Scheduled tasks are coming next.
 
 ## Coding agent
 

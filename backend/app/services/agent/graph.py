@@ -114,6 +114,13 @@ def build_tools_and_prompt(thread: str) -> tuple[list, str]:
         text += "\n\n" + skills_text
 
     tools.extend(mcp_tools.chat_tools())
+
+    # The browser engine (Node 24, built): website tools.
+    from app.services import browser_engine
+    from app.services.agent import browser
+    if browser_engine.unavailable_reason() is None:
+        tools.extend(browser.TOOLS)
+        text += "\n\n" + browser.PROMPT
     return tools, text
 
 

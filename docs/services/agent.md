@@ -6,8 +6,8 @@ calculator, stocks, knowledge base, skills, memory and your connectors). It
 asks you when it needs something, and asks before a connector tool changes
 anything. You can close the page; it keeps working.
 
-The browser (signing in to websites and using them) and scheduled tasks are
-planned next; see [browser engine](browser-engine.md).
+It can also use **websites** in a browser (below). Scheduled tasks are planned
+next.
 
 ## Files
 
@@ -17,6 +17,10 @@ planned next; see [browser engine](browser-engine.md).
 | `app/services/agent/store.py` | Sessions and events in the database (`agent_sessions`, `agent_events`) |
 | `app/services/agent/graph.py` | The LangGraph graph, its tools and prompt |
 | `app/services/agent/runner.py` | The background worker, limits, Stop, pauses, recovery after a restart |
+| `app/services/agent/browser.py` | The browser tools, site permissions, the browser's questions |
+| `app/router/browser.py` | `/api/browser`: status, websites, saved website tools |
+| `frontend/src/components/agent/BrowserInputCard.jsx` | The browser's questions on the page (login, code, choice) |
+| `frontend/src/components/settings/BrowserPage.jsx` | Settings > Browser |
 | `app/services/chat_approvals.py` | Approvals: in a session they pause the graph instead of waiting in chat |
 | `app/router/agent.py` | `/api/agent` |
 | `frontend/src/components/agent/AgentView.jsx` | The page: new task, the session timeline, question and approval cards |
@@ -53,11 +57,43 @@ Statuses: `queued`, `running`, `waiting`, `done`, `failed`, `stopped`,
 | Stopped while waiting | **Continue** shows the question or approval again |
 | Done | Type an instruction to give it more to do in the same session |
 
+## The browser
+
+When the [browser engine](browser-engine.md) can run here (Node.js 24 and a
+built engine; Settings > Browser says what is missing), the agent gets three
+tools:
+
+| Tool | Does |
+|---|---|
+| `Browser_task(url, task, effect, input)` | Builds a tool for the task on that site (minutes). A **read** tool then runs and returns what it found; a **write** tool makes its change once while it is built |
+| `Browser_tools()` | Lists saved website tools |
+| `Run_browser_tool(name, input)` | Runs a saved tool again, with no model |
+
+- **Permission first.** The first time the agent uses a website it asks
+  (an approval card); allowing it lets the agent read that site later too.
+  **Every write asks**, also on a site already allowed. Settings > Browser
+  lists the websites (read, or read and change) and saved tools; you can
+  change or remove them.
+- **Logins.** The browser starts empty every time and signs in itself: when a
+  site needs a login, a one-time code or a choice, the session waits and the
+  page shows a card. The answers go from the page straight to the engine
+  (`POST .../browser-input`), kept in memory only: never in the database, the
+  events, the checkpoint or a model's context. The engine types a login only
+  on that site's own sign-in pages. Logins aren't saved, so a later run asks
+  again.
+- **Stop** while the browser waits cancels its job. After a restart, a
+  session that was waiting for the browser becomes interrupted (the browser
+  process is gone); Continue starts the browser task again.
+- While the browser works, the run occupies the worker (other sessions wait).
+- Saved tools are in `app/storage/browser/integrations/<name>/`.
+
 ## Events
 
 What the page shows, in order (`agent_events`, numbered per session):
 `task`, `instruction`, `plan`, `message`, `tool_call`, `tool_result`,
-`question`, `answer`, `approval`, `approval_done`, `result`, `status`. A
+`question`, `answer`, `approval`, `approval_done`, `browser_input` (the
+questions, never an answer or an expected username), `browser_input_done`,
+`result`, `status`. A
 tool result shown on the page is cut at 8,000 characters (the model gets the
 whole result). The page polls `GET /api/agent/sessions/{id}?after=<seq>`
 every 1.5 seconds while the session works, and every 5 seconds otherwise.
@@ -83,18 +119,29 @@ every 1.5 seconds while the session works, and every 5 seconds otherwise.
 | `PUT /api/agent/sessions/{id}` | Rename `{title}` |
 | `POST /api/agent/sessions/{id}/answer` | Answer its question `{text}` |
 | `POST /api/agent/sessions/{id}/approval` | `{decision: "allow" \| "deny"}` |
+| `POST /api/agent/sessions/{id}/browser-input` | `{request_id, answers}`: answers to the browser's questions, to the engine only |
 | `POST /api/agent/sessions/{id}/stop` | Stop |
+| `GET /api/browser/status` | `{available, reason}` |
+| `GET/PUT/DELETE /api/browser/sites` | Websites the agent may use: `{url, access: "read" \| "write"}` |
+| `GET /api/browser/tools`, `DELETE /api/browser/tools/{name}` | Saved website tools |
 | `POST /api/agent/sessions/{id}/continue` | Go on; optional `{message}` adds an instruction |
 | `DELETE /api/agent/sessions/{id}` | Delete it, its events and its checkpoint (not while running) |
 
 ## Not covered yet
 
-- The browser (phase 3) and scheduled tasks (phase 4).
+- Scheduled tasks.
+- Saved logins (each browser task asks for a login again) and a live view of
+  the browser.
 - Several sessions at once: one runs, the rest queue.
 
 See [decision 0010](../decisions/0010-agent-sessions.md).
 
 ## Tests
+
+`tests/test_agent_browser.py`: the browser tools against a stand-in engine
+(`tests/fake_browser_engine.py`): permission, the login card (the password
+reaches the engine and is stored nowhere), writes, Stop, saved tools,
+recovery, routes.
 
 `tests/test_agent.py`: runs with a scripted model (plan, tools, result),
 questions, approvals (each tool call runs once), denial, Stop and Continue,

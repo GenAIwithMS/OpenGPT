@@ -13,6 +13,7 @@ from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.router.agent import agent_router
+from app.router.browser import browser_router
 from app.router.chat import chat_router
 from app.router.health import health_router
 from app.router.code import code_router
@@ -123,6 +124,9 @@ def create_app():
     )
     app.include_router(
         agent_router, prefix="/api", tags=["agent"], dependencies=[Depends(require_api_token)]
+    )
+    app.include_router(
+        browser_router, prefix="/api", tags=["browser"], dependencies=[Depends(require_api_token)]
     )
     app.include_router(
         settings_router, prefix="/api", tags=["settings"], dependencies=[Depends(require_api_token)]

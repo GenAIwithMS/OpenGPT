@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { agentService } from '../../services/api';
 import { markdownComponents } from '../MessageList';
+import BrowserInputCard from './BrowserInputCard';
 
 const STATUS = {
   queued: { label: 'Queued', className: 'bg-gray-600/40 text-gray-200' },
@@ -290,10 +291,21 @@ function buildTimeline(events, session) {
     } else if (e.type === 'approval_done') {
       if (openApproval) openApproval.decision = d.decision;
       openApproval = null;
+    } else if (e.type === 'browser_input') {
+      items.push({ key: e.seq, kind: 'browser', request: d, done: false });
+    } else if (e.type === 'browser_input_done') {
+      const item = items.find((i) => i.kind === 'browser' && i.request.request_id === d.request_id);
+      if (item) item.done = true;
     } else if (e.type === 'result') items.push({ key: e.seq, kind: 'result', text: d.text });
     else if (e.type === 'status' && d.reason && ['stopped', 'failed', 'interrupted'].includes(d.status)) {
       items.push({ key: e.seq, kind: 'note', status: d.status, text: d.reason });
     }
+  }
+  // The browser's questions can be answered while the session waits for exactly those.
+  const browserWaiting = session?.status === 'waiting' && session.waiting?.kind === 'browser_input'
+    ? session.waiting.request_id : null;
+  for (const item of items) {
+    if (item.kind === 'browser') item.current = !item.done && item.request.request_id === browserWaiting;
   }
   // Only the latest open question or approval can be answered, and only while waiting.
   const waiting = session?.status === 'waiting' ? session.waiting?.kind : null;
@@ -395,6 +407,10 @@ const Session = ({ sessionId, onChanged }) => {
             if (item.kind === 'tool') return <ToolStep key={item.key} call={item.call} result={item.result} />;
             if (item.kind === 'question') return <QuestionCard key={item.key} {...item} sessionId={sessionId} onChanged={changed} />;
             if (item.kind === 'approval') return <ApprovalCard key={item.key} {...item} sessionId={sessionId} onChanged={changed} />;
+            if (item.kind === 'browser') {
+              return <BrowserInputCard key={item.key} request={item.request} current={item.current} done={item.done}
+                sessionId={sessionId} onChanged={changed} />;
+            }
             if (item.kind === 'result') {
               return (
                 <div key={item.key} className="rounded-xl border border-green-500/30 bg-green-500/5 p-4">

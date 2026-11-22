@@ -171,6 +171,9 @@ class RunTests(AgentTestCase):
         self.addCleanup(folder.cleanup)
         engine = create_engine(f"sqlite:///{folder.name}/agent.db", connect_args={"timeout": 30})
         self.addCleanup(engine.dispose)
+        previous = (DatabaseConfig._engine, DatabaseConfig._session_factory)
+        self.addCleanup(lambda: setattr(DatabaseConfig, "_engine", previous[0])
+                        or setattr(DatabaseConfig, "_session_factory", previous[1]))
         Base.metadata.create_all(engine)
         DatabaseConfig._engine, DatabaseConfig._session_factory = engine, sessionmaker(bind=engine)
         runner.checkpointer = None

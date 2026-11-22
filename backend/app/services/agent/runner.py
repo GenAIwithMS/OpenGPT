@@ -72,6 +72,12 @@ def recover() -> None:
         store.update(session_id, status="interrupted")
         store.add_event(session_id, "status", {"status": "interrupted",
                                                "reason": "OpenGPT stopped while this session was running."})
+    # Questions from the browser can't be answered after a restart: the browser is gone.
+    for session_id in store.with_status("waiting"):
+        if (store.get(session_id)["waiting"] or {}).get("kind") == "browser_input":
+            store.update(session_id, status="interrupted", waiting=None)
+            store.add_event(session_id, "status", {"status": "interrupted",
+                                                   "reason": "OpenGPT stopped while the browser was waiting for you."})
     for session_id in store.with_status("queued"):
         _queue.put((session_id, None))
 
@@ -101,6 +107,12 @@ def submit(session_id: str, run_input: Any = None) -> None:
 def request_stop(session_id: str) -> None:
     with _lock:
         _stop_requests.add(session_id)
+
+
+def stop_requested(session_id: str) -> bool:
+    """Whether Stop was pressed (a long tool checks this without clearing it)."""
+    with _lock:
+        return session_id in _stop_requests
 
 
 def _take_stop(session_id: str) -> bool:

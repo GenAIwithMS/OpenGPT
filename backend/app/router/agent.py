@@ -26,6 +26,11 @@ class Decision(BaseModel):
     decision: Literal["allow", "deny"]
 
 
+class BrowserAnswers(BaseModel):
+    request_id: str = Field(..., max_length=64)
+    answers: dict
+
+
 class Continue(BaseModel):
     message: Optional[str] = Field(None, max_length=store.MAX_TASK_CHARS)
 
@@ -63,6 +68,13 @@ def answer(session_id: str, body: Answer):
 def approval(session_id: str, body: Decision):
     """Allow or deny the action the session is waiting to take."""
     return agent.decide(session_id, body.decision)
+
+
+@agent_router.post("/agent/sessions/{session_id}/browser-input", status_code=204)
+def browser_input(session_id: str, body: BrowserAnswers):
+    """Answers to the browser's questions (a login, a code, a choice). They go to the browser
+    engine only; nothing here is stored or logged."""
+    agent.answer_browser(session_id, body.request_id, body.answers)
 
 
 @agent_router.post("/agent/sessions/{session_id}/stop")

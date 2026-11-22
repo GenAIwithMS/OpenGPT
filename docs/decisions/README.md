@@ -17,6 +17,7 @@ replaces the old one rather than rewriting history.
 | [0009](0009-projects.md) | Projects: chats with shared instructions and files | 2026-11-22 |
 | [0010](0010-agent-sessions.md) | Agent sessions: background tasks that pause for the user | 2026-11-22 |
 | [0011](0011-browser-engine-on-any-provider.md) | The browser engine on any provider | 2026-11-22 |
+| [0012](0012-browser-sign-in.md) | The browser signs in itself; logins are never stored | 2026-11-23 |
 
 ## Template
 

@@ -16,15 +16,21 @@ For developers, to try a build from the terminal:
     python -m app.services.browser_engine mint --url https://example.com \\
         --intent "Read the main heading" --out /tmp/heading --effect read
 """
+import itertools
 import json
+import logging
 import os
+import queue
 import shutil
 import subprocess
 import sys
+import threading
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from app import llm
+
+logger = logging.getLogger(__name__)
 
 ENGINE_DIR = Path(__file__).resolve().parents[2] / "browser_engine"
 CLI = ENGINE_DIR / "dist" / "typescript" / "src" / "standalone" / "cli.js"
@@ -93,7 +99,7 @@ def start(entry: Path, args: list[str], **popen) -> subprocess.Popen:
     check()
     read_fd, write_fd = os.pipe()
     try:
-        env = {**os.environ, "BROWSER_ENGINE_CONFIG_FD": str(read_fd)}
+        env = {**os.environ, "BROWSER_ENGINE_CONFIG_FD": str(read_fd), "BROWSER_ENGINE_LOG_MODEL_ERRORS": "1"}
         env.pop("OPENAI_API_KEY", None)  # the engine uses the configuration, nothing else
         process = subprocess.Popen([node_path(), str(entry), *args], env=env, pass_fds=(read_fd,),
                                    cwd=str(ENGINE_DIR), **popen)
@@ -102,6 +108,106 @@ def start(entry: Path, args: list[str], **popen) -> subprocess.Popen:
     with os.fdopen(write_fd, "w") as pipe:
         json.dump(config(), pipe)
     return process
+
+
+class EngineError(RuntimeError):
+    """The engine process failed or answered with an error."""
+
+
+class EngineClient:
+    """A minimal MCP client over the engine's stdin/stdout (newline-delimited JSON-RPC).
+
+    One client is one engine process: ``mint`` mode builds tools, ``serve`` mode runs one saved
+    tool. Calls are synchronous (the agent's tools run in a worker thread).
+    """
+
+    def __init__(self, args: list[str]):
+        self.process = start(MCP_CLI, args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE, text=True, bufsize=1)
+        self._ids = itertools.count(1)
+        self._replies: "queue.Queue[dict]" = queue.Queue()
+        threading.Thread(target=self._read, daemon=True).start()
+        threading.Thread(target=self._log_stderr, daemon=True).start()
+        self._request("initialize", {"protocolVersion": "2025-06-18", "capabilities": {},
+                                     "clientInfo": {"name": "opengpt", "version": "1"}}, timeout=60)
+        self._send({"jsonrpc": "2.0", "method": "notifications/initialized"})
+
+    def _read(self):
+        for line in self.process.stdout:
+            try:
+                message = json.loads(line)
+            except ValueError:
+                continue
+            if "id" in message and ("result" in message or "error" in message):
+                self._replies.put(message)
+        self._replies.put({"closed": True})
+
+    def _log_stderr(self):
+        for line in self.process.stderr:
+            line = line.strip()
+            if line and "ExperimentalWarning" not in line and "--trace-warnings" not in line:
+                logger.warning("Browser engine: %s", line[:500])
+
+    def _send(self, message: dict):
+        try:
+            self.process.stdin.write(json.dumps(message) + "\n")
+            self.process.stdin.flush()
+        except (BrokenPipeError, OSError) as e:
+            raise EngineError("The browser engine stopped.") from e
+
+    def _request(self, method: str, params: dict, timeout: float = 120) -> dict:
+        request_id = next(self._ids)
+        self._send({"jsonrpc": "2.0", "id": request_id, "method": method, "params": params})
+        while True:
+            try:
+                reply = self._replies.get(timeout=timeout)
+            except queue.Empty:
+                raise EngineError("The browser engine didn't answer in time.")
+            if reply.get("closed"):
+                raise EngineError("The browser engine stopped.")
+            if reply.get("id") == request_id:
+                if "error" in reply:
+                    raise EngineError(str(reply["error"].get("message", "engine error"))[:500])
+                return reply["result"]
+
+    def call(self, tool: str, arguments: dict, timeout: float = 120) -> dict:
+        """Call a tool; returns its JSON result (a job view or a tool's output)."""
+        result = self._request("tools/call", {"name": tool, "arguments": arguments}, timeout=timeout)
+        text = "".join(part.get("text", "") for part in result.get("content", []) if part.get("type") == "text")
+        try:
+            value: Any = result.get("structuredContent") or json.loads(text)
+        except ValueError:
+            value = {"text": text}
+        if result.get("isError") and isinstance(value, dict):
+            value = {**value, "is_error": True}
+        elif result.get("isError"):
+            value = {"is_error": True, "text": text}
+        return value
+
+    def close(self):
+        try:
+            self.process.stdin.close()
+        except OSError:
+            pass
+        try:
+            self.process.wait(timeout=15)
+        except subprocess.TimeoutExpired:
+            self.process.kill()
+
+
+_available: Optional[str] = None
+
+
+def unavailable_reason(refresh: bool = False) -> Optional[str]:
+    """None when the engine can run here, else what is missing (checked once)."""
+    global _available
+    if _available is None or refresh:
+        try:
+            check()
+            _available = ""
+        except EngineUnavailable as e:
+            _available = str(e)
+    return _available or None
 
 
 if __name__ == "__main__":  # python -m app.services.browser_engine <cli args>

@@ -1,8 +1,7 @@
 # Browser engine
 
-The engine that will let OpenGPT's agent use websites in a browser. It is in
-the repository but not used by the app yet: the Agent page (planned) will
-start it.
+The engine behind the agent's browser: it builds and runs website tools. The
+Agent page uses it through the browser tools ([agent](agent.md#the-browser)).
 
 ## Files
 
@@ -50,8 +49,13 @@ pages you allow, and never resubmits a login the site rejected.
 - To try a build from the terminal (from `backend/`):
   `python -m app.services.browser_engine mint --url https://example.com
   --intent "Read the main heading" --out /tmp/heading --effect read`.
-- The Agent page will start it (planned). Until then the Docker image doesn't
-  include it.
+- The agent's browser tools use its MCP mode (`opengpt-browser-mcp`):
+  `mint --root app/storage/browser/integrations` to build, and
+  `serve --artifact <tool folder>` to run a saved tool. `EngineClient` in
+  `browser_engine.py` speaks MCP over the process's stdin and stdout: it
+  calls `mint`, follows the job with `get_job`, and answers its questions
+  with `provide_input`.
+- The Docker image doesn't include it yet (Node.js 24 and Chromium).
 
 ## Models
 

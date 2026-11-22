@@ -15,7 +15,7 @@ from langchain_core.messages import HumanMessage
 
 from app.exceptions import ValidationError
 from app.services.agent import graph as agent_graph
-from app.services.agent import runner, store
+from app.services.agent import browser, runner, store
 
 MAX_ANSWER_CHARS = 4000
 
@@ -71,10 +71,18 @@ def decide(session_id: str, decision: str) -> dict:
     return store.get(session["id"])
 
 
+def answer_browser(session_id: str, request_id: str, answers: dict) -> None:
+    """Answers to the browser's questions (logins, codes, choices): straight to the engine."""
+    store.get(session_id)
+    browser.answer_input(session_id, request_id, answers)
+
+
 def stop(session_id: str) -> dict:
     session = store.get(session_id)
-    if session["status"] == "running":
-        runner.request_stop(session["id"])   # the worker stops after the current step
+    if session["status"] == "running" or browser.waiting_for_input(session["id"]):
+        # Running, or a browser tool waiting for answers inside the run: stop after it.
+        runner.request_stop(session["id"])
+        browser.cancel_input(session["id"])
         return session
     if session["status"] in ("queued", "waiting"):
         store.update(session["id"], status="stopped")
@@ -122,7 +130,7 @@ def runner_state(session_id: str):
 
 def delete(session_id: str) -> None:
     session = store.get(session_id)
-    if session["status"] == "running":
+    if session["status"] == "running" or browser.waiting_for_input(session["id"]):
         raise ValidationError("Stop the session before deleting it.")
     store.delete(session["id"])
     try:
