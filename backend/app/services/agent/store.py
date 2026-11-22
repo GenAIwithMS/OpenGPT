@@ -15,7 +15,7 @@ from app.database import DatabaseConfig
 from app.database.models import AgentEvent, AgentSession
 from app.exceptions import NotFoundError, ValidationError
 
-STATUSES = ("queued", "running", "waiting", "done", "failed", "stopped", "interrupted")
+STATUSES = ("queued", "running", "waiting", "done", "failed", "stopped", "interrupted", "expired")
 ACTIVE = ("queued", "running")          # the worker owns these
 MAX_TITLE_CHARS = 200
 MAX_TASK_CHARS = 20_000
@@ -41,6 +41,7 @@ def _info(row: AgentSession) -> dict:
         "title": row.title,
         "task": row.task,
         "status": row.status,
+        "schedule_id": row.schedule_id,
         "waiting": json.loads(row.waiting) if row.waiting else None,
         "result": row.result,
         "error": row.error,
@@ -61,7 +62,7 @@ def title_from_task(task: str) -> str:
     return first if len(first) <= 80 else first[:77].rstrip() + "..."
 
 
-def create(task: str) -> dict:
+def create(task: str, schedule_id: Optional[str] = None, title: Optional[str] = None) -> dict:
     task = str(task or "").strip()
     if not task:
         raise ValidationError("Task: describe what the agent should do")
@@ -69,7 +70,8 @@ def create(task: str) -> dict:
         raise ValidationError(f"Task: at most {MAX_TASK_CHARS} characters")
     session_id = str(uuid.uuid4())
     with _session() as db:
-        db.add(AgentSession(id=session_id, title=title_from_task(task), task=task, status="queued"))
+        db.add(AgentSession(id=session_id, title=clean_title(title) if title else title_from_task(task),
+                            task=task, status="queued", schedule_id=schedule_id))
         db.commit()
     add_event(session_id, "task", {"text": task})
     return get(session_id)

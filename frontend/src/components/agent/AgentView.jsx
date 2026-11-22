@@ -3,12 +3,13 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize from 'rehype-sanitize';
 import {
-  Bot, Check, ChevronRight, Circle, CheckCircle2, Loader2, MessageCircleQuestion, Play, Send,
+  Bot, CalendarClock, Check, ChevronRight, Circle, CheckCircle2, Loader2, MessageCircleQuestion, Play, Send,
   ShieldQuestion, Square, Wrench, X,
 } from 'lucide-react';
 import { agentService } from '../../services/api';
 import { markdownComponents } from '../MessageList';
 import BrowserInputCard from './BrowserInputCard';
+import { ScheduleDialog, SchedulesList } from './Schedules';
 
 const STATUS = {
   queued: { label: 'Queued', className: 'bg-gray-600/40 text-gray-200' },
@@ -18,6 +19,7 @@ const STATUS = {
   failed: { label: 'Failed', className: 'bg-red-500/15 text-red-200' },
   stopped: { label: 'Stopped', className: 'bg-gray-600/40 text-gray-200' },
   interrupted: { label: 'Interrupted', className: 'bg-gray-600/40 text-gray-200' },
+  expired: { label: 'Expired', className: 'bg-gray-600/40 text-gray-200' },
 };
 const ACTIVE = new Set(['queued', 'running']);
 const EXAMPLES = [
@@ -105,6 +107,7 @@ const NewTask = ({ onCreated }) => {
             </button>
           ))}
         </div>
+        <SchedulesList onOpenSession={onCreated} />
       </div>
     </div>
   );
@@ -297,7 +300,7 @@ function buildTimeline(events, session) {
       const item = items.find((i) => i.kind === 'browser' && i.request.request_id === d.request_id);
       if (item) item.done = true;
     } else if (e.type === 'result') items.push({ key: e.seq, kind: 'result', text: d.text });
-    else if (e.type === 'status' && d.reason && ['stopped', 'failed', 'interrupted'].includes(d.status)) {
+    else if (e.type === 'status' && d.reason && ['stopped', 'failed', 'interrupted', 'expired'].includes(d.status)) {
       items.push({ key: e.seq, kind: 'note', status: d.status, text: d.reason });
     }
   }
@@ -327,6 +330,7 @@ const Session = ({ sessionId, onChanged }) => {
   const [error, setError] = useState(null);
   const [instruction, setInstruction] = useState('');
   const [busy, setBusy] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
   const lastSeq = useRef(0);
   const bottom = useRef(null);
 
@@ -387,17 +391,25 @@ const Session = ({ sessionId, onChanged }) => {
     );
   }
 
-  const canContinue = ['stopped', 'failed', 'interrupted'].includes(session.status);
-  const canInstruct = ['done', 'stopped', 'failed', 'interrupted'].includes(session.status);
+  const canContinue = ['stopped', 'failed', 'interrupted', 'expired'].includes(session.status);
+  const canInstruct = ['done', 'stopped', 'failed', 'interrupted', 'expired'].includes(session.status);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-3 border-b border-gray-700/60 px-4 py-3 pl-14 lg:pl-4">
         <Bot size={18} className="shrink-0 text-gray-400" />
         <h1 className="min-w-0 flex-1 truncate text-sm font-medium text-gray-100">{session.title}</h1>
+        {session.schedule_id && <span className="shrink-0 text-xs text-gray-500">Scheduled run</span>}
+        <button type="button" onClick={() => setScheduling(true)} title="Run this task at set times"
+          className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs text-gray-300 hover:bg-white/5">
+          <CalendarClock size={14} /> Schedule
+        </button>
         <StatusPill status={session.status} />
       </div>
 
+      {scheduling && (
+        <ScheduleDialog initial={{ task: session.task }} onClose={() => setScheduling(false)} onSaved={() => {}} />
+      )}
       <div className="thin-scroll min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-3xl space-y-3 px-4 py-6">
           {plan && <Plan plan={plan} />}

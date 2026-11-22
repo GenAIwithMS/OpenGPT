@@ -6,8 +6,8 @@ calculator, stocks, knowledge base, skills, memory and your connectors). It
 asks you when it needs something, and asks before a connector tool changes
 anything. You can close the page; it keeps working.
 
-It can also use **websites** in a browser (below). Scheduled tasks are planned
-next.
+It can also use **websites** in a browser, and run tasks **on a schedule**
+(below).
 
 ## Files
 
@@ -18,6 +18,8 @@ next.
 | `app/services/agent/graph.py` | The LangGraph graph, its tools and prompt |
 | `app/services/agent/runner.py` | The background worker, limits, Stop, pauses, recovery after a restart |
 | `app/services/agent/browser.py` | The browser tools, site permissions, the browser's questions |
+| `app/services/agent/schedules.py` | Scheduled tasks: next times, the scheduler thread, missed runs, expiry |
+| `frontend/src/components/agent/Schedules.jsx` | The schedule list and dialog |
 | `app/router/browser.py` | `/api/browser`: status, websites, saved website tools |
 | `frontend/src/components/agent/BrowserInputCard.jsx` | The browser's questions on the page (login, code, choice) |
 | `frontend/src/components/settings/BrowserPage.jsx` | Settings > Browser |
@@ -46,7 +48,7 @@ next.
    result and the session is `done`.
 
 Statuses: `queued`, `running`, `waiting`, `done`, `failed`, `stopped`,
-`interrupted`.
+`interrupted`, `expired` (a scheduled session's approval nobody answered).
 
 | Situation | What happens |
 |---|---|
@@ -87,6 +89,31 @@ tools:
 - While the browser works, the run occupies the worker (other sessions wait).
 - Saved tools are in `app/storage/browser/integrations/<name>/`.
 
+## Scheduled tasks
+
+A schedule starts the same kind of session at set times: **once** (date and
+time), **every day**, **some days of the week**, or a **cron line**
+(`m h dom mon dow`), in the user's timezone (the browser's, saved with the
+schedule). Times are wall-clock times there, so 09:00 stays 09:00 across
+daylight saving changes.
+
+- **Prepare and wait.** A scheduled session is told nobody is watching: it
+  reads and prepares, and anything that changes data waits for approval, as
+  every change does. You get the badge and notification when it needs you.
+- **Expiry.** An approval nobody answers within `AGENT_APPROVAL_HOURS`
+  (default 24) ends the session as `expired`; nothing is changed. Continue
+  shows the approval again.
+- **One run at a time.** While a schedule's last session still works or
+  waits, its next time is skipped (`skipped_busy`).
+- **OpenGPT must be running.** A time missed while it was off is skipped and
+  shown as `missed`; with `AGENT_SCHEDULE_CATCH_UP=true` it runs once at
+  startup instead.
+- A one-off schedule turns itself off after it runs. Pausing keeps it, with
+  no next time.
+- The scheduler is a thread in the backend that checks every 30 seconds.
+- On the Agent page, the start screen lists schedules (run now, pause,
+  edit, delete); a session's **Schedule** button schedules its task.
+
 ## Events
 
 What the page shows, in order (`agent_events`, numbered per session):
@@ -126,10 +153,13 @@ every 1.5 seconds while the session works, and every 5 seconds otherwise.
 | `GET /api/browser/tools`, `DELETE /api/browser/tools/{name}` | Saved website tools |
 | `POST /api/agent/sessions/{id}/continue` | Go on; optional `{message}` adds an instruction |
 | `DELETE /api/agent/sessions/{id}` | Delete it, its events and its checkpoint (not while running) |
+| `GET/POST /api/agent/schedules` | List, or create `{task, title?, repeat, time, date, days (Monday is 0), cron, timezone}` |
+| `PUT/DELETE /api/agent/schedules/{id}` | Change any field (`enabled` pauses), or delete |
+| `POST /api/agent/schedules/{id}/run` | Run it now |
+| `GET /api/agent/schedules/{id}/runs` | The sessions it started |
 
 ## Not covered yet
 
-- Scheduled tasks.
 - Saved logins (each browser task asks for a login again) and a live view of
   the browser.
 - Several sessions at once: one runs, the rest queue.
@@ -137,6 +167,10 @@ every 1.5 seconds while the session works, and every 5 seconds otherwise.
 See [decision 0010](../decisions/0010-agent-sessions.md).
 
 ## Tests
+
+`tests/test_agent_schedules.py`: next times (timezones, daylight saving,
+cron), the scheduler (one run at a time, one-off, paused), missed runs,
+expiry, the scheduled-run note, routes.
 
 `tests/test_agent_browser.py`: the browser tools against a stand-in engine
 (`tests/fake_browser_engine.py`): permission, the login card (the password

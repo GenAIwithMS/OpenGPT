@@ -20,8 +20,8 @@ from app.services.agent import browser, runner, store
 MAX_ANSWER_CHARS = 4000
 
 
-def create(task: str) -> dict:
-    session = store.create(task)
+def create(task: str, schedule_id: Optional[str] = None, title: Optional[str] = None) -> dict:
+    session = store.create(task, schedule_id=schedule_id, title=title)
     runner.submit(session["id"])
     return session
 
@@ -146,5 +146,13 @@ class _NoModel:
         return self
 
 
-start = runner.start
-shutdown = runner.shutdown
+def start() -> None:
+    from app.services.agent import schedules
+    runner.start()
+    schedules.start()
+
+
+def shutdown() -> None:
+    from app.services.agent import schedules
+    schedules.shutdown()
+    runner.shutdown()

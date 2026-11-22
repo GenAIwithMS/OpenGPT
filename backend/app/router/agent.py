@@ -5,7 +5,7 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
 
 from app.services import agent
-from app.services.agent import store
+from app.services.agent import schedules, store
 
 agent_router = APIRouter()
 
@@ -29,6 +29,18 @@ class Decision(BaseModel):
 class BrowserAnswers(BaseModel):
     request_id: str = Field(..., max_length=64)
     answers: dict
+
+
+class ScheduleBody(BaseModel):
+    task: Optional[str] = Field(None, max_length=store.MAX_TASK_CHARS)
+    title: Optional[str] = Field(None, max_length=store.MAX_TITLE_CHARS)
+    repeat: Optional[Literal["once", "daily", "weekly", "cron"]] = None
+    time: Optional[str] = Field(None, max_length=5)
+    date: Optional[str] = Field(None, max_length=10)
+    days: Optional[list[int]] = None
+    cron: Optional[str] = Field(None, max_length=100)
+    timezone: Optional[str] = Field(None, max_length=64)
+    enabled: Optional[bool] = None
 
 
 class Continue(BaseModel):
@@ -91,3 +103,38 @@ def continue_session(session_id: str, body: Optional[Continue] = None):
 @agent_router.delete("/agent/sessions/{session_id}", status_code=204)
 def delete_session(session_id: str):
     agent.delete(session_id)
+
+
+@agent_router.get("/agent/schedules")
+def list_schedules():
+    """Scheduled tasks with their next and last run."""
+    return {"schedules": schedules.list_schedules()}
+
+
+@agent_router.post("/agent/schedules", status_code=201)
+def create_schedule(body: ScheduleBody):
+    """Schedule a task: repeat once (date, time), daily (time), weekly (days, time) or cron."""
+    return schedules.create(body.model_dump())
+
+
+@agent_router.put("/agent/schedules/{schedule_id}")
+def update_schedule(schedule_id: str, body: ScheduleBody):
+    """Change any field, or pause and resume it with ``enabled``."""
+    return schedules.update(schedule_id, body.model_dump())
+
+
+@agent_router.delete("/agent/schedules/{schedule_id}", status_code=204)
+def delete_schedule(schedule_id: str):
+    schedules.delete(schedule_id)
+
+
+@agent_router.post("/agent/schedules/{schedule_id}/run", status_code=201)
+def run_schedule(schedule_id: str):
+    """Start the scheduled task now; its times stay as they are."""
+    return schedules.run_now(schedule_id)
+
+
+@agent_router.get("/agent/schedules/{schedule_id}/runs")
+def schedule_runs(schedule_id: str):
+    """The sessions the schedule started, latest first."""
+    return {"runs": schedules.runs(schedule_id)}

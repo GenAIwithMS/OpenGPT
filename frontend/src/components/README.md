@@ -13,7 +13,8 @@ App
 │                          from project, Delete; Agent (with a badge); UserMenu
 ├─ agent/AgentView ────── the Agent page (/agent): new task, a session's timeline,
 │                          question and approval cards, Stop, Continue;
-│                          BrowserInputCard (the browser's login/code/choice questions)
+│                          BrowserInputCard (the browser's login/code/choice questions);
+│                          Schedules (schedule list and dialog)
 ├─ projects/ProjectView ── a project's page (/project/<id>): new chat box,
 │                          instructions, files, chats; NewProjectDialog,
 │                          ProjectSettingsDialog (sidebar "Project settings")

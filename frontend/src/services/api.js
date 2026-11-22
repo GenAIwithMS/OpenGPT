@@ -262,6 +262,12 @@ export const agentService = {
   stop: async (id) => (await api.post(`/agent/sessions/${enc(id)}/stop`)).data,
   continue: async (id, message = null) => (await api.post(`/agent/sessions/${enc(id)}/continue`, { message })).data,
   remove: async (id) => { await api.delete(`/agent/sessions/${enc(id)}`); },
+  // Scheduled tasks: {task, title?, repeat: once|daily|weekly|cron, time, date, days, cron, timezone, enabled}
+  schedules: async () => (await api.get('/agent/schedules')).data.schedules,
+  createSchedule: async (spec) => (await api.post('/agent/schedules', spec)).data,
+  updateSchedule: async (id, changes) => (await api.put(`/agent/schedules/${enc(id)}`, changes)).data,
+  deleteSchedule: async (id) => { await api.delete(`/agent/schedules/${enc(id)}`); },
+  runSchedule: async (id) => (await api.post(`/agent/schedules/${enc(id)}/run`)).data,
 };
 
 // The agent's browser: availability, site permissions, saved website tools.

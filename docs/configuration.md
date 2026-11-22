@@ -96,6 +96,8 @@ The Agent page ([agent](services/agent.md)).
 |---|---|---|
 | `AGENT_MAX_STEPS` | `50` | Model calls per run; then the session stops and **Continue** goes on |
 | `AGENT_MAX_MINUTES` | `30` | Minutes per run; then the session stops the same way |
+| `AGENT_APPROVAL_HOURS` | `24` | A scheduled session's approval nobody answers in this time expires |
+| `AGENT_SCHEDULE_CATCH_UP` | `false` | `true`: a scheduled time missed while OpenGPT was off runs once at startup (default: skipped) |
 
 ## Browser engine
 

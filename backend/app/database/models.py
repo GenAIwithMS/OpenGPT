@@ -148,8 +148,10 @@ class AgentSession(Base):
     id = Column(String(36), primary_key=True)
     title = Column(String(200), nullable=False)
     task = Column(BigText, nullable=False)
-    # queued, running, waiting, done, failed, stopped, interrupted
+    # queued, running, waiting, done, failed, stopped, interrupted, expired
     status = Column(String(20), nullable=False, default="queued")
+    # The schedule that started it, if any (agent_schedules).
+    schedule_id = Column(String(36), nullable=True)
     # What the agent is waiting for (JSON: a question or an approval), when waiting.
     waiting = Column(Text, nullable=True)
     result = Column(BigText, nullable=True)
@@ -157,7 +159,10 @@ class AgentSession(Base):
     created_at = Column(TIMESTAMP, default=func.current_timestamp())
     updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp())
 
-    __table_args__ = (Index("idx_agent_sessions_updated", "updated_at"),)
+    __table_args__ = (
+        Index("idx_agent_sessions_updated", "updated_at"),
+        Index("idx_agent_sessions_schedule", "schedule_id"),
+    )
 
 
 class AgentEvent(Base):
@@ -173,3 +178,29 @@ class AgentEvent(Base):
     created_at = Column(TIMESTAMP, default=func.current_timestamp())
 
     __table_args__ = (Index("idx_agent_events_session", "session_id", "seq", unique=True),)
+
+
+class AgentSchedule(Base):
+    """Scheduled agent tasks: a task that starts an agent session at set times.
+    See app/services/agent/schedules.py."""
+    __tablename__ = "agent_schedules"
+
+    id = Column(String(36), primary_key=True)
+    title = Column(String(200), nullable=False)
+    task = Column(BigText, nullable=False)
+    # once | daily | weekly | cron
+    repeat = Column(String(10), nullable=False)
+    time = Column(String(5), nullable=True)        # HH:MM (once, daily, weekly)
+    date = Column(String(10), nullable=True)       # YYYY-MM-DD (once)
+    days = Column(String(20), nullable=True)       # weekly: "0,2,4" (Monday is 0)
+    cron = Column(String(100), nullable=True)      # cron: "m h dom mon dow"
+    timezone = Column(String(64), nullable=False, default="UTC")
+    enabled = Column(Boolean, nullable=False, default=True, server_default="1")
+    next_run_at = Column(TIMESTAMP, nullable=True)  # UTC
+    last_run_at = Column(TIMESTAMP, nullable=True)  # UTC
+    # started, skipped_busy, missed
+    last_outcome = Column(String(20), nullable=True)
+    created_at = Column(TIMESTAMP, default=func.current_timestamp())
+    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp())
+
+    __table_args__ = (Index("idx_agent_schedules_next", "next_run_at"),)

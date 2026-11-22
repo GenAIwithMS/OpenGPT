@@ -40,6 +40,11 @@ MAX_STEPS = _int_env("AGENT_MAX_STEPS", 50)        # model calls per run
 MAX_MINUTES = _int_env("AGENT_MAX_MINUTES", 30)    # per run
 RECURSION_LIMIT = 10_000                           # the step limit above is what stops a run
 
+# Added to a scheduled session's task: nobody is watching while it runs.
+SCHEDULED_NOTE = ("\n\n(This is a scheduled run and the user isn't watching. Do the reading and "
+                  "preparation; anything that changes data waits for their approval. Don't use Ask_user "
+                  "unless you can't go on; end with a short summary of what is ready for them.)")
+
 _queue: "queue.Queue[tuple[str, Any]]" = queue.Queue()
 _stop_requests: set[str] = set()
 _lock = threading.Lock()
@@ -196,7 +201,10 @@ def run(session_id: str, run_input: Any = None) -> None:
     if run_input is None:
         existing = graph.get_state(cfg)
         if not existing.values.get("messages"):
-            run_input = {"messages": [HumanMessage(content=session["task"])], "thread_id": thread}
+            task = session["task"]
+            if session.get("schedule_id"):
+                task += SCHEDULED_NOTE
+            run_input = {"messages": [HumanMessage(content=task)], "thread_id": thread}
 
     store.update(session_id, status="running", waiting=None, error=None)
     store.add_event(session_id, "status", {"status": "running"})

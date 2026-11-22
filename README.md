@@ -217,7 +217,9 @@ The **Agent** page runs a task in the background, step by step: it writes a plan
 
 - **Websites.** For sites you have no connector for, the agent can use a browser (needs Node.js 24 and the built browser engine; Settings > Browser says what is missing). It asks before it uses a site and before any change, and when a site needs a login it asks you for it on the page: the login goes only to the browser, is typed only on that site and is never saved. Each website task leaves a saved tool that runs again quickly.
 
-See [docs/services/agent.md](docs/services/agent.md). Scheduled tasks are coming next.
+- **Schedules.** Run a task once, every day, on some weekdays or by a cron line, in your timezone ("every weekday at 09:00: summarise my issues and draft an update"). A scheduled run prepares everything and waits for your approval before it changes anything; an approval nobody answers within a day expires. OpenGPT must be running at that time.
+
+See [docs/services/agent.md](docs/services/agent.md).
 
 ## Coding agent
 
