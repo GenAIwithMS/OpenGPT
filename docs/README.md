@@ -20,6 +20,7 @@ the page for the part you are changing. To install and run OpenGPT, see the
 | [Deep research](services/deep-research.md) | Multi-step research reports |
 | [Blogs](services/blogs.md) | The blog writer |
 | [Coding agent](services/coding-agent.md) | The Code page: projects, sessions, approvals, the agent process |
+| [Browser engine](services/browser-engine.md) | Builds website tools in a local browser (in the repository, not used by the app yet) |
 | [Connectors](services/connectors.md) | MCP servers: catalog, sign-in (OAuth), chat tools and approvals |
 | [Skills](services/skills.md) | SKILL.md instructions for chat and the coding agent |
 | [Providers](services/providers.md) | Model providers and the model used for each job |

@@ -96,7 +96,8 @@ How the image works: [Dockerfile](../../Dockerfile).
 ## How the published image is built
 
 [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) runs the backend
-tests, the frontend build and the coding agent type check on every push to
+tests, the frontend build, the coding agent type check and the browser
+engine tests on every push to
 `main` and every pull request. After a push to `main` passes, it builds the
 image (linux/amd64) and pushes it to Docker Hub as `latest` and
 `sha-<commit>`. It needs two repository secrets: `DOCKERHUB_USERNAME` and

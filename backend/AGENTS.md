@@ -23,6 +23,7 @@ lifespan for background work).
 | `app/skills/` | OpenGPT's built-in skills (SKILL.md folders). |
 | `app/storage/` | Runtime data: uploads, encryption key, skills, logs. Git-ignored; never commit or print it. |
 | `tests/` | unittest tests. |
+| `browser_engine/` | The browser engine (TypeScript, Node 24), not Python. Not used by the app yet. See its own AGENTS.md. |
 
 ## Rules
 

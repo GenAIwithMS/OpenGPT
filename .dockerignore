@@ -23,5 +23,7 @@ coding-agent/**/dist
 
 # Not needed to run
 backend/tests/
+# Not used by the app yet (the Agent page will add it, with Node 24 and Chromium)
+backend/browser_engine/
 **/.ruff_cache
 **/.pytest_cache

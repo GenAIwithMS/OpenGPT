@@ -1,0 +1,1043 @@
+{
+  "name": "opengpt-browser-engine",
+  "version": "0.4.0",
+  "private": true,
+  "description": "OpenGPT's browser engine: builds website integrations with a local Chromium, reviewed before they run",
+  "type": "module",
+  "license": "MIT",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=24.21.0 <25"
+  },
+  "bin": {
+    "opengpt-browser-engine": "dist/typescript/src/standalone/cli.js",
+    "opengpt-browser-mcp": "dist/typescript/src/standalone/mcp-cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/typescript/src/standalone/index.d.ts",
+      "import": "./dist/typescript/src/standalone/index.js",
+      "default": "./dist/typescript/src/standalone/index.js"
+    },
+    "./runtime": {
+      "types": "./dist/typescript/src/browser/index.d.ts",
+      "import": "./dist/typescript/src/browser/index.js",
+      "default": "./dist/typescript/src/browser/index.js"
+    },
+    "./mcp": {
+      "types": "./dist/typescript/src/standalone/mcp-server.d.ts",
+      "import": "./dist/typescript/src/standalone/mcp-server.js",
+      "default": "./dist/typescript/src/standalone/mcp-server.js"
+    },
+    "./assets": {
+      "types": "./dist/typescript/src/assets.d.ts",
+      "import": "./dist/typescript/src/assets.js",
+      "default": "./dist/typescript/src/assets.js"
+    },
+    "./package.json": "./package.json",
+    "./runtime-sources.json": "./dist/runtime-sources.json",
+    "./authoring/caller-choice": {
+      "types": "./dist/typescript/authoring/examples/caller-choice.d.ts",
+      "import": "./dist/typescript/authoring/examples/caller-choice.js",
+      "default": "./dist/typescript/authoring/examples/caller-choice.js"
+    },
+    "./core/auth/authority-metadata": {
+      "types": "./dist/typescript/src/auth/authority-metadata.d.ts",
+      "import": "./dist/typescript/src/auth/authority-metadata.js",
+      "default": "./dist/typescript/src/auth/authority-metadata.js"
+    },
+    "./core/browser/dialogs/action": {
+      "types": "./dist/typescript/src/browser/dialogs/action.d.ts",
+      "import": "./dist/typescript/src/browser/dialogs/action.js",
+      "default": "./dist/typescript/src/browser/dialogs/action.js"
+    },
+    "./core/browser/dialogs/contracts": {
+      "types": "./dist/typescript/src/browser/dialogs/contracts.d.ts",
+      "import": "./dist/typescript/src/browser/dialogs/contracts.js",
+      "default": "./dist/typescript/src/browser/dialogs/contracts.js"
+    },
+    "./core/browser/dialogs/expected": {
+      "types": "./dist/typescript/src/browser/dialogs/expected.d.ts",
+      "import": "./dist/typescript/src/browser/dialogs/expected.js",
+      "default": "./dist/typescript/src/browser/dialogs/expected.js"
+    },
+    "./core/browser/dialogs/service": {
+      "types": "./dist/typescript/src/browser/dialogs/service.d.ts",
+      "import": "./dist/typescript/src/browser/dialogs/service.js",
+      "default": "./dist/typescript/src/browser/dialogs/service.js"
+    },
+    "./core/browser/form-controls": {
+      "types": "./dist/typescript/src/browser/form-controls.d.ts",
+      "import": "./dist/typescript/src/browser/form-controls.js",
+      "default": "./dist/typescript/src/browser/form-controls.js"
+    },
+    "./core/browser/index": {
+      "types": "./dist/typescript/src/browser/index.d.ts",
+      "import": "./dist/typescript/src/browser/index.js",
+      "default": "./dist/typescript/src/browser/index.js"
+    },
+    "./core/browser/pagination": {
+      "types": "./dist/typescript/src/browser/pagination.d.ts",
+      "import": "./dist/typescript/src/browser/pagination.js",
+      "default": "./dist/typescript/src/browser/pagination.js"
+    },
+    "./core/browser/outcome-wait": {
+      "types": "./dist/typescript/src/browser/outcome-wait.d.ts",
+      "import": "./dist/typescript/src/browser/outcome-wait.js",
+      "default": "./dist/typescript/src/browser/outcome-wait.js"
+    },
+    "./core/capabilities/intake-contracts": {
+      "types": "./dist/typescript/src/capabilities/intake-contracts.d.ts",
+      "import": "./dist/typescript/src/capabilities/intake-contracts.js",
+      "default": "./dist/typescript/src/capabilities/intake-contracts.js"
+    },
+    "./core/capabilities/review-contracts": {
+      "types": "./dist/typescript/src/capabilities/review-contracts.d.ts",
+      "import": "./dist/typescript/src/capabilities/review-contracts.js",
+      "default": "./dist/typescript/src/capabilities/review-contracts.js"
+    },
+    "./core/destinations/autofill-contracts": {
+      "types": "./dist/typescript/src/destinations/autofill-contracts.d.ts",
+      "import": "./dist/typescript/src/destinations/autofill-contracts.js",
+      "default": "./dist/typescript/src/destinations/autofill-contracts.js"
+    },
+    "./core/destinations/autofill-fill": {
+      "types": "./dist/typescript/src/destinations/autofill-fill.d.ts",
+      "import": "./dist/typescript/src/destinations/autofill-fill.js",
+      "default": "./dist/typescript/src/destinations/autofill-fill.js"
+    },
+    "./core/destinations/autofill-marker": {
+      "types": "./dist/typescript/src/destinations/autofill-marker.d.ts",
+      "import": "./dist/typescript/src/destinations/autofill-marker.js",
+      "default": "./dist/typescript/src/destinations/autofill-marker.js"
+    },
+    "./core/destinations/autofill-locate-code": {
+      "types": "./dist/typescript/src/destinations/autofill-locate-code.d.ts",
+      "import": "./dist/typescript/src/destinations/autofill-locate-code.js",
+      "default": "./dist/typescript/src/destinations/autofill-locate-code.js"
+    },
+    "./core/destinations/autofill-page": {
+      "types": "./dist/typescript/src/destinations/autofill-page.d.ts",
+      "import": "./dist/typescript/src/destinations/autofill-page.js",
+      "default": "./dist/typescript/src/destinations/autofill-page.js"
+    },
+    "./core/destinations/autofill-page-code": {
+      "types": "./dist/typescript/src/destinations/autofill-page-code.d.ts",
+      "import": "./dist/typescript/src/destinations/autofill-page-code.js",
+      "default": "./dist/typescript/src/destinations/autofill-page-code.js"
+    },
+    "./core/destinations/autofill-recipe": {
+      "types": "./dist/typescript/src/destinations/autofill-recipe.d.ts",
+      "import": "./dist/typescript/src/destinations/autofill-recipe.js",
+      "default": "./dist/typescript/src/destinations/autofill-recipe.js"
+    },
+    "./core/destinations/autofill-refusal": {
+      "types": "./dist/typescript/src/destinations/autofill-refusal.d.ts",
+      "import": "./dist/typescript/src/destinations/autofill-refusal.js",
+      "default": "./dist/typescript/src/destinations/autofill-refusal.js"
+    },
+    "./core/destinations/autofill-refusal-evidence": {
+      "types": "./dist/typescript/src/destinations/autofill-refusal-evidence.d.ts",
+      "import": "./dist/typescript/src/destinations/autofill-refusal-evidence.js",
+      "default": "./dist/typescript/src/destinations/autofill-refusal-evidence.js"
+    },
+    "./core/destinations/autofill-step": {
+      "types": "./dist/typescript/src/destinations/autofill-step.d.ts",
+      "import": "./dist/typescript/src/destinations/autofill-step.js",
+      "default": "./dist/typescript/src/destinations/autofill-step.js"
+    },
+    "./core/destinations/autofill-typed-page": {
+      "types": "./dist/typescript/src/destinations/autofill-typed-page.d.ts",
+      "import": "./dist/typescript/src/destinations/autofill-typed-page.js",
+      "default": "./dist/typescript/src/destinations/autofill-typed-page.js"
+    },
+    "./core/destinations/card-fill": {
+      "types": "./dist/typescript/src/destinations/card-fill.d.ts",
+      "import": "./dist/typescript/src/destinations/card-fill.js",
+      "default": "./dist/typescript/src/destinations/card-fill.js"
+    },
+    "./core/destinations/credential-keyboard": {
+      "types": "./dist/typescript/src/destinations/credential-keyboard.d.ts",
+      "import": "./dist/typescript/src/destinations/credential-keyboard.js",
+      "default": "./dist/typescript/src/destinations/credential-keyboard.js"
+    },
+    "./core/destinations/login-field-formats": {
+      "types": "./dist/typescript/src/destinations/login-field-formats.d.ts",
+      "import": "./dist/typescript/src/destinations/login-field-formats.js",
+      "default": "./dist/typescript/src/destinations/login-field-formats.js"
+    },
+    "./core/destinations/login-fields": {
+      "types": "./dist/typescript/src/destinations/login-fields.d.ts",
+      "import": "./dist/typescript/src/destinations/login-fields.js",
+      "default": "./dist/typescript/src/destinations/login-fields.js"
+    },
+    "./core/destinations/marker-settle": {
+      "types": "./dist/typescript/src/destinations/marker-settle.d.ts",
+      "import": "./dist/typescript/src/destinations/marker-settle.js",
+      "default": "./dist/typescript/src/destinations/marker-settle.js"
+    },
+    "./core/destinations/payment-frames": {
+      "types": "./dist/typescript/src/destinations/payment-frames.d.ts",
+      "import": "./dist/typescript/src/destinations/payment-frames.js",
+      "default": "./dist/typescript/src/destinations/payment-frames.js"
+    },
+    "./core/destinations/private-candidate": {
+      "types": "./dist/typescript/src/destinations/private-candidate.d.ts",
+      "import": "./dist/typescript/src/destinations/private-candidate.js",
+      "default": "./dist/typescript/src/destinations/private-candidate.js"
+    },
+    "./core/destinations/signed-in-marker": {
+      "types": "./dist/typescript/src/destinations/signed-in-marker.d.ts",
+      "import": "./dist/typescript/src/destinations/signed-in-marker.js",
+      "default": "./dist/typescript/src/destinations/signed-in-marker.js"
+    },
+    "./core/destinations/sign-in-provider-codes": {
+      "types": "./dist/typescript/src/destinations/sign-in-provider-codes.d.ts",
+      "import": "./dist/typescript/src/destinations/sign-in-provider-codes.js",
+      "default": "./dist/typescript/src/destinations/sign-in-provider-codes.js"
+    },
+    "./core/execution/boundary": {
+      "types": "./dist/typescript/src/execution/boundary.d.ts",
+      "import": "./dist/typescript/src/execution/boundary.js",
+      "default": "./dist/typescript/src/execution/boundary.js"
+    },
+    "./core/execution/declared-questions": {
+      "types": "./dist/typescript/src/execution/declared-questions.d.ts",
+      "import": "./dist/typescript/src/execution/declared-questions.js",
+      "default": "./dist/typescript/src/execution/declared-questions.js"
+    },
+    "./core/execution/playwright-execute": {
+      "types": "./dist/typescript/src/execution/playwright-execute.d.ts",
+      "import": "./dist/typescript/src/execution/playwright-execute.js",
+      "default": "./dist/typescript/src/execution/playwright-execute.js"
+    },
+    "./core/execution/sign-in-diagnostics": {
+      "types": "./dist/typescript/src/execution/sign-in-diagnostics.d.ts",
+      "import": "./dist/typescript/src/execution/sign-in-diagnostics.js",
+      "default": "./dist/typescript/src/execution/sign-in-diagnostics.js"
+    },
+    "./core/filesystem/read": {
+      "types": "./dist/typescript/src/filesystem/read.d.ts",
+      "import": "./dist/typescript/src/filesystem/read.js",
+      "default": "./dist/typescript/src/filesystem/read.js"
+    },
+    "./core/guardian/model": {
+      "types": "./dist/typescript/src/guardian/model.d.ts",
+      "import": "./dist/typescript/src/guardian/model.js",
+      "default": "./dist/typescript/src/guardian/model.js"
+    },
+    "./core/guardian/openai": {
+      "types": "./dist/typescript/src/guardian/openai.d.ts",
+      "import": "./dist/typescript/src/guardian/openai.js",
+      "default": "./dist/typescript/src/guardian/openai.js"
+    },
+    "./core/guardian/publication": {
+      "types": "./dist/typescript/src/guardian/publication.d.ts",
+      "import": "./dist/typescript/src/guardian/publication.js",
+      "default": "./dist/typescript/src/guardian/publication.js"
+    },
+    "./core/guardian/question": {
+      "types": "./dist/typescript/src/guardian/question.d.ts",
+      "import": "./dist/typescript/src/guardian/question.js",
+      "default": "./dist/typescript/src/guardian/question.js"
+    },
+    "./core/guardian/review": {
+      "types": "./dist/typescript/src/guardian/review.d.ts",
+      "import": "./dist/typescript/src/guardian/review.js",
+      "default": "./dist/typescript/src/guardian/review.js"
+    },
+    "./core/guardian/review-contracts": {
+      "types": "./dist/typescript/src/guardian/review-contracts.d.ts",
+      "import": "./dist/typescript/src/guardian/review-contracts.js",
+      "default": "./dist/typescript/src/guardian/review-contracts.js"
+    },
+    "./core/guardian/session": {
+      "types": "./dist/typescript/src/guardian/session.d.ts",
+      "import": "./dist/typescript/src/guardian/session.js",
+      "default": "./dist/typescript/src/guardian/session.js"
+    },
+    "./core/guardian/sign-in-origin-reviews": {
+      "types": "./dist/typescript/src/guardian/sign-in-origin-reviews.d.ts",
+      "import": "./dist/typescript/src/guardian/sign-in-origin-reviews.js",
+      "default": "./dist/typescript/src/guardian/sign-in-origin-reviews.js"
+    },
+    "./core/guardian/source": {
+      "types": "./dist/typescript/src/guardian/source.d.ts",
+      "import": "./dist/typescript/src/guardian/source.js",
+      "default": "./dist/typescript/src/guardian/source.js"
+    },
+    "./core/guardian/task-update": {
+      "types": "./dist/typescript/src/guardian/task-update.d.ts",
+      "import": "./dist/typescript/src/guardian/task-update.js",
+      "default": "./dist/typescript/src/guardian/task-update.js"
+    },
+    "./core/guardian/upstream-policy": {
+      "types": "./dist/typescript/src/guardian/upstream-policy.d.ts",
+      "import": "./dist/typescript/src/guardian/upstream-policy.js",
+      "default": "./dist/typescript/src/guardian/upstream-policy.js"
+    },
+    "./core/mcp/schema": {
+      "types": "./dist/typescript/src/mcp/schema.d.ts",
+      "import": "./dist/typescript/src/mcp/schema.js",
+      "default": "./dist/typescript/src/mcp/schema.js"
+    },
+    "./core/mint/autofill-account-rejected": {
+      "types": "./dist/typescript/src/mint/autofill-account-rejected.d.ts",
+      "import": "./dist/typescript/src/mint/autofill-account-rejected.js",
+      "default": "./dist/typescript/src/mint/autofill-account-rejected.js"
+    },
+    "./core/mint/autofill-filled": {
+      "types": "./dist/typescript/src/mint/autofill-filled.d.ts",
+      "import": "./dist/typescript/src/mint/autofill-filled.js",
+      "default": "./dist/typescript/src/mint/autofill-filled.js"
+    },
+    "./core/mint/autofill-guards": {
+      "types": "./dist/typescript/src/mint/autofill-guards.d.ts",
+      "import": "./dist/typescript/src/mint/autofill-guards.js",
+      "default": "./dist/typescript/src/mint/autofill-guards.js"
+    },
+    "./core/mint/autofill-rejected": {
+      "types": "./dist/typescript/src/mint/autofill-rejected.d.ts",
+      "import": "./dist/typescript/src/mint/autofill-rejected.js",
+      "default": "./dist/typescript/src/mint/autofill-rejected.js"
+    },
+    "./core/mint/autofill-results": {
+      "types": "./dist/typescript/src/mint/autofill-results.d.ts",
+      "import": "./dist/typescript/src/mint/autofill-results.js",
+      "default": "./dist/typescript/src/mint/autofill-results.js"
+    },
+    "./core/mint/contracts": {
+      "types": "./dist/typescript/src/mint/contracts.d.ts",
+      "import": "./dist/typescript/src/mint/contracts.js",
+      "default": "./dist/typescript/src/mint/contracts.js"
+    },
+    "./core/mint/diagnostics": {
+      "types": "./dist/typescript/src/mint/diagnostics.d.ts",
+      "import": "./dist/typescript/src/mint/diagnostics.js",
+      "default": "./dist/typescript/src/mint/diagnostics.js"
+    },
+    "./core/mint/draft-questions": {
+      "types": "./dist/typescript/src/mint/draft-questions.d.ts",
+      "import": "./dist/typescript/src/mint/draft-questions.js",
+      "default": "./dist/typescript/src/mint/draft-questions.js"
+    },
+    "./core/mint/harness": {
+      "types": "./dist/typescript/src/mint/harness.d.ts",
+      "import": "./dist/typescript/src/mint/harness.js",
+      "default": "./dist/typescript/src/mint/harness.js"
+    },
+    "./core/mint/held-rejections": {
+      "types": "./dist/typescript/src/mint/held-rejections.d.ts",
+      "import": "./dist/typescript/src/mint/held-rejections.js",
+      "default": "./dist/typescript/src/mint/held-rejections.js"
+    },
+    "./core/mint/incident-contracts": {
+      "types": "./dist/typescript/src/mint/incident-contracts.d.ts",
+      "import": "./dist/typescript/src/mint/incident-contracts.js",
+      "default": "./dist/typescript/src/mint/incident-contracts.js"
+    },
+    "./core/mint/input-feedback": {
+      "types": "./dist/typescript/src/mint/input-feedback.d.ts",
+      "import": "./dist/typescript/src/mint/input-feedback.js",
+      "default": "./dist/typescript/src/mint/input-feedback.js"
+    },
+    "./core/mint/invocation": {
+      "types": "./dist/typescript/src/mint/invocation.d.ts",
+      "import": "./dist/typescript/src/mint/invocation.js",
+      "default": "./dist/typescript/src/mint/invocation.js"
+    },
+    "./core/mint/live-tests": {
+      "types": "./dist/typescript/src/mint/live-tests.d.ts",
+      "import": "./dist/typescript/src/mint/live-tests.js",
+      "default": "./dist/typescript/src/mint/live-tests.js"
+    },
+    "./core/mint/login-url": {
+      "types": "./dist/typescript/src/mint/login-url.d.ts",
+      "import": "./dist/typescript/src/mint/login-url.js",
+      "default": "./dist/typescript/src/mint/login-url.js"
+    },
+    "./core/mint/openai": {
+      "types": "./dist/typescript/src/mint/openai.d.ts",
+      "import": "./dist/typescript/src/mint/openai.js",
+      "default": "./dist/typescript/src/mint/openai.js"
+    },
+    "./core/mint/operation-source": {
+      "types": "./dist/typescript/src/mint/operation-source.d.ts",
+      "import": "./dist/typescript/src/mint/operation-source.js",
+      "default": "./dist/typescript/src/mint/operation-source.js"
+    },
+    "./core/mint/output-notes": {
+      "types": "./dist/typescript/src/mint/output-notes.d.ts",
+      "import": "./dist/typescript/src/mint/output-notes.js",
+      "default": "./dist/typescript/src/mint/output-notes.js"
+    },
+    "./core/mint/outcome-review": {
+      "types": "./dist/typescript/src/mint/outcome-review.d.ts",
+      "import": "./dist/typescript/src/mint/outcome-review.js",
+      "default": "./dist/typescript/src/mint/outcome-review.js"
+    },
+    "./core/mint/outcome-review-contracts": {
+      "types": "./dist/typescript/src/mint/outcome-review-contracts.d.ts",
+      "import": "./dist/typescript/src/mint/outcome-review-contracts.js",
+      "default": "./dist/typescript/src/mint/outcome-review-contracts.js"
+    },
+    "./core/mint/outcome-review-openai": {
+      "types": "./dist/typescript/src/mint/outcome-review-openai.d.ts",
+      "import": "./dist/typescript/src/mint/outcome-review-openai.js",
+      "default": "./dist/typescript/src/mint/outcome-review-openai.js"
+    },
+    "./core/mint/projection": {
+      "types": "./dist/typescript/src/mint/projection.d.ts",
+      "import": "./dist/typescript/src/mint/projection.js",
+      "default": "./dist/typescript/src/mint/projection.js"
+    },
+    "./core/mint/publication-review": {
+      "types": "./dist/typescript/src/mint/publication-review.d.ts",
+      "import": "./dist/typescript/src/mint/publication-review.js",
+      "default": "./dist/typescript/src/mint/publication-review.js"
+    },
+    "./core/mint/recovery-contracts": {
+      "types": "./dist/typescript/src/mint/recovery-contracts.d.ts",
+      "import": "./dist/typescript/src/mint/recovery-contracts.js",
+      "default": "./dist/typescript/src/mint/recovery-contracts.js"
+    },
+    "./core/mint/review-context": {
+      "types": "./dist/typescript/src/mint/review-context.d.ts",
+      "import": "./dist/typescript/src/mint/review-context.js",
+      "default": "./dist/typescript/src/mint/review-context.js"
+    },
+    "./core/mint/runner-failure": {
+      "types": "./dist/typescript/src/mint/runner-failure.d.ts",
+      "import": "./dist/typescript/src/mint/runner-failure.js",
+      "default": "./dist/typescript/src/mint/runner-failure.js"
+    },
+    "./core/mint/file-handles": {
+      "types": "./dist/typescript/src/mint/file-handles.d.ts",
+      "import": "./dist/typescript/src/mint/file-handles.js",
+      "default": "./dist/typescript/src/mint/file-handles.js"
+    },
+    "./core/mint/card-readback": {
+      "types": "./dist/typescript/src/mint/card-readback.d.ts",
+      "import": "./dist/typescript/src/mint/card-readback.js",
+      "default": "./dist/typescript/src/mint/card-readback.js"
+    },
+    "./core/mint/file-readback": {
+      "types": "./dist/typescript/src/mint/file-readback.d.ts",
+      "import": "./dist/typescript/src/mint/file-readback.js",
+      "default": "./dist/typescript/src/mint/file-readback.js"
+    },
+    "./core/mint/script-answer-reuse": {
+      "types": "./dist/typescript/src/mint/script-answer-reuse.d.ts",
+      "import": "./dist/typescript/src/mint/script-answer-reuse.js",
+      "default": "./dist/typescript/src/mint/script-answer-reuse.js"
+    },
+    "./core/mint/secret-handles": {
+      "types": "./dist/typescript/src/mint/secret-handles.d.ts",
+      "import": "./dist/typescript/src/mint/secret-handles.js",
+      "default": "./dist/typescript/src/mint/secret-handles.js"
+    },
+    "./core/mint/sign-in-failure": {
+      "types": "./dist/typescript/src/mint/sign-in-failure.d.ts",
+      "import": "./dist/typescript/src/mint/sign-in-failure.js",
+      "default": "./dist/typescript/src/mint/sign-in-failure.js"
+    },
+    "./core/mint/sign-in-version": {
+      "types": "./dist/typescript/src/mint/sign-in-version.d.ts",
+      "import": "./dist/typescript/src/mint/sign-in-version.js",
+      "default": "./dist/typescript/src/mint/sign-in-version.js"
+    },
+    "./core/mint/signed-in-marker": {
+      "types": "./dist/typescript/src/mint/signed-in-marker.d.ts",
+      "import": "./dist/typescript/src/mint/signed-in-marker.js",
+      "default": "./dist/typescript/src/mint/signed-in-marker.js"
+    },
+    "./core/mint/site-access-contracts": {
+      "types": "./dist/typescript/src/mint/site-access-contracts.d.ts",
+      "import": "./dist/typescript/src/mint/site-access-contracts.js",
+      "default": "./dist/typescript/src/mint/site-access-contracts.js"
+    },
+    "./core/mint/skills": {
+      "types": "./dist/typescript/src/mint/skills.d.ts",
+      "import": "./dist/typescript/src/mint/skills.js",
+      "default": "./dist/typescript/src/mint/skills.js"
+    },
+    "./core/mint/step-checks": {
+      "types": "./dist/typescript/src/mint/step-checks.d.ts",
+      "import": "./dist/typescript/src/mint/step-checks.js",
+      "default": "./dist/typescript/src/mint/step-checks.js"
+    },
+    "./core/mint/workspace": {
+      "types": "./dist/typescript/src/mint/workspace.d.ts",
+      "import": "./dist/typescript/src/mint/workspace.js",
+      "default": "./dist/typescript/src/mint/workspace.js"
+    },
+    "./core/mint/write-contract": {
+      "types": "./dist/typescript/src/mint/write-contract.d.ts",
+      "import": "./dist/typescript/src/mint/write-contract.js",
+      "default": "./dist/typescript/src/mint/write-contract.js"
+    },
+    "./core/mint/write-session": {
+      "types": "./dist/typescript/src/mint/write-session.d.ts",
+      "import": "./dist/typescript/src/mint/write-session.js",
+      "default": "./dist/typescript/src/mint/write-session.js"
+    },
+    "./core/models/model-diagnostic-failure": {
+      "types": "./dist/typescript/src/models/model-diagnostic-failure.d.ts",
+      "import": "./dist/typescript/src/models/model-diagnostic-failure.js",
+      "default": "./dist/typescript/src/models/model-diagnostic-failure.js"
+    },
+    "./core/models/model-diagnostic-timing": {
+      "types": "./dist/typescript/src/models/model-diagnostic-timing.d.ts",
+      "import": "./dist/typescript/src/models/model-diagnostic-timing.js",
+      "default": "./dist/typescript/src/models/model-diagnostic-timing.js"
+    },
+    "./core/models/model-failure": {
+      "types": "./dist/typescript/src/models/model-failure.d.ts",
+      "import": "./dist/typescript/src/models/model-failure.js",
+      "default": "./dist/typescript/src/models/model-failure.js"
+    },
+    "./core/models/model-observer": {
+      "types": "./dist/typescript/src/models/model-observer.d.ts",
+      "import": "./dist/typescript/src/models/model-observer.js",
+      "default": "./dist/typescript/src/models/model-observer.js"
+    },
+    "./core/models/model-runtime-record": {
+      "types": "./dist/typescript/src/models/model-runtime-record.d.ts",
+      "import": "./dist/typescript/src/models/model-runtime-record.js",
+      "default": "./dist/typescript/src/models/model-runtime-record.js"
+    },
+    "./core/models/models": {
+      "types": "./dist/typescript/src/models/models.d.ts",
+      "import": "./dist/typescript/src/models/models.js",
+      "default": "./dist/typescript/src/models/models.js"
+    },
+    "./core/models/prompt-cache": {
+      "types": "./dist/typescript/src/models/prompt-cache.d.ts",
+      "import": "./dist/typescript/src/models/prompt-cache.js",
+      "default": "./dist/typescript/src/models/prompt-cache.js"
+    },
+    "./core/models/reasoning-settings": {
+      "types": "./dist/typescript/src/models/reasoning-settings.d.ts",
+      "import": "./dist/typescript/src/models/reasoning-settings.js",
+      "default": "./dist/typescript/src/models/reasoning-settings.js"
+    },
+    "./core/privacy/credential-policy": {
+      "types": "./dist/typescript/src/privacy/credential-policy.d.ts",
+      "import": "./dist/typescript/src/privacy/credential-policy.js",
+      "default": "./dist/typescript/src/privacy/credential-policy.js"
+    },
+    "./core/privacy/secret-keys": {
+      "types": "./dist/typescript/src/privacy/secret-keys.d.ts",
+      "import": "./dist/typescript/src/privacy/secret-keys.js",
+      "default": "./dist/typescript/src/privacy/secret-keys.js"
+    },
+    "./core/privacy/url-spans": {
+      "types": "./dist/typescript/src/privacy/url-spans.d.ts",
+      "import": "./dist/typescript/src/privacy/url-spans.js",
+      "default": "./dist/typescript/src/privacy/url-spans.js"
+    },
+    "./core/privacy/value-forms": {
+      "types": "./dist/typescript/src/privacy/value-forms.d.ts",
+      "import": "./dist/typescript/src/privacy/value-forms.js",
+      "default": "./dist/typescript/src/privacy/value-forms.js"
+    },
+    "./core/registry/issues": {
+      "types": "./dist/typescript/src/registry/issues.d.ts",
+      "import": "./dist/typescript/src/registry/issues.js",
+      "default": "./dist/typescript/src/registry/issues.js"
+    },
+    "./core/registry/operation-variants": {
+      "types": "./dist/typescript/src/registry/operation-variants.d.ts",
+      "import": "./dist/typescript/src/registry/operation-variants.js",
+      "default": "./dist/typescript/src/registry/operation-variants.js"
+    },
+    "./core/registry/schema-references": {
+      "types": "./dist/typescript/src/registry/schema-references.d.ts",
+      "import": "./dist/typescript/src/registry/schema-references.js",
+      "default": "./dist/typescript/src/registry/schema-references.js"
+    },
+    "./core/runtime/authentication": {
+      "types": "./dist/typescript/src/runtime/authentication.d.ts",
+      "import": "./dist/typescript/src/runtime/authentication.js",
+      "default": "./dist/typescript/src/runtime/authentication.js"
+    },
+    "./core/runtime/autofill-correction": {
+      "types": "./dist/typescript/src/runtime/autofill-correction.d.ts",
+      "import": "./dist/typescript/src/runtime/autofill-correction.js",
+      "default": "./dist/typescript/src/runtime/autofill-correction.js"
+    },
+    "./core/runtime/autofill-fresh-values": {
+      "types": "./dist/typescript/src/runtime/autofill-fresh-values.d.ts",
+      "import": "./dist/typescript/src/runtime/autofill-fresh-values.js",
+      "default": "./dist/typescript/src/runtime/autofill-fresh-values.js"
+    },
+    "./core/runtime/autofill-rejection": {
+      "types": "./dist/typescript/src/runtime/autofill-rejection.d.ts",
+      "import": "./dist/typescript/src/runtime/autofill-rejection.js",
+      "default": "./dist/typescript/src/runtime/autofill-rejection.js"
+    },
+    "./core/runtime/autofill-replay": {
+      "types": "./dist/typescript/src/runtime/autofill-replay.d.ts",
+      "import": "./dist/typescript/src/runtime/autofill-replay.js",
+      "default": "./dist/typescript/src/runtime/autofill-replay.js"
+    },
+    "./core/runtime/autofill-replay-code-screen": {
+      "types": "./dist/typescript/src/runtime/autofill-replay-code-screen.d.ts",
+      "import": "./dist/typescript/src/runtime/autofill-replay-code-screen.js",
+      "default": "./dist/typescript/src/runtime/autofill-replay-code-screen.js"
+    },
+    "./core/runtime/autofill-replay-fill": {
+      "types": "./dist/typescript/src/runtime/autofill-replay-fill.d.ts",
+      "import": "./dist/typescript/src/runtime/autofill-replay-fill.js",
+      "default": "./dist/typescript/src/runtime/autofill-replay-fill.js"
+    },
+    "./core/runtime/autofill-replay-pages": {
+      "types": "./dist/typescript/src/runtime/autofill-replay-pages.d.ts",
+      "import": "./dist/typescript/src/runtime/autofill-replay-pages.js",
+      "default": "./dist/typescript/src/runtime/autofill-replay-pages.js"
+    },
+    "./core/runtime/autofill-replay-screens": {
+      "types": "./dist/typescript/src/runtime/autofill-replay-screens.d.ts",
+      "import": "./dist/typescript/src/runtime/autofill-replay-screens.js",
+      "default": "./dist/typescript/src/runtime/autofill-replay-screens.js"
+    },
+    "./core/runtime/autofill-replay-session": {
+      "types": "./dist/typescript/src/runtime/autofill-replay-session.d.ts",
+      "import": "./dist/typescript/src/runtime/autofill-replay-session.js",
+      "default": "./dist/typescript/src/runtime/autofill-replay-session.js"
+    },
+    "./core/runtime/autofill-replay-steps": {
+      "types": "./dist/typescript/src/runtime/autofill-replay-steps.d.ts",
+      "import": "./dist/typescript/src/runtime/autofill-replay-steps.js",
+      "default": "./dist/typescript/src/runtime/autofill-replay-steps.js"
+    },
+    "./core/runtime/autofill-replay-workspace": {
+      "types": "./dist/typescript/src/runtime/autofill-replay-workspace.d.ts",
+      "import": "./dist/typescript/src/runtime/autofill-replay-workspace.js",
+      "default": "./dist/typescript/src/runtime/autofill-replay-workspace.js"
+    },
+    "./core/runtime/autofill-state": {
+      "types": "./dist/typescript/src/runtime/autofill-state.d.ts",
+      "import": "./dist/typescript/src/runtime/autofill-state.js",
+      "default": "./dist/typescript/src/runtime/autofill-state.js"
+    },
+    "./core/runtime/autofill-unrecorded-code": {
+      "types": "./dist/typescript/src/runtime/autofill-unrecorded-code.d.ts",
+      "import": "./dist/typescript/src/runtime/autofill-unrecorded-code.js",
+      "default": "./dist/typescript/src/runtime/autofill-unrecorded-code.js"
+    },
+    "./core/runtime/autofill-values": {
+      "types": "./dist/typescript/src/runtime/autofill-values.d.ts",
+      "import": "./dist/typescript/src/runtime/autofill-values.js",
+      "default": "./dist/typescript/src/runtime/autofill-values.js"
+    },
+    "./core/runtime/capture-diagnostic": {
+      "types": "./dist/typescript/src/runtime/capture-diagnostic.d.ts",
+      "import": "./dist/typescript/src/runtime/capture-diagnostic.js",
+      "default": "./dist/typescript/src/runtime/capture-diagnostic.js"
+    },
+    "./core/runtime/challenge": {
+      "types": "./dist/typescript/src/runtime/challenge.d.ts",
+      "import": "./dist/typescript/src/runtime/challenge.js",
+      "default": "./dist/typescript/src/runtime/challenge.js"
+    },
+    "./core/runtime/context": {
+      "types": "./dist/typescript/src/runtime/context.d.ts",
+      "import": "./dist/typescript/src/runtime/context.js",
+      "default": "./dist/typescript/src/runtime/context.js"
+    },
+    "./core/runtime/credential-prompts": {
+      "types": "./dist/typescript/src/runtime/credential-prompts.d.ts",
+      "import": "./dist/typescript/src/runtime/credential-prompts.js",
+      "default": "./dist/typescript/src/runtime/credential-prompts.js"
+    },
+    "./core/runtime/deadline": {
+      "types": "./dist/typescript/src/runtime/deadline.d.ts",
+      "import": "./dist/typescript/src/runtime/deadline.js",
+      "default": "./dist/typescript/src/runtime/deadline.js"
+    },
+    "./core/runtime/dialogs": {
+      "types": "./dist/typescript/src/runtime/dialogs.d.ts",
+      "import": "./dist/typescript/src/runtime/dialogs.js",
+      "default": "./dist/typescript/src/runtime/dialogs.js"
+    },
+    "./core/runtime/errors": {
+      "types": "./dist/typescript/src/runtime/errors.d.ts",
+      "import": "./dist/typescript/src/runtime/errors.js",
+      "default": "./dist/typescript/src/runtime/errors.js"
+    },
+    "./core/runtime/failure-detail": {
+      "types": "./dist/typescript/src/runtime/failure-detail.d.ts",
+      "import": "./dist/typescript/src/runtime/failure-detail.js",
+      "default": "./dist/typescript/src/runtime/failure-detail.js"
+    },
+    "./core/runtime/failure-renderer-contract": {
+      "types": "./dist/typescript/src/runtime/failure-renderer-contract.d.ts",
+      "import": "./dist/typescript/src/runtime/failure-renderer-contract.js",
+      "default": "./dist/typescript/src/runtime/failure-renderer-contract.js"
+    },
+    "./core/runtime/file-transfer": {
+      "types": "./dist/typescript/src/runtime/file-transfer.d.ts",
+      "import": "./dist/typescript/src/runtime/file-transfer.js",
+      "default": "./dist/typescript/src/runtime/file-transfer.js"
+    },
+    "./core/runtime/file-types": {
+      "types": "./dist/typescript/src/runtime/file-types.d.ts",
+      "import": "./dist/typescript/src/runtime/file-types.js",
+      "default": "./dist/typescript/src/runtime/file-types.js"
+    },
+    "./core/runtime/files": {
+      "types": "./dist/typescript/src/runtime/files.d.ts",
+      "import": "./dist/typescript/src/runtime/files.js",
+      "default": "./dist/typescript/src/runtime/files.js"
+    },
+    "./core/runtime/fingerprint": {
+      "types": "./dist/typescript/src/runtime/fingerprint.d.ts",
+      "import": "./dist/typescript/src/runtime/fingerprint.js",
+      "default": "./dist/typescript/src/runtime/fingerprint.js"
+    },
+    "./core/runtime/host-execute": {
+      "types": "./dist/typescript/src/runtime/host-execute.d.ts",
+      "import": "./dist/typescript/src/runtime/host-execute.js",
+      "default": "./dist/typescript/src/runtime/host-execute.js"
+    },
+    "./core/runtime/incidents": {
+      "types": "./dist/typescript/src/runtime/incidents.d.ts",
+      "import": "./dist/typescript/src/runtime/incidents.js",
+      "default": "./dist/typescript/src/runtime/incidents.js"
+    },
+    "./core/runtime/input-request": {
+      "types": "./dist/typescript/src/runtime/input-request.d.ts",
+      "import": "./dist/typescript/src/runtime/input-request.js",
+      "default": "./dist/typescript/src/runtime/input-request.js"
+    },
+    "./core/runtime/job-store": {
+      "types": "./dist/typescript/src/runtime/job-store.d.ts",
+      "import": "./dist/typescript/src/runtime/job-store.js",
+      "default": "./dist/typescript/src/runtime/job-store.js"
+    },
+    "./core/runtime/http-operation": {
+      "types": "./dist/typescript/src/runtime/http-operation.d.ts",
+      "import": "./dist/typescript/src/runtime/http-operation.js",
+      "default": "./dist/typescript/src/runtime/http-operation.js"
+    },
+    "./core/runtime/saved-http": {
+      "types": "./dist/typescript/src/runtime/saved-http.d.ts",
+      "import": "./dist/typescript/src/runtime/saved-http.js",
+      "default": "./dist/typescript/src/runtime/saved-http.js"
+    },
+    "./core/runtime/site-http": {
+      "types": "./dist/typescript/src/runtime/site-http.d.ts",
+      "import": "./dist/typescript/src/runtime/site-http.js",
+      "default": "./dist/typescript/src/runtime/site-http.js"
+    },
+    "./core/runtime/site-http-host": {
+      "types": "./dist/typescript/src/runtime/site-http-host.d.ts",
+      "import": "./dist/typescript/src/runtime/site-http-host.js",
+      "default": "./dist/typescript/src/runtime/site-http-host.js"
+    },
+    "./core/runtime/list-cursor": {
+      "types": "./dist/typescript/src/runtime/list-cursor.d.ts",
+      "import": "./dist/typescript/src/runtime/list-cursor.js",
+      "default": "./dist/typescript/src/runtime/list-cursor.js"
+    },
+    "./core/runtime/list-page": {
+      "types": "./dist/typescript/src/runtime/list-page.d.ts",
+      "import": "./dist/typescript/src/runtime/list-page.js",
+      "default": "./dist/typescript/src/runtime/list-page.js"
+    },
+    "./core/runtime/login-values": {
+      "types": "./dist/typescript/src/runtime/login-values.d.ts",
+      "import": "./dist/typescript/src/runtime/login-values.js",
+      "default": "./dist/typescript/src/runtime/login-values.js"
+    },
+    "./core/runtime/login-field-asks": {
+      "types": "./dist/typescript/src/runtime/login-field-asks.d.ts",
+      "import": "./dist/typescript/src/runtime/login-field-asks.js",
+      "default": "./dist/typescript/src/runtime/login-field-asks.js"
+    },
+    "./core/runtime/kernel-compatibility": {
+      "types": "./dist/typescript/src/runtime/kernel-compatibility.d.ts",
+      "import": "./dist/typescript/src/runtime/kernel-compatibility.js",
+      "default": "./dist/typescript/src/runtime/kernel-compatibility.js"
+    },
+    "./core/runtime/kernel-operation": {
+      "types": "./dist/typescript/src/runtime/kernel-operation.d.ts",
+      "import": "./dist/typescript/src/runtime/kernel-operation.js",
+      "default": "./dist/typescript/src/runtime/kernel-operation.js"
+    },
+    "./core/runtime/kernel-operation-run": {
+      "types": "./dist/typescript/src/runtime/kernel-operation-run.d.ts",
+      "import": "./dist/typescript/src/runtime/kernel-operation-run.js",
+      "default": "./dist/typescript/src/runtime/kernel-operation-run.js"
+    },
+    "./core/runtime/kernel-operation-validation": {
+      "types": "./dist/typescript/src/runtime/kernel-operation-validation.d.ts",
+      "import": "./dist/typescript/src/runtime/kernel-operation-validation.js",
+      "default": "./dist/typescript/src/runtime/kernel-operation-validation.js"
+    },
+    "./core/runtime/operation": {
+      "types": "./dist/typescript/src/runtime/operation.d.ts",
+      "import": "./dist/typescript/src/runtime/operation.js",
+      "default": "./dist/typescript/src/runtime/operation.js"
+    },
+    "./core/runtime/operation-failure": {
+      "types": "./dist/typescript/src/runtime/operation-failure.d.ts",
+      "import": "./dist/typescript/src/runtime/operation-failure.js",
+      "default": "./dist/typescript/src/runtime/operation-failure.js"
+    },
+    "./core/runtime/output-lint": {
+      "types": "./dist/typescript/src/runtime/output-lint.d.ts",
+      "import": "./dist/typescript/src/runtime/output-lint.js",
+      "default": "./dist/typescript/src/runtime/output-lint.js"
+    },
+    "./core/runtime/policy-metadata": {
+      "types": "./dist/typescript/src/runtime/policy-metadata.d.ts",
+      "import": "./dist/typescript/src/runtime/policy-metadata.js",
+      "default": "./dist/typescript/src/runtime/policy-metadata.js"
+    },
+    "./core/runtime/provider-metadata": {
+      "types": "./dist/typescript/src/runtime/provider-metadata.d.ts",
+      "import": "./dist/typescript/src/runtime/provider-metadata.js",
+      "default": "./dist/typescript/src/runtime/provider-metadata.js"
+    },
+    "./core/runtime/run-login": {
+      "types": "./dist/typescript/src/runtime/run-login.d.ts",
+      "import": "./dist/typescript/src/runtime/run-login.js",
+      "default": "./dist/typescript/src/runtime/run-login.js"
+    },
+    "./core/runtime/run-outcome": {
+      "types": "./dist/typescript/src/runtime/run-outcome.d.ts",
+      "import": "./dist/typescript/src/runtime/run-outcome.js",
+      "default": "./dist/typescript/src/runtime/run-outcome.js"
+    },
+    "./core/runtime/runner-codes": {
+      "types": "./dist/typescript/src/runtime/runner-codes.d.ts",
+      "import": "./dist/typescript/src/runtime/runner-codes.js",
+      "default": "./dist/typescript/src/runtime/runner-codes.js"
+    },
+    "./core/runtime/same-site": {
+      "types": "./dist/typescript/src/runtime/same-site.d.ts",
+      "import": "./dist/typescript/src/runtime/same-site.js",
+      "default": "./dist/typescript/src/runtime/same-site.js"
+    },
+    "./core/runtime/schema-issues": {
+      "types": "./dist/typescript/src/runtime/schema-issues.d.ts",
+      "import": "./dist/typescript/src/runtime/schema-issues.js",
+      "default": "./dist/typescript/src/runtime/schema-issues.js"
+    },
+    "./core/runtime/session-sign-in": {
+      "types": "./dist/typescript/src/runtime/session-sign-in.d.ts",
+      "import": "./dist/typescript/src/runtime/session-sign-in.js",
+      "default": "./dist/typescript/src/runtime/session-sign-in.js"
+    },
+    "./core/runtime/script-card-fill": {
+      "types": "./dist/typescript/src/runtime/script-card-fill.d.ts",
+      "import": "./dist/typescript/src/runtime/script-card-fill.js",
+      "default": "./dist/typescript/src/runtime/script-card-fill.js"
+    },
+    "./core/runtime/script-input": {
+      "types": "./dist/typescript/src/runtime/script-input.d.ts",
+      "import": "./dist/typescript/src/runtime/script-input.js",
+      "default": "./dist/typescript/src/runtime/script-input.js"
+    },
+    "./core/runtime/sign-in-telemetry": {
+      "types": "./dist/typescript/src/runtime/sign-in-telemetry.d.ts",
+      "import": "./dist/typescript/src/runtime/sign-in-telemetry.js",
+      "default": "./dist/typescript/src/runtime/sign-in-telemetry.js"
+    },
+    "./core/runtime/source-syntax": {
+      "types": "./dist/typescript/src/runtime/source-syntax.d.ts",
+      "import": "./dist/typescript/src/runtime/source-syntax.js",
+      "default": "./dist/typescript/src/runtime/source-syntax.js"
+    },
+    "./core/testing/local-kernel": {
+      "types": "./dist/typescript/src/testing/local-kernel.d.ts",
+      "import": "./dist/typescript/src/testing/local-kernel.js",
+      "default": "./dist/typescript/src/testing/local-kernel.js"
+    },
+    "./testing/authoring-fixture": {
+      "types": "./dist/typescript/tests/browser/authoring-fixture.d.ts",
+      "import": "./dist/typescript/tests/browser/authoring-fixture.js",
+      "default": "./dist/typescript/tests/browser/authoring-fixture.js"
+    },
+    "./testing/autofill-date-fixture": {
+      "types": "./dist/typescript/tests/browser/autofill-date-fixture.d.ts",
+      "import": "./dist/typescript/tests/browser/autofill-date-fixture.js",
+      "default": "./dist/typescript/tests/browser/autofill-date-fixture.js"
+    },
+    "./core/runtime/start-state": {
+      "types": "./dist/typescript/src/runtime/start-state.d.ts",
+      "import": "./dist/typescript/src/runtime/start-state.js",
+      "default": "./dist/typescript/src/runtime/start-state.js"
+    },
+    "./core/runtime/variants": {
+      "types": "./dist/typescript/src/runtime/variants.d.ts",
+      "import": "./dist/typescript/src/runtime/variants.js",
+      "default": "./dist/typescript/src/runtime/variants.js"
+    },
+    "./core/runtime/workspace-origin": {
+      "types": "./dist/typescript/src/runtime/workspace-origin.d.ts",
+      "import": "./dist/typescript/src/runtime/workspace-origin.js",
+      "default": "./dist/typescript/src/runtime/workspace-origin.js"
+    },
+    "./testing/canary": {
+      "types": "./dist/typescript/tests/support/canary.d.ts",
+      "import": "./dist/typescript/tests/support/canary.js",
+      "default": "./dist/typescript/tests/support/canary.js"
+    },
+    "./testing/confirm-popups-contract": {
+      "types": "./dist/typescript/tests/support/confirm-popups-contract.d.ts",
+      "import": "./dist/typescript/tests/support/confirm-popups-contract.js",
+      "default": "./dist/typescript/tests/support/confirm-popups-contract.js"
+    },
+    "./testing/credential-masking-corpus": {
+      "types": "./dist/typescript/tests/support/credential-masking-corpus.d.ts",
+      "import": "./dist/typescript/tests/support/credential-masking-corpus.js",
+      "default": "./dist/typescript/tests/support/credential-masking-corpus.js"
+    },
+    "./testing/expect-failure": {
+      "types": "./dist/typescript/tests/support/expect-failure.d.ts",
+      "import": "./dist/typescript/tests/support/expect-failure.js",
+      "default": "./dist/typescript/tests/support/expect-failure.js"
+    },
+    "./testing/isolated-locator-page": {
+      "types": "./dist/typescript/tests/browser/isolated-locator-page.d.ts",
+      "import": "./dist/typescript/tests/browser/isolated-locator-page.js",
+      "default": "./dist/typescript/tests/browser/isolated-locator-page.js"
+    },
+    "./testing/job-store-contract": {
+      "types": "./dist/typescript/tests/support/job-store-contract.d.ts",
+      "import": "./dist/typescript/tests/support/job-store-contract.js",
+      "default": "./dist/typescript/tests/support/job-store-contract.js"
+    },
+    "./testing/mint-fixtures": {
+      "types": "./dist/typescript/tests/support/mint-fixtures.d.ts",
+      "import": "./dist/typescript/tests/support/mint-fixtures.js",
+      "default": "./dist/typescript/tests/support/mint-fixtures.js"
+    },
+    "./testing/shop-fixture": {
+      "types": "./dist/typescript/tests/browser/shop-fixture.d.ts",
+      "import": "./dist/typescript/tests/browser/shop-fixture.js",
+      "default": "./dist/typescript/tests/browser/shop-fixture.js"
+    },
+    "./testing/session-sign-in-contract": {
+      "types": "./dist/typescript/tests/support/session-sign-in-contract.d.ts",
+      "import": "./dist/typescript/tests/support/session-sign-in-contract.js",
+      "default": "./dist/typescript/tests/support/session-sign-in-contract.js"
+    },
+    "./testing/tenant-policy": {
+      "types": "./dist/typescript/tests/support/tenant-policy.d.ts",
+      "import": "./dist/typescript/tests/support/tenant-policy.js",
+      "default": "./dist/typescript/tests/support/tenant-policy.js"
+    },
+    "./authoring/auth-entry": {
+      "types": "./dist/typescript/authoring/examples/auth-entry.d.ts",
+      "import": "./dist/typescript/authoring/examples/auth-entry.js",
+      "default": "./dist/typescript/authoring/examples/auth-entry.js"
+    },
+    "./authoring/custom-selection": {
+      "types": "./dist/typescript/authoring/examples/custom-selection.d.ts",
+      "import": "./dist/typescript/authoring/examples/custom-selection.js",
+      "default": "./dist/typescript/authoring/examples/custom-selection.js"
+    },
+    "./authoring/dates-and-dropdowns": {
+      "types": "./dist/typescript/authoring/examples/dates-and-dropdowns.d.ts",
+      "import": "./dist/typescript/authoring/examples/dates-and-dropdowns.js",
+      "default": "./dist/typescript/authoring/examples/dates-and-dropdowns.js"
+    },
+    "./authoring/dates-and-files": {
+      "types": "./dist/typescript/authoring/examples/dates-and-files.d.ts",
+      "import": "./dist/typescript/authoring/examples/dates-and-files.js",
+      "default": "./dist/typescript/authoring/examples/dates-and-files.js"
+    },
+    "./authoring/dialog-picker": {
+      "types": "./dist/typescript/authoring/examples/dialog-picker.d.ts",
+      "import": "./dist/typescript/authoring/examples/dialog-picker.js",
+      "default": "./dist/typescript/authoring/examples/dialog-picker.js"
+    },
+    "./authoring/native-dialog": {
+      "types": "./dist/typescript/authoring/examples/native-dialog.d.ts",
+      "import": "./dist/typescript/authoring/examples/native-dialog.js",
+      "default": "./dist/typescript/authoring/examples/native-dialog.js"
+    },
+    "./authoring/native-page": {
+      "types": "./dist/typescript/authoring/examples/native-page.d.ts",
+      "import": "./dist/typescript/authoring/examples/native-page.js",
+      "default": "./dist/typescript/authoring/examples/native-page.js"
+    },
+    "./authoring/navigation": {
+      "types": "./dist/typescript/authoring/examples/navigation.d.ts",
+      "import": "./dist/typescript/authoring/examples/navigation.js",
+      "default": "./dist/typescript/authoring/examples/navigation.js"
+    },
+    "./authoring/selection": {
+      "types": "./dist/typescript/authoring/examples/selection.d.ts",
+      "import": "./dist/typescript/authoring/examples/selection.js",
+      "default": "./dist/typescript/authoring/examples/selection.js"
+    },
+    "./authoring/variants": {
+      "types": "./dist/typescript/authoring/examples/variants.d.ts",
+      "import": "./dist/typescript/authoring/examples/variants.js",
+      "default": "./dist/typescript/authoring/examples/variants.js"
+    },
+    "./authoring/write-readback": {
+      "types": "./dist/typescript/authoring/examples/write-readback.d.ts",
+      "import": "./dist/typescript/authoring/examples/write-readback.js",
+      "default": "./dist/typescript/authoring/examples/write-readback.js"
+    },
+    "./authoring/write-session": {
+      "types": "./dist/typescript/authoring/examples/write-session.d.ts",
+      "import": "./dist/typescript/authoring/examples/write-session.js",
+      "default": "./dist/typescript/authoring/examples/write-session.js"
+    },
+    "./core/registry/site-naming": {
+      "types": "./dist/typescript/src/registry/site-naming.d.ts",
+      "import": "./dist/typescript/src/registry/site-naming.js",
+      "default": "./dist/typescript/src/registry/site-naming.js"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.json && node tools/copy-assets.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+    "start": "node dist/typescript/src/standalone/cli.js",
+    "mcp": "node dist/typescript/src/standalone/mcp-cli.js",
+    "test": "vitest run",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.3.1",
+    "css-select": "7.0.0",
+    "domhandler": "6.0.1",
+    "domutils": "4.0.2",
+    "htmlparser2": "12.0.0",
+    "openai": "7.23.0",
+    "oxc-parser": "0.152.0",
+    "playwright": "1.63.0",
+    "tldts": "7.4.16"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.3.1",
+    "@openai/agents": "0.18.0",
+    "@playwright/test": "1.63.0",
+    "@types/node": "24.13.4",
+    "effect": "3.22.2",
+    "patchright": "1.63.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  },
+  "peerDependencies": {
+    "@openai/agents": "0.18.0",
+    "effect": "3.22.2",
+    "patchright": "1.63.0",
+    "vitest": "^5.0.2"
+  },
+  "peerDependenciesMeta": {
+    "patchright": {
+      "optional": true
+    },
+    "vitest": {
+      "optional": true
+    }
+  }
+}

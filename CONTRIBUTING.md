@@ -34,6 +34,7 @@ Set `RELOAD=true` in `backend/.env` to reload the backend when you edit it.
 cd backend && python -m unittest discover -s tests -t .   # all tests pass
 cd frontend && npm run build                              # builds cleanly
 cd coding-agent && bun run typecheck:tsc                  # only if you changed coding-agent/
+cd backend/browser_engine && pnpm typecheck && pnpm test  # only if you changed the browser engine (Node 24)
 ```
 
 - The same checks run on GitHub for every pull request

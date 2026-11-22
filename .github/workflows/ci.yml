@@ -73,9 +73,38 @@ jobs:
         working-directory: coding-agent
         run: bun run typecheck:tsc
 
+  browser-engine:
+    name: Browser engine tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/browser_engine
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: backend/browser_engine/package.json
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.22.3"
+          cache: pnpm
+          cache-dependency-path: backend/browser_engine/pnpm-lock.yaml
+      - name: Install packages
+        run: pnpm install --frozen-lockfile
+      - name: Type check
+        run: pnpm typecheck
+      - name: Unit tests
+        run: pnpm test
+      - name: Build
+        run: pnpm build
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Browser tests
+        run: pnpm test:browser
+
   docker:
     name: Build and push image
-    needs: [backend, frontend, coding-agent]
+    needs: [backend, frontend, coding-agent, browser-engine]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     concurrency:

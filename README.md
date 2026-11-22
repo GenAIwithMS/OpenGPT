@@ -244,6 +244,7 @@ Tools without a key are simply unavailable. For example, without `GOOGLE_API_KEY
 backend/        FastAPI app: routers, services, chat graph, tools, tests
 frontend/       React app (Vite, Tailwind)
 coding-agent/   Coding agent service (Bun/TypeScript), started by the backend
+backend/browser_engine/   Browser engine (Node/TypeScript), not used by the app yet
 docs/           Developer documentation
 start.sh / start.bat   Start backend + frontend
 ```
