@@ -17,6 +17,7 @@ Settings (backend/.env):
     RESEARCH_MODEL      deep research (default: LLM_MODEL)
     LLM_MAX_TOKENS      max output tokens per call (default: 8192)
     CODING_AGENT_MODEL  the coding agent (default: LLM_MODEL)
+    AGENT_MODEL         the agent on the Agent page (default: LLM_MODEL)
 
 Settings > Developer can add more providers and choose the active one and a
 model per job (app/services/providers.py); that choice overrides the above.
@@ -49,7 +50,7 @@ def env(name: str) -> Optional[str]:
     return value
 
 
-ROLES = ("model", "small_model", "research_model", "blog_model", "coding_model")
+ROLES = ("model", "small_model", "research_model", "blog_model", "coding_model", "agent_model")
 
 
 def env_settings() -> dict:
@@ -79,6 +80,7 @@ def env_settings() -> dict:
         "blog_model": env("BLOG_MODEL") or model,
         "research_model": env("RESEARCH_MODEL") or model,
         "coding_model": env("CODING_AGENT_MODEL") or model,
+        "agent_model": env("AGENT_MODEL") or model,
         "max_tokens": int(env("LLM_MAX_TOKENS") or 8192),
     }
 
@@ -126,7 +128,7 @@ def validate() -> None:
 
 
 def model_name(role: str = "model") -> str:
-    """Configured model name for a role: model, small_model, blog_model, research_model, coding_model."""
+    """Configured model name for a role: model, small_model, blog_model, research_model, coding_model, agent_model."""
     return settings()[role]
 
 

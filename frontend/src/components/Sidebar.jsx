@@ -11,6 +11,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Code2,
+  Bot,
   Folder,
   FolderOpen,
   FolderInput,
@@ -63,6 +64,9 @@ const SquarePenIcon = (props) => (
  * @param {() => void} props.onToggleCollapse
  * @param {boolean} [props.isCodeActive]  The Code page is showing.
  * @param {() => void} props.onOpenCode
+ * @param {boolean} [props.isAgentActive]  The Agent page is showing.
+ * @param {() => void} [props.onOpenAgent]
+ * @param {number} [props.agentNeedsYou]  Agent sessions waiting for the user (badge).
  * @param {string} [props.listLabel]  Heading over the list ("Recents", "Sessions · project").
  * @param {string} [props.emptyText]
  * @param {string} [props.displayName]  Shown in the user menu.
@@ -98,6 +102,9 @@ const Sidebar = ({
   onToggleCollapse,
   isCodeActive = false,
   onOpenCode,
+  isAgentActive = false,
+  onOpenAgent = null,
+  agentNeedsYou = 0,
   listLabel = 'Recents',
   emptyText = 'No chats yet',
   displayName = 'Muhammad',
@@ -493,6 +500,20 @@ const Sidebar = ({
               <Code2 size={18} />
             </button>
 
+            {onOpenAgent && (
+              <button
+                onClick={onOpenAgent}
+                title={agentNeedsYou ? `Agent: ${agentNeedsYou} waiting for you` : 'Agent'}
+                aria-current={isAgentActive ? 'page' : undefined}
+                className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-colors mt-1 ${
+                  isAgentActive ? 'bg-gray-700/90' : 'hover:bg-gray-700'
+                }`}
+              >
+                <Bot size={18} />
+                {agentNeedsYou > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-amber-400" />}
+              </button>
+            )}
+
             {projects && (
               <button
                 onClick={() => onToggleCollapse?.()}
@@ -570,6 +591,32 @@ const Sidebar = ({
                 <span className="text-sm font-medium whitespace-nowrap">Code</span>
               </button>
             </div>
+
+            {/* Agent: long tasks in the background */}
+            {onOpenAgent && (
+              <div className="px-2">
+                <button
+                  onClick={onOpenAgent}
+                  aria-current={isAgentActive ? 'page' : undefined}
+                  className={`
+                    flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl transition-colors text-left
+                    ${isAgentActive ? 'bg-gray-700/90' : 'hover:bg-gray-700/80'}
+                  `}
+                  title="Agent"
+                >
+                  <span className="flex items-center justify-center w-5 h-5 shrink-0">
+                    <Bot size={18} />
+                  </span>
+                  <span className="flex-1 text-sm font-medium whitespace-nowrap">Agent</span>
+                  {agentNeedsYou > 0 && (
+                    <span className="rounded-full bg-amber-400/90 px-1.5 text-xs font-semibold text-gray-900"
+                      aria-label={`${agentNeedsYou} waiting for you`}>
+                      {agentNeedsYou}
+                    </span>
+                  )}
+                </button>
+              </div>
+            )}
 
             {/* Scrollable middle: Recents header + chat history.
                 This region is the only flexible part; the OpenGPT header and

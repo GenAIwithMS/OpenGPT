@@ -26,6 +26,7 @@ open with a docstring explaining how they work; the feature pages in
 | `chat_approvals.py` | Ask the user in chat before a connector tool changes data | [connectors](../../../docs/services/connectors.md) |
 | `skills.py` | Skills: sources, install, the `Skill` tool | [skills](../../../docs/services/skills.md) |
 | `coding_agent/` | The coding agent integration | [README](coding_agent/README.md) |
+| `agent/` | Agent sessions: background tasks with tools, questions and approvals | [agent](../../../docs/services/agent.md) |
 
 ## How services depend on each other
 

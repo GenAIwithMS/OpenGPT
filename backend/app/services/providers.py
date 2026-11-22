@@ -10,6 +10,7 @@ active at a time, with a model for each job:
     research_model  deep research
     blog_model      blog writer
     coding_model    the coding agent (Code page)
+    agent_model     the agent (Agent page)
 
 An empty role uses the provider's default model. Changing the active
 provider or its models takes effect at once (app/llm.py is reloaded) and
@@ -30,7 +31,7 @@ from app.exceptions import NotFoundError, ValidationError
 
 SETTINGS_KEY = "providers"
 ENV_ID = "env"
-ROLES = ("model", "small_model", "research_model", "blog_model", "coding_model")
+ROLES = ("model", "small_model", "research_model", "blog_model", "coding_model", "agent_model")
 MAX_PROVIDERS = 30
 KINDS = ("openai", "anthropic")
 TIMEOUT = httpx.Timeout(15.0)

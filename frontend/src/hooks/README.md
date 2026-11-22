@@ -8,6 +8,7 @@ hooks call `services/api.js`.
 | `useChat` | The open chat's messages, sending, streaming, edit, regenerate, stop | App ─► MessageList, MessageInput |
 | `useThreads` | The chat list and renaming (App deletes chats through `chatService`) | App ─► Sidebar, SearchPalette |
 | `useProjects` | The project list and creating a project | App ─► Sidebar |
+| `useAgentSessions` | Agent sessions: polls the list, counts sessions waiting for you, notifies when one finishes or waits | App ─► Sidebar, AgentView |
 | `useCodeWorkspace` | Coding agent status, projects, chosen project, its sessions (only while the Code page is open) | App ─► Sidebar, CodeView |
 | `useCodeSession` | One coding session: messages, streaming, approvals, stop | CodeView |
 | `useSettings` | Settings from the backend, saved optimistically | App ─► SettingsModal |

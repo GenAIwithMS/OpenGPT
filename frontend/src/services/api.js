@@ -246,6 +246,20 @@ export const projectService = {
   removeFile: async (id, fileId) => { await api.delete(`/projects/${enc(id)}/files/${enc(fileId)}`); },
 };
 
+// Agent sessions (the Agent page). See backend/app/services/agent/.
+export const agentService = {
+  list: async () => (await api.get('/agent/sessions')).data.sessions,
+  // The session and its events after `after` (an event's seq).
+  get: async (id, after = 0) => (await api.get(`/agent/sessions/${enc(id)}`, { params: { after } })).data,
+  create: async (task) => (await api.post('/agent/sessions', { task })).data,
+  rename: async (id, title) => (await api.put(`/agent/sessions/${enc(id)}`, { title })).data,
+  answer: async (id, text) => (await api.post(`/agent/sessions/${enc(id)}/answer`, { text })).data,
+  decide: async (id, decision) => (await api.post(`/agent/sessions/${enc(id)}/approval`, { decision })).data,
+  stop: async (id) => (await api.post(`/agent/sessions/${enc(id)}/stop`)).data,
+  continue: async (id, message = null) => (await api.post(`/agent/sessions/${enc(id)}/continue`, { message })).data,
+  remove: async (id) => { await api.delete(`/agent/sessions/${enc(id)}`); },
+};
+
 // App settings (the Settings popup). See backend/app/services/settings.py.
 export const settingsService = {
   // {profile, general, display_name}

@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from app.router.agent import agent_router
 from app.router.chat import chat_router
 from app.router.health import health_router
 from app.router.code import code_router
@@ -22,7 +23,7 @@ from app.router.providers import providers_router
 from app.router.connectors import connectors_callback_router, connectors_router
 from app.router.connectors import refresh_loop as connectors_refresh_loop
 from app.services.coding_agent.process import agent as coding_agent
-from app.services import mcp_tools
+from app.services import agent, mcp_tools
 from app.services.coding_agent import client as coding_agent_client
 from app.database.init_db import DatabaseInitError, init_database
 from app.error_handlers import register_error_handlers
@@ -48,9 +49,12 @@ async def _lifespan(app: FastAPI):
     threading.Thread(target=connectors_refresh_loop, args=(stop_refresh,), daemon=True).start()
     # Connect chat's connectors in the background.
     mcp_tools.warm()
+    # Agent sessions: recover the last run's and start the background worker.
+    agent.start()
     try:
         yield
     finally:
+        agent.shutdown()
         stop_refresh.set()
         await asyncio.to_thread(mcp_tools.close_all)
         await coding_agent_client.close()
@@ -116,6 +120,9 @@ def create_app():
     )
     app.include_router(
         code_router, prefix="/api", tags=["code"], dependencies=[Depends(require_api_token)]
+    )
+    app.include_router(
+        agent_router, prefix="/api", tags=["agent"], dependencies=[Depends(require_api_token)]
     )
     app.include_router(
         settings_router, prefix="/api", tags=["settings"], dependencies=[Depends(require_api_token)]

@@ -73,6 +73,7 @@ OpenGPT is an open-source chat assistant built with LangGraph. It has a FastAPI 
 - **Chat with documents (RAG)**: attach PDF, Markdown or text files; several files per chat, searched together
 - **Persistent threads** in MySQL, plus **temporary chats** that are never saved
 - **Safe defaults**: local-only server, optional API token, rate limits, size limits, sanitized rendering
+- **Agent** (the Agent page): give it a task and it works in the background with your tools and connected apps, asks when it needs you and before it changes anything ([Agent](#agent))
 - **Coding agent** (the Code page): works in a project folder, reads and edits code and runs commands, with live progress. It asks before editing files or running commands and shows the diff first ([Coding agent](#coding-agent))
 - **Connectors (MCP)**: add GitHub, Notion, Linear and other MCP servers by signing in, or your own by command, URL or JSON; chat and the coding agent can use their tools, and anything that changes data asks first
 - **Skills**: reusable instructions (SKILL.md) that chat and the coding agent load when a task fits; built-in ones, an Explore catalog, or create, upload and import from GitHub
@@ -205,6 +206,16 @@ A project groups chats that share instructions and files. Every chat in it gets 
 - **Pinned** chats and projects stay at the top of their list, with a pin icon. Pinning doesn't change when they were last used.
 
 Shared links open for anyone who can already reach your OpenGPT (your other devices, or others on the same server); there are no public links. See [docs/services/projects.md](docs/services/projects.md).
+
+## Agent
+
+The **Agent** page runs a task in the background, step by step: it writes a plan, uses the same tools as chat (search, knowledge base, skills, memory and your connectors) and ends with a summary.
+
+- **It asks first.** A question when it needs something only you know, and an approval before a connector tool changes anything. It waits as long as it takes; the sidebar shows a badge, and you can get a notification (Settings > General).
+- **Close the page any time.** It keeps working; after a restart, an interrupted session continues with **Continue**.
+- **Stop** at any time. Limits: `AGENT_MAX_STEPS` (50 model calls) and `AGENT_MAX_MINUTES` (30) per run, then **Continue** goes on. Choose its model in Settings > Models (**Agent**).
+
+See [docs/services/agent.md](docs/services/agent.md). Using websites in a browser and scheduled tasks are coming next.
 
 ## Coding agent
 

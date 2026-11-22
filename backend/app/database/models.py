@@ -2,7 +2,7 @@
 SQLAlchemy ORM Models for Chatbot Database
 """
 from sqlalchemy import Boolean, Column, String, Integer, TIMESTAMP, LargeBinary, Index, Text
-from sqlalchemy.dialects.mysql import LONGBLOB
+from sqlalchemy.dialects.mysql import LONGBLOB, LONGTEXT
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.sql import func
 
@@ -11,6 +11,8 @@ Base = declarative_base()
 # Checkpoints hold the whole conversation, which quickly outgrows MySQL's plain
 # BLOB (64 KB). LONGBLOB allows up to 4 GB; other databases keep LargeBinary.
 BigBinary = LargeBinary().with_variant(LONGBLOB(), "mysql")
+# Long text (agent tasks, results, event data): plain TEXT is 64 KB in MySQL.
+BigText = Text().with_variant(LONGTEXT(), "mysql")
 
 
 class ThreadMetadata(Base):
@@ -135,3 +137,39 @@ class Project(Base):
     pinned = Column(Boolean, nullable=False, default=False, server_default="0")
     created_at = Column(TIMESTAMP, default=func.current_timestamp())
     updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp())
+
+
+class AgentSession(Base):
+    """Agent sessions: a task the agent works on in the background, with its
+    status. Its conversation is a LangGraph checkpoint under the thread id
+    "agent-<id>". See app/services/agent/."""
+    __tablename__ = "agent_sessions"
+
+    id = Column(String(36), primary_key=True)
+    title = Column(String(200), nullable=False)
+    task = Column(BigText, nullable=False)
+    # queued, running, waiting, done, failed, stopped, interrupted
+    status = Column(String(20), nullable=False, default="queued")
+    # What the agent is waiting for (JSON: a question or an approval), when waiting.
+    waiting = Column(Text, nullable=True)
+    result = Column(BigText, nullable=True)
+    error = Column(String(500), nullable=True)
+    created_at = Column(TIMESTAMP, default=func.current_timestamp())
+    updated_at = Column(TIMESTAMP, default=func.current_timestamp(), onupdate=func.current_timestamp())
+
+    __table_args__ = (Index("idx_agent_sessions_updated", "updated_at"),)
+
+
+class AgentEvent(Base):
+    """What happened in an agent session, in order: the plan, tool calls and
+    results, messages, questions, approvals, status changes."""
+    __tablename__ = "agent_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(String(36), nullable=False)
+    seq = Column(Integer, nullable=False)
+    type = Column(String(30), nullable=False)
+    data = Column(BigText, nullable=True)  # JSON
+    created_at = Column(TIMESTAMP, default=func.current_timestamp())
+
+    __table_args__ = (Index("idx_agent_events_session", "session_id", "seq", unique=True),)

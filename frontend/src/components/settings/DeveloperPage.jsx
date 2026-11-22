@@ -11,6 +11,7 @@ const ROLES = [
   { id: 'research_model', label: 'Deep research', hint: 'Research reports' },
   { id: 'blog_model', label: 'Blog writer', hint: 'Blog posts' },
   { id: 'coding_model', label: 'Coding agent', hint: 'The Code page' },
+  { id: 'agent_model', label: 'Agent', hint: 'The Agent page: long tasks with your apps' },
 ];
 
 const API_NAMES = { openai: 'OpenAI-compatible API', anthropic: 'Anthropic-compatible API' };

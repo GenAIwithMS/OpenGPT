@@ -15,6 +15,7 @@ replaces the old one rather than rewriting history.
 | [0007](0007-find-local-models.md) | Find local models by port and by the apps' own folders | 2026-11-19 |
 | [0008](0008-memory.md) | Memory: saved facts plus searching past chats; files stay per chat | 2026-11-21 |
 | [0009](0009-projects.md) | Projects: chats with shared instructions and files | 2026-11-22 |
+| [0010](0010-agent-sessions.md) | Agent sessions: background tasks that pause for the user | 2026-11-22 |
 
 ## Template
 

@@ -10,7 +10,9 @@ App
 ├─ Sidebar ─────────────── new chat, Search chats (button), Code, Projects (each
 │                          with its chats and menu), chat list; chat menu: Share,
 │                          Rename, Pin, Move to project (hover submenu), Remove
-│                          from project, Delete; UserMenu
+│                          from project, Delete; Agent (with a badge); UserMenu
+├─ agent/AgentView ────── the Agent page (/agent): new task, a session's timeline,
+│                          question and approval cards, Stop, Continue
 ├─ projects/ProjectView ── a project's page (/project/<id>): new chat box,
 │                          instructions, files, chats; NewProjectDialog,
 │                          ProjectSettingsDialog (sidebar "Project settings")

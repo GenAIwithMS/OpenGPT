@@ -5,6 +5,10 @@ The tool runs inside the chat graph (a worker thread). It sends an
 which arrives through ``POST /api/chat/approvals/{id}``. No answer within
 the timeout, a stopped reply, or a run that can't show the question (no
 live stream) all count as "no".
+
+In an agent session (app/services/agent/) the question pauses the agent's
+graph instead (``interrupt``): the session waits, with no time limit, until
+the user answers on the Agent page, even after a restart.
 """
 import logging
 import threading
@@ -27,6 +31,10 @@ def ask(info: dict, timeout: float = TIMEOUT_SECONDS) -> str:
 
     try:
         configurable = get_config().get("configurable", {})
+        if configurable.get("agent_session"):
+            from langgraph.types import interrupt
+            decision = interrupt({"type": "approval", **info})
+            return decision if decision in DECISIONS else "deny"
         if not configurable.get("can_ask"):
             return "unavailable"
         writer = get_stream_writer()

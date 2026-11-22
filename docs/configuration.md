@@ -17,6 +17,7 @@ Skills) are stored in the database instead and apply at once.
 | `RESEARCH_MODEL` | `LLM_MODEL` | Deep research |
 | `BLOG_MODEL` | `LLM_MODEL` | Blog writer |
 | `CODING_AGENT_MODEL` | `LLM_MODEL` | Coding agent |
+| `AGENT_MODEL` | `LLM_MODEL` | The agent on the Agent page. Needs good tool calling |
 | `LLM_MAX_TOKENS` | `8192` | Max output tokens per call |
 
 A provider chosen in Settings > Developer overrides these (see
@@ -84,6 +85,15 @@ The database and tables are created at startup.
 | `DEEP_RESEARCH_MAX_ITERATIONS` | `3` | Rounds the research supervisor may run |
 | `DEEP_RESEARCH_MAX_TOOL_CALLS` | `6` | Searches each researcher may make |
 | `MAX_CONCURRENT_RESEARCH_UNITS` | `5` | Researchers working in parallel |
+
+## Agent
+
+The Agent page ([agent](services/agent.md)).
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `AGENT_MAX_STEPS` | `50` | Model calls per run; then the session stops and **Continue** goes on |
+| `AGENT_MAX_MINUTES` | `30` | Minutes per run; then the session stops the same way |
 
 ## Coding agent
 
