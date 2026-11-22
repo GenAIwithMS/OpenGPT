@@ -55,7 +55,11 @@ pages you allow, and never resubmits a login the site rejected.
   `browser_engine.py` speaks MCP over the process's stdin and stdout: it
   calls `mint`, follows the job with `get_job`, and answers its questions
   with `provide_input`.
-- The Docker image doesn't include it yet (Node.js 24 and Chromium).
+- The Docker image includes it: a build stage on Node.js 24 builds it, and
+  the final image has Node.js 24 and Chromium (`PLAYWRIGHT_BROWSERS_PATH=/opt/playwright`,
+  `BROWSER_ENGINE_NODE=/usr/local/bin/node`).
+- `./start.sh` builds it the first time and after it changes (when Node.js 24
+  is found), and installs Chromium. On Windows the browser isn't available.
 
 ## Models
 

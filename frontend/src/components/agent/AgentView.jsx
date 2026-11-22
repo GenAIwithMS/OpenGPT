@@ -6,7 +6,7 @@ import {
   Bot, CalendarClock, Check, ChevronRight, Circle, CheckCircle2, Loader2, MessageCircleQuestion, Play, Send,
   ShieldQuestion, Square, Wrench, X,
 } from 'lucide-react';
-import { agentService } from '../../services/api';
+import { agentService, browserService } from '../../services/api';
 import { markdownComponents } from '../MessageList';
 import BrowserInputCard from './BrowserInputCard';
 import { ScheduleDialog, SchedulesList } from './Schedules';
@@ -51,6 +51,8 @@ const pretty = (value) => {
 
 const NewTask = ({ onCreated }) => {
   const [task, setTask] = useState('');
+  const [browser, setBrowser] = useState(null);
+  useEffect(() => { browserService.status().then(setBrowser).catch(() => {}); }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
@@ -98,6 +100,11 @@ const NewTask = ({ onCreated }) => {
           </div>
         </form>
         {error && <p role="alert" className="mt-3 text-sm text-red-300">{error}</p>}
+        {browser && !browser.available && (
+          <p className="mt-3 text-xs text-gray-500">
+            Websites: the agent's browser isn't available here ({browser.reason}) It works with your apps and tools without it.
+          </p>
+        )}
         <div className="mt-6 space-y-2">
           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Examples</p>
           {EXAMPLES.map((example) => (

@@ -15,10 +15,10 @@ the Code page. Data is stored in MySQL.
 | `backend/app/services/coding_agent/` | Starts and talks to the coding agent | [its AGENTS.md](backend/app/services/coding_agent/AGENTS.md) |
 | `frontend/` | React + Vite + Tailwind UI | [frontend/AGENTS.md](frontend/AGENTS.md) |
 | `coding-agent/` | The coding agent service (TypeScript, Bun), a trimmed fork | [coding-agent/AGENTS.md](coding-agent/AGENTS.md) |
-| `backend/browser_engine/` | The browser engine (TypeScript, Node 24): builds website tools in a local Chromium; the backend will run it as a child process. Not used by the app yet | [its AGENTS.md](backend/browser_engine/AGENTS.md) |
+| `backend/browser_engine/` | The browser engine (TypeScript, Node 24): builds website tools in a local Chromium; the backend runs it as a child process for the agent's browser | [its AGENTS.md](backend/browser_engine/AGENTS.md) |
 | `docs/` | Developer docs: architecture, configuration, one page per service, guides, decisions | [docs/README.md](docs/README.md) |
 | `README.md` | What OpenGPT is, quick start, configuration | |
-| `Dockerfile`, `docker-compose.yml`, `.dockerignore` | The `genaiwithms/opengpt` image (backend + built frontend + coding agent) and MySQL | [Run with Docker](docs/guides/run-with-docker.md) |
+| `Dockerfile`, `docker-compose.yml`, `.dockerignore` | The `genaiwithms/opengpt` image (backend + built frontend + coding agent + browser engine) and MySQL | [Run with Docker](docs/guides/run-with-docker.md) |
 | `.github/workflows/ci.yml` | CI: tests, frontend build, coding agent type check and browser engine tests on pushes to `main` and pull requests; then builds and pushes the image to Docker Hub | [Run with Docker](docs/guides/run-with-docker.md#how-the-published-image-is-built) |
 
 More specific `AGENTS.md` files override this one for their folder.

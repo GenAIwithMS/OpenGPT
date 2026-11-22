@@ -3,7 +3,8 @@
 #  OpenGPT - Linux/Mac startup script
 #  Starts the FastAPI backend (port 8000) and the React frontend (port 3000).
 #  If a port is already in use, the next free one is used instead.
-#  The backend starts the coding agent (Code page) itself when Bun is installed.
+#  The backend starts the coding agent (Code page) itself when Bun is installed,
+#  and the agent's browser when Node.js 24 is installed.
 # ============================================================================
 
 set -e
@@ -77,6 +78,31 @@ export OPENGPT_FRONTEND_PORT="$FRONTEND_PORT"
 # Let the frontend's address call the API, unless backend/.env sets its own list.
 if [ -z "${CORS_ORIGINS:-}" ] && [ -z "$(env_value CORS_ORIGINS)" ]; then
     export CORS_ORIGINS="http://localhost:$FRONTEND_PORT,http://127.0.0.1:$FRONTEND_PORT"
+fi
+
+# --- Browser engine (once, and after it changes) ----------------------------
+# The agent's browser needs Node.js 24: BROWSER_ENGINE_NODE (environment or
+# backend/.env), or node on PATH. Chat and the Agent page work without it.
+ENGINE="$BACKEND/browser_engine"
+ENGINE_NODE="${BROWSER_ENGINE_NODE:-$(env_value BROWSER_ENGINE_NODE)}"
+[ -z "$ENGINE_NODE" ] && ENGINE_NODE="$(command -v node || true)"
+ENGINE_MAJOR="$([ -n "$ENGINE_NODE" ] && "$ENGINE_NODE" --version 2>/dev/null | sed -e 's/^v//' -e 's/\..*//')"
+if [ "$ENGINE_MAJOR" = "24" ]; then
+    export BROWSER_ENGINE_NODE="$ENGINE_NODE"
+    NODE_BIN="$(dirname "$ENGINE_NODE")"
+    if [ ! -f "$ENGINE/dist/.built" ] || [ -n "$(find "$ENGINE/typescript" "$ENGINE/package.json" -newer "$ENGINE/dist/.built" -print -quit 2>/dev/null)" ]; then
+        echo "Building the browser engine (first run, or after an update)..."
+        (
+            cd "$ENGINE" && export PATH="$NODE_BIN:$PATH" \
+            && if command -v pnpm >/dev/null; then PNPM=pnpm; else PNPM="corepack pnpm"; fi \
+            && $PNPM install --frozen-lockfile && $PNPM build \
+            && node node_modules/playwright/cli.js install chromium \
+            && touch dist/.built
+        ) || echo "The browser engine didn't build; the agent's browser will be unavailable (see Settings > Browser)."
+    fi
+else
+    echo "Node.js 24 not found: the agent's browser will be unavailable. Install Node.js 24, or set"
+    echo "BROWSER_ENGINE_NODE to a Node.js 24 binary. Chat and the Agent page work without it."
 fi
 
 # --- Start Backend ----------------------------------------------------------

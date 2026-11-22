@@ -168,6 +168,8 @@ cd frontend && npm install
 cd coding-agent && bun install
 ```
 
+The agent's browser (optional, macOS or Linux) needs Node.js 24; `./start.sh` builds it the first time. By hand: `cd backend/browser_engine && pnpm install --frozen-lockfile && pnpm build && node node_modules/playwright/cli.js install chromium`.
+
 ### 3. Start
 
 **Start scripts:** `./start.sh` (Linux/macOS) or `start.bat` (Windows). They start the backend on port 8000 (or `PORT` from `backend/.env`) and the frontend on port 3000, using `.venv` if present. If a port is already in use they pick the next free one and print the addresses to open. When Bun is installed they also install the coding agent's dependencies on the first run; the backend then starts the coding agent itself.
@@ -219,7 +221,7 @@ The **Agent** page runs a task in the background, step by step: it writes a plan
 
 - **Schedules.** Run a task once, every day, on some weekdays or by a cron line, in your timezone ("every weekday at 09:00: summarise my issues and draft an update"). A scheduled run prepares everything and waits for your approval before it changes anything; an approval nobody answers within a day expires. OpenGPT must be running at that time.
 
-See [docs/services/agent.md](docs/services/agent.md).
+How to use it, and what it stores: [docs/guides/use-the-agent.md](docs/guides/use-the-agent.md). How it works: [docs/services/agent.md](docs/services/agent.md).
 
 ## Coding agent
 
@@ -259,7 +261,7 @@ Tools without a key are simply unavailable. For example, without `GOOGLE_API_KEY
 backend/        FastAPI app: routers, services, chat graph, tools, tests
 frontend/       React app (Vite, Tailwind)
 coding-agent/   Coding agent service (Bun/TypeScript), started by the backend
-backend/browser_engine/   Browser engine (Node/TypeScript), not used by the app yet
+backend/browser_engine/   Browser engine (Node/TypeScript), started by the backend for the agent's browser
 docs/           Developer documentation
 start.sh / start.bat   Start backend + frontend
 ```

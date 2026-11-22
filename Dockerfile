@@ -1,4 +1,4 @@
-# OpenGPT: backend, built frontend and the coding agent in one image.
+# OpenGPT: backend, built frontend, the coding agent and the browser engine in one image.
 # MySQL runs separately (see docker-compose.yml). Configure with environment
 # variables (backend/.env.example lists them); nothing secret is in the image.
 #
@@ -19,6 +19,17 @@ RUN npm run build
 
 # ---------------------------------------------------------------- bun
 FROM docker.io/oven/bun:1.3.14-debian AS bun
+
+# ---------------------------------------------------------------- browser engine
+# The agent's browser (backend/browser_engine) runs on Node.js 24. Its dev
+# dependencies are needed at runtime too (the Agents SDK, Effect), so all are kept.
+FROM docker.io/library/node:24-bookworm-slim AS browser
+WORKDIR /src/backend/browser_engine
+RUN npm install -g pnpm@10.34.5
+COPY backend/browser_engine/package.json backend/browser_engine/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+COPY backend/browser_engine/ ./
+RUN pnpm build
 
 # ---------------------------------------------------------------- app
 FROM docker.io/library/python:3.13-slim-bookworm
@@ -52,6 +63,16 @@ COPY backend/ backend/
 COPY LICENSE ./
 COPY --from=frontend /src/frontend/dist /app/frontend/dist
 
+# The browser engine: Node.js 24, its built code and packages, and Chromium
+# with its system libraries (in /opt/playwright, readable by the app user).
+COPY --from=browser /usr/local/bin/node /usr/local/bin/node
+COPY --from=browser /src/backend/browser_engine/node_modules backend/browser_engine/node_modules
+COPY --from=browser /src/backend/browser_engine/dist backend/browser_engine/dist
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
+RUN cd backend/browser_engine \
+    && node node_modules/playwright/cli.js install --with-deps chromium \
+    && rm -rf /var/lib/apt/lists/*
+
 # Run as a normal user; /data holds everything that must survive restarts.
 RUN useradd --create-home --uid 1000 opengpt \
     && mkdir -p /data/projects /data/cache /app/backend/app/storage \
@@ -63,6 +84,7 @@ ENV HOST=127.0.0.1 \
     PORT=8000 \
     FRONTEND_DIST=/app/frontend/dist \
     BUN_PATH=/usr/local/bin/bun \
+    BROWSER_ENGINE_NODE=/usr/local/bin/node \
     CODE_PROJECTS_ROOT=/data/projects \
     CODE_ALLOWED_ROOTS=/data/projects \
     HF_HOME=/data/cache/huggingface

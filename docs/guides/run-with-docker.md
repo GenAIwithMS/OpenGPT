@@ -1,7 +1,8 @@
 # Run with Docker
 
-The image `genaiwithms/opengpt` holds the backend, the built frontend and the
-coding agent. MySQL runs as a second container. Nothing secret is in the
+The image `genaiwithms/opengpt` holds the backend, the built frontend, the
+coding agent and the agent's browser (the browser engine with Node.js 24 and
+Chromium, which adds a few hundred MB). MySQL runs as a second container. Nothing secret is in the
 image: settings come from `backend/.env` and environment variables.
 
 ## Start
@@ -58,6 +59,13 @@ inside the container. The server must also listen on more than 127.0.0.1
 The Code page works on folders in the `opengpt-data` volume
 (`/data/projects`). To work on folders from your computer, mount them there,
 for example under `volumes:` add `- ./my-projects:/data/projects`.
+
+## The agent's browser
+
+The browser works in the image as it is: Settings > Browser should say it's
+ready. Saved website tools are kept in the storage volume
+(`app/storage/browser/integrations`); the browser itself starts empty for
+every task. Scheduled tasks run only while the container is running.
 
 ## Open it to your network
 
