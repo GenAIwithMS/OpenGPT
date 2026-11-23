@@ -1,5 +1,10 @@
 # Use the agent
 
+> **Status: not fully tested yet.** The agent, its browser and schedules are
+> built, but they need proper testing in real use: the browser in particular
+> has not yet finished a real website build. Treat these features as a
+> preview and check what they do.
+
 The **Agent** page runs a task in the background: it plans, uses your tools,
 connected apps and (optionally) websites, and ends with a summary. You can
 close the page while it works.
@@ -24,9 +29,17 @@ tools well.
 For sites you have no connector for, the agent can use a browser.
 
 - **Setup.** It needs Node.js 24 on macOS or Linux (or the Docker image,
-  which has it). `./start.sh` builds the browser engine and installs Chromium
-  the first time. Settings > Browser says whether it's ready, or what's
-  missing.
+  which has it). Install Node.js 24, or set `BROWSER_ENGINE_NODE` in
+  `backend/.env` to a Node.js 24 binary; `./start.sh` then builds the browser
+  engine and installs Chromium the first time. Restart the backend after
+  changing it. Settings > Browser says whether it's ready, or what's missing.
+  Until then the agent has no browser tools and says so if you ask it to use
+  a website.
+- **It's OpenGPT's own browser**, not the one you are using: the agent never
+  controls your browser or its sign-ins.
+- **Watch it.** Turn on **Show the browser window** in Settings > Browser to
+  see the browser in a window on your computer while it works (needs a
+  screen; leave it off on a server or in Docker).
 - **Permission.** The first time it uses a site, it asks. Every change on a
   website asks again. Settings > Browser lists the sites (read, or read and
   change) and lets you remove them.

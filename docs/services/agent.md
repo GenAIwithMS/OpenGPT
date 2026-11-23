@@ -1,5 +1,13 @@
 # Agent
 
+> **Status: not fully tested yet.** The Agent page, the browser and scheduled
+> tasks are built and covered by automated tests, but they still need proper
+> testing in real use. So far: one live agent session with a real model
+> worked (a question, a tool and a result); scheduled tasks have only run in
+> tests; and the browser has not yet finished a real website build (see
+> [browser engine](browser-engine.md)). Expect rough edges, and report what
+> you find.
+
 The **Agent** page: you give the agent a task and it works on it in the
 background, step by step, with the same tools chat has (web search, weather,
 calculator, stocks, knowledge base, skills, memory and your connectors). It
@@ -88,6 +96,11 @@ tools:
   process is gone); Continue starts the browser task again.
 - While the browser works, the run occupies the worker (other sessions wait).
 - Saved tools are in `app/storage/browser/integrations/<name>/`.
+- **Show the browser window** (Settings > Browser, `/api/browser/options`)
+  starts the engine with `--headed`, so Chromium opens in a window on this
+  computer.
+- Without the browser, the agent's prompt says why (Node.js 24 missing, not
+  built), so it tells the user instead of refusing vaguely.
 
 ## Scheduled tasks
 
@@ -149,6 +162,7 @@ every 1.5 seconds while the session works, and every 5 seconds otherwise.
 | `POST /api/agent/sessions/{id}/browser-input` | `{request_id, answers}`: answers to the browser's questions, to the engine only |
 | `POST /api/agent/sessions/{id}/stop` | Stop |
 | `GET /api/browser/status` | `{available, reason}` |
+| `GET/PUT /api/browser/options` | `{show_window}`: show the browser in a window |
 | `GET/PUT/DELETE /api/browser/sites` | Websites the agent may use: `{url, access: "read" \| "write"}` |
 | `GET /api/browser/tools`, `DELETE /api/browser/tools/{name}` | Saved website tools |
 | `POST /api/agent/sessions/{id}/continue` | Go on; optional `{message}` adds an instruction |
@@ -160,8 +174,8 @@ every 1.5 seconds while the session works, and every 5 seconds otherwise.
 
 ## Not covered yet
 
-- Saved logins (each browser task asks for a login again) and a live view of
-  the browser.
+- Saved logins (each browser task asks for a login again) and a live view
+  of the browser in the page (a window on this computer is available).
 - Several sessions at once: one runs, the rest queue.
 
 See [decision 0010](../decisions/0010-agent-sessions.md).

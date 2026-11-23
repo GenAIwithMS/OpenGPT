@@ -110,6 +110,9 @@ the two browser models above.
 | `BROWSER_CONTEXT_TOKENS` | `128000` (OpenAI: as tuned) | The browser models' context window; compaction thresholds scale to it |
 | `BROWSER_REASONING_EFFORT` | `false` | Send a reasoning effort on chat APIs (only for models that accept it) |
 | `BROWSER_ENGINE_LOG_MODEL_ERRORS` | | `1`: the engine logs why a provider refused a model call (status and message, never the request) |
+| `BROWSER_ENGINE_LOG_PROGRESS` | | `1`, for debugging: one log line per model call (time, tokens, the tools called) with the start of tool inputs and results, which can include page content |
+| `BROWSER_BUILD_MINUTES` | `40` | Time budget for building one website tool; slower models need more |
+| `BROWSER_STRICT_TOOLS` | `true` | `false` for a server that rejects strict tool schemas (chat APIs only) |
 
 ## Coding agent
 

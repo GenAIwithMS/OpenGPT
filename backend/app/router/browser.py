@@ -10,6 +10,10 @@ from app.services.agent import browser
 browser_router = APIRouter()
 
 
+class Options(BaseModel):
+    show_window: bool
+
+
 class Site(BaseModel):
     url: str = Field(..., max_length=2048)
     access: Literal["read", "write"]
@@ -20,6 +24,17 @@ def status():
     """{available, reason}: reason says what is missing (Node.js 24, a built engine)."""
     reason = browser_engine.unavailable_reason(refresh=True)
     return {"available": reason is None, "reason": reason}
+
+
+@browser_router.get("/browser/options")
+def get_options():
+    """{show_window}: open the browser in a window on this computer while it works."""
+    return browser.get_options()
+
+
+@browser_router.put("/browser/options")
+def set_options(body: Options):
+    return browser.set_options(body.show_window)
 
 
 @browser_router.get("/browser/sites")

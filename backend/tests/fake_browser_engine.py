@@ -62,7 +62,7 @@ for line in sys.stdin:
                               "serverInfo": {"name": "fake", "version": "1"}})
         continue
     name, arguments = params.get("name"), params.get("arguments") or {}
-    record({"mode": args[0], "tool": name, "arguments": arguments})
+    record({"mode": args[0], "tool": name, "arguments": arguments, "argv": args})
     if args[0] == "serve":
         reply(message["id"], tool_result({"heading": "Example Domain"}))
     elif name == "mint":

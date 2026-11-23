@@ -147,6 +147,8 @@ class BrowserTaskTests(BrowserTestCase):
 
         calls = self.engine_calls()
         mint = next(c for c in calls if c["tool"] == "mint")
+        self.assertIn("--timeout-seconds", mint["argv"])   # BROWSER_BUILD_MINUTES (default 40)
+        self.assertEqual(mint["argv"][mint["argv"].index("--timeout-seconds") + 1], "2400")
         self.assertEqual((mint["arguments"]["url"], mint["arguments"]["effect"]), ("https://example.com/about", "read"))
         given = next(c for c in calls if c["tool"] == "provide_input")
         self.assertEqual(given["arguments"]["answers"]["login"]["password"], PASSWORD)   # reached the engine
@@ -204,6 +206,14 @@ class BrowserTaskTests(BrowserTestCase):
         agent.create("Heading again")
         self.assertEqual(self.run_next()["status"], "done")
         self.assertEqual([c["mode"] for c in self.engine_calls()], ["serve"])
+        self.assertNotIn("--headed", self.engine_calls()[0]["argv"])
+
+        # "Show the browser window": Chromium opens in a window.
+        self.assertEqual(browser.set_options(True), {"show_window": True})
+        runner.model = Scripted(AIMessage(content="", tool_calls=[call("Run_browser_tool", {"name": "read_heading"})]))
+        agent.create("Once more")
+        self.run_next()
+        self.assertIn("--headed", self.engine_calls()[-1]["argv"])
 
     def test_restart_recovery_for_a_browser_wait(self):
         session = agent.create("Was waiting")
@@ -217,7 +227,9 @@ class BrowserTaskTests(BrowserTestCase):
             with mock.patch.object(agent_graph, "mcp_tools") as mcp:
                 mcp.chat_tools.return_value = []
                 tools, _ = agent_graph.build_tools_and_prompt("agent-x")
-            self.assertNotIn("Browser_task", [t.name for t in tools])
+            tools_names = [t.name for t in tools]
+            self.assertNotIn("Browser_task", tools_names)
+            self.assertIn("Node.js 24 is needed.", _)   # the agent can say why, not just refuse
             with mock.patch.object(browser, "_session_id", return_value="s"):
                 self.assertIn("Node.js 24", browser.Browser_task.invoke({"url": "https://example.com", "task": "x"}))
 
@@ -241,6 +253,8 @@ class SiteAndRouteTests(BrowserTestCase):
         self.assertEqual(c.get("/api/browser/tools").json(), {"tools": []})
         self.assertEqual(c.delete("/api/browser/tools/../../etc").status_code, 404)
         self.assertEqual(c.get("/api/browser/status").json(), {"available": True, "reason": None})
+        self.assertEqual(c.get("/api/browser/options").json(), {"show_window": False})
+        self.assertEqual(c.put("/api/browser/options", json={"show_window": True}).json(), {"show_window": True})
         session = agent.create("x")
         self.assertEqual(c.post(f"/api/agent/sessions/{session['id']}/browser-input",
                                 json={"request_id": "r", "answers": {"a": 1}}).status_code, 422)

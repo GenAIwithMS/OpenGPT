@@ -522,6 +522,12 @@ const readSourceMaxFiles = 10;
 /** Once the files a `read_source` call read returned this many UTF-16 code units, no further
  * file of the call starts. Each file keeps its own default and maximum length. */
 const readSourceMaxTotal = 200_000;
+/**
+ * The smallest range a read returns, in UTF-16 code units. Some models ask for a few hundred
+ * characters at a time, so reading the skills would take hundreds of turns; a smaller limit
+ * reads this much instead (nextOffset still says where to go on).
+ */
+const readSourceMinLimit = 12_000;
 const ReadOffset = Schema.NullOr(Schema.Int.pipe(Schema.between(0, Number.MAX_SAFE_INTEGER)));
 const ReadLimit = Schema.NullOr(Schema.Int.pipe(Schema.between(1, 64_000)));
 const SourceRead = Schema.Struct({ path: Schema.String, offset: ReadOffset, limit: ReadLimit });
@@ -980,7 +986,7 @@ const openAIMinter = (
                       turn.runTool(
                         turn.actions.readSource(file.path, {
                           ...(file.offset === null ? {} : { offset: file.offset }),
-                          ...(file.limit === null ? {} : { limit: file.limit }),
+                          ...(file.limit === null ? {} : { limit: Math.max(file.limit, readSourceMinLimit) }),
                         }),
                       ),
                     {

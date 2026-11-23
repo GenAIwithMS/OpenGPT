@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle2, Globe, Trash2, AlertTriangle, Wrench } from 'lucide-react';
-import { PageHeader, Row, Section, Select } from './controls';
+import { PageHeader, Row, Section, Select, Toggle } from './controls';
 import { browserService } from '../../services/api';
 
 const ACCESS = [
@@ -16,12 +16,15 @@ const BrowserPage = () => {
   const [status, setStatus] = useState(null);
   const [sites, setSites] = useState({});
   const [tools, setTools] = useState([]);
+  const [options, setOptions] = useState({ show_window: false });
   const [error, setError] = useState(null);
 
   const load = async () => {
     try {
-      const [s, list, built] = await Promise.all([browserService.status(), browserService.sites(), browserService.tools()]);
+      const [s, list, built, opts] = await Promise.all([browserService.status(), browserService.sites(),
+        browserService.tools(), browserService.options()]);
       setStatus(s);
+      setOptions(opts);
       setSites(list);
       setTools(built);
       setError(null);
@@ -47,8 +50,20 @@ const BrowserPage = () => {
         {status && (status.available ? (
           <p className="flex items-center gap-2 py-3 text-sm text-gray-300"><CheckCircle2 size={16} className="text-green-300" />The browser is ready.</p>
         ) : (
-          <p className="flex items-start gap-2 py-3 text-sm text-amber-200"><AlertTriangle size={16} className="mt-0.5 shrink-0" />{status.reason}</p>
+          <div className="space-y-2 py-3 text-sm">
+            <p className="flex items-start gap-2 text-amber-200"><AlertTriangle size={16} className="mt-0.5 shrink-0" />{status.reason}</p>
+            <ol className="list-decimal space-y-1 pl-6 text-gray-400">
+              <li>Install Node.js 24 (macOS or Linux), or set <code>BROWSER_ENGINE_NODE</code> in <code>backend/.env</code> to a Node.js 24 binary.</li>
+              <li>Start OpenGPT with <code>./start.sh</code>, which builds the browser the first time (or build it by hand: see the README).</li>
+              <li>Restart the backend, then open this page again.</li>
+            </ol>
+          </div>
         ))}
+        <Row label="Show the browser window"
+          description="Open the browser in a window on this computer while the agent works, so you can watch it. Needs a screen; leave it off on a server or in Docker.">
+          <Toggle label="Show the browser window" checked={options.show_window}
+            onChange={(value) => act(() => browserService.setOptions({ show_window: value }))} />
+        </Row>
       </Section>
 
       <Section title="Websites">

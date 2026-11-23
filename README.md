@@ -73,7 +73,7 @@ OpenGPT is an open-source chat assistant built with LangGraph. It has a FastAPI 
 - **Chat with documents (RAG)**: attach PDF, Markdown or text files; several files per chat, searched together
 - **Persistent threads** in MySQL, plus **temporary chats** that are never saved
 - **Safe defaults**: local-only server, optional API token, rate limits, size limits, sanitized rendering
-- **Agent** (the Agent page): give it a task and it works in the background with your tools and connected apps, asks when it needs you and before it changes anything ([Agent](#agent))
+- **Agent** (the Agent page, preview: not fully tested yet): give it a task and it works in the background with your tools and connected apps, asks when it needs you and before it changes anything ([Agent](#agent))
 - **Coding agent** (the Code page): works in a project folder, reads and edits code and runs commands, with live progress. It asks before editing files or running commands and shows the diff first ([Coding agent](#coding-agent))
 - **Connectors (MCP)**: add GitHub, Notion, Linear and other MCP servers by signing in, or your own by command, URL or JSON; chat and the coding agent can use their tools, and anything that changes data asks first
 - **Skills**: reusable instructions (SKILL.md) that chat and the coding agent load when a task fits; built-in ones, an Explore catalog, or create, upload and import from GitHub
@@ -210,6 +210,8 @@ A project groups chats that share instructions and files. Every chat in it gets 
 Shared links open for anyone who can already reach your OpenGPT (your other devices, or others on the same server); there are no public links. See [docs/services/projects.md](docs/services/projects.md).
 
 ## Agent
+
+> **Not fully tested yet.** The Agent page, its browser and scheduled tasks are built, but they need proper testing in real use. The browser has not yet finished a real website build. Treat them as a preview.
 
 The **Agent** page runs a task in the background, step by step: it writes a plan, uses the same tools as chat (search, knowledge base, skills, memory and your connectors) and ends with a summary.
 

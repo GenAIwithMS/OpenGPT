@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { AgentInputItem, Model, ModelRequest, ModelResponse } from "@openai/agents";
 import { Usage } from "@openai/agents";
 import { afterEach, describe, expect, it } from "vitest";
-import { ChatCompletionsCompatModel, summaryPrefix, toChatItems, toChatRequest } from "../../src/models/compat-model.js";
+import { ChatCompletionsCompatModel, coerce, normalizePatch, repairJson, summaryPrefix, toChatItems, toChatRequest } from "../../src/models/compat-model.js";
 import { configureContextWindow, scaledTokens } from "../../src/models/context-window.js";
 import { lunaModel, solModel } from "../../src/models/models.js";
 import { makeModelProvider, modelName, modelOptions, parseModelConfig, readModelConfig } from "../../src/models/provider-config.js";
@@ -64,7 +64,9 @@ describe("a request for a chat API", () => {
       }),
     );
     expect(sent.tools.map((t) => t.name)).toEqual(["execute"]);
-    expect(sent.tools.every((t) => t.type !== "function" || t.strict === false)).toBe(true);
+    expect(sent.tools.every((t) => t.type !== "function" || t.strict === true)).toBe(true);   // kept
+    const loose = toChatRequest(request({ tools: [tool("execute")] }), { strictTools: false });
+    expect(loose.tools.every((t) => t.type !== "function" || t.strict === false)).toBe(true);
     expect(sent.modelSettings).toEqual({ providerData: { temperature_hint: 1 } });
   });
 
@@ -73,6 +75,17 @@ describe("a request for a chat API", () => {
     expect(toChatRequest(request({ modelSettings: settings })).modelSettings.reasoning).toBeUndefined();
     expect(toChatRequest(request({ modelSettings: settings }), { reasoningEffort: true }).modelSettings.reasoning)
       .toEqual({ effort: "low" });
+  });
+
+  it("keeps system messages at the start, merged, and turns a later one into a host note", () => {
+    const dev = (text: string) => ({ type: "unknown", providerData: { type: "message", role: "developer",
+      content: [{ type: "input_text", text }] } }) as AgentInputItem;
+    const items = toChatItems([dev("A"), dev("B"), { role: "user", content: "hi", type: "message" } as AgentInputItem, dev("C")]);
+    expect(items).toEqual([
+      { type: "message", role: "system", content: "A\n\nB" },
+      { role: "user", content: "hi", type: "message" },
+      { type: "message", role: "user", content: "Host note:\nC" },
+    ]);
   });
 
   it("turns raw and compacted items into plain messages", () => {
@@ -91,6 +104,103 @@ describe("a request for a chat API", () => {
       { type: "message", role: "user", content: expect.stringContaining("not available") },
       { role: "user", content: "next", type: "message" },
     ]);
+  });
+});
+
+describe("tool-call arguments with type slips", () => {
+  it("corrects numbers and booleans sent as text, and empty text where null is allowed", () => {
+    const schema = {
+      type: "object",
+      properties: {
+        path: { type: "string" },
+        offset: { type: ["integer", "null"] },
+        limit: { type: "number" },
+        tty: { type: "boolean" },
+        paths: { anyOf: [{ type: "array", items: { type: "string" } }, { type: "null" }] },
+        note: { type: ["string", "null"] },
+        nested: { type: "object", properties: { n: { type: "integer" } } },
+      },
+    };
+    expect(coerce({ path: "a", offset: "0", limit: "400", tty: "false", paths: "", note: "", nested: { n: "3" } }, schema))
+      .toEqual({ path: "a", offset: 0, limit: 400, tty: false, paths: null, note: "", nested: { n: 3 } });
+    expect(coerce({ paths: "[\"x\"]", offset: "abc" }, schema)).toEqual({ paths: ["x"], offset: "abc" });
+    expect(coerce({ paths: "None", offset: "null", note: "None" }, schema)).toEqual({ paths: null, offset: null, note: null });
+    // Schemas that point at definitions ($ref), as the engine's tools do.
+    const withRefs = {
+      type: "object",
+      properties: { step: { anyOf: [{ $ref: "#/$defs/Step" }, { type: "null" }] }, count: { $ref: "#/$defs/Count" } },
+      $defs: { Step: { type: "object", properties: { timeout: { type: "integer" } } }, Count: { type: "integer" } },
+    };
+    expect(coerce({ step: "None", count: "4" }, withRefs)).toEqual({ step: null, count: 4 });
+    expect(coerce({ step: { timeout: "15" }, count: 1 }, withRefs)).toEqual({ step: { timeout: 15 }, count: 1 });
+  });
+
+  it("fixes the arguments of a model's tool call before the engine reads them", async () => {
+    const inner = new Recorder();
+    inner.getResponse = async () => ({
+      usage: new Usage(),
+      output: [{ type: "function_call", callId: "c1", name: "read_source", status: "completed",
+                 arguments: JSON.stringify({ offset: "0" }) }],
+    }) as unknown as ModelResponse;
+    const model = new ChatCompletionsCompatModel(inner);
+    const readSource = { ...tool("read_source"), parameters: { type: "object" as const,
+      properties: { offset: { type: "integer" } }, required: ["offset"], additionalProperties: false } };
+    const response = await model.getResponse(request({ tools: [readSource] }));
+    expect(Reflect.get(response.output[0] as object, "arguments")).toBe(JSON.stringify({ offset: 0 }));
+  });
+});
+
+describe("tool calls with invalid JSON", () => {
+  it("quotes a bare word value and never sends invalid arguments back", () => {
+    expect(repairJson('{"operation": create_file, "path": "a.mjs", "ok": true}'))
+      .toBe('{"operation": "create_file", "path": "a.mjs", "ok": true}');
+    expect(repairJson('{"a": 1}')).toBe('{"a": 1}');
+    const items = toChatItems([
+      { type: "function_call", callId: "c1", name: "apply_patch", status: "completed", arguments: '{"operation": create_file}' },
+      { type: "function_call", callId: "c2", name: "x", status: "completed", arguments: '{"broken": ' },
+    ] as unknown as AgentInputItem[]);
+    expect(items.map((i) => JSON.parse(String(Reflect.get(i, "arguments"))))).toEqual([
+      { operation: "create_file" }, { invalid_arguments: '{"broken": ' },
+    ]);
+  });
+});
+
+describe("more argument slips", () => {
+  it("reads None as null in a text-or-null field, and as the minimum for a required number", () => {
+    const schema = { type: "object", properties: {
+      exampleInput: { anyOf: [{ type: "string" }, { type: "null" }] },
+      maxWorkers: { type: "integer", minimum: 1, maximum: 16 },
+      label: { type: "string" },
+    } };
+    expect(coerce({ exampleInput: "None", maxWorkers: "None", label: "None" }, schema))
+      .toEqual({ exampleInput: null, maxWorkers: 1, label: "None" });
+    expect(coerce({ exampleInput: "" }, schema)).toEqual({ exampleInput: "" });
+    const lists = { type: "object", properties: { caseFilter: { type: "array", items: { type: "string" } },
+      maybe: { anyOf: [{ type: "array" }, { type: "null" }] } } };
+    expect(coerce({ caseFilter: null, maybe: null }, lists)).toEqual({ caseFilter: [], maybe: null });
+    const required = { ...lists, required: ["caseFilter", "maybe"] };
+    expect(coerce({}, required)).toEqual({ caseFilter: [], maybe: null });
+    const minimum = { type: "object", properties: { testInput: { anyOf: [{ type: "string", minLength: 2 }, { type: "null" }] } } };
+    expect(coerce({ testInput: "" }, minimum)).toEqual({ testInput: null });
+    const jsonText = { type: "object", properties: { exampleInput: { anyOf: [{ type: "string" }, { type: "null" }] } } };
+    expect(coerce({ exampleInput: {} }, jsonText)).toEqual({ exampleInput: "{}" });
+    expect(coerce({ exampleInput: { a: 1 } }, jsonText)).toEqual({ exampleInput: '{"a":1}' });
+  });
+
+  it("escapes raw line breaks inside JSON strings", () => {
+    expect(JSON.parse(repairJson('{"patch": "line one\nline two", "n": 1}'.replace("\\n", "\n"))))
+      .toEqual({ patch: "line one\nline two", n: 1 });
+  });
+
+  it("turns any apply_patch form into one patch text", () => {
+    const patch = "*** Begin Patch\n*** Create File: /workspace/explore/a.mjs\n+x\n*** End Patch";
+    const fixed = "*** Begin Patch\n*** Add File: explore/a.mjs\n+x\n*** End Patch";
+    expect(normalizePatch({ command: ["apply_patch", patch] })).toEqual({ patch: fixed });
+    expect(normalizePatch({ command: ["apply_patch"], operation: "create_file", path: "x", patch })).toEqual({ patch: fixed });
+    expect(normalizePatch({ operations: [{ type: "create_file", path: "/workspace/b.mjs", content: "a\nb" }] }))
+      .toEqual({ patch: "*** Begin Patch\n*** Add File: b.mjs\n+a\n+b\n*** End Patch" });
+    const update = { operation: { type: "update_file", path: "c.mjs", diff: "@@\n-a\n+b" } };
+    expect(normalizePatch(update)).toBe(update);   // a real update diff goes to the tool as it is
   });
 });
 

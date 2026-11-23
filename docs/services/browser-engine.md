@@ -1,5 +1,12 @@
 # Browser engine
 
+> **Status: not fully tested yet.** The browser engine is built and its
+> automated tests pass, but it has not yet finished a real website build with
+> any provider. Real runs with an OpenAI-compatible provider got as far as
+> writing scripts and running reviewed browser steps; each run found a
+> problem that is now fixed (see `models/compat-model.ts`), but a complete
+> build still needs testing. It needs proper testing before you rely on it.
+
 The engine behind the agent's browser: it builds and runs website tools. The
 Agent page uses it through the browser tools ([agent](agent.md#the-browser)).
 
@@ -79,7 +86,11 @@ On Chat Completions and Anthropic, `ChatCompletionsCompatModel` turns the
 engine's OpenAI-only request features into plain ones: no prompt-cache or
 reasoning-continuity settings, the allowed tools as the tool list, the cached
 instructions as a system message, function tools instead of hosted shell and
-patch tools, and compaction as a summary the model writes. Compaction
+patch tools, and compaction as a summary the model writes. Tool schemas stay
+strict (`BROWSER_STRICT_TOOLS=false` turns that off), and obvious type slips in
+a model's tool-call arguments are corrected before the engine checks them: a
+number or boolean sent as text, and `""` or `"None"` where the schema allows
+null. Without that, some models' calls are all refused and a build loops. Compaction
 thresholds scale to the context window (`BROWSER_CONTEXT_TOKENS`, default
 128,000).
 

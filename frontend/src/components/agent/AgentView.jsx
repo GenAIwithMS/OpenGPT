@@ -9,6 +9,7 @@ import {
 import { agentService, browserService } from '../../services/api';
 import { markdownComponents } from '../MessageList';
 import BrowserInputCard from './BrowserInputCard';
+import AgentInput from './AgentInput';
 import { ScheduleDialog, SchedulesList } from './Schedules';
 
 const STATUS = {
@@ -56,13 +57,13 @@ const NewTask = ({ onCreated }) => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
-  const start = async (e) => {
+  const start = async (e, text = task) => {
     e?.preventDefault();
-    if (!task.trim() || busy) return;
+    if (!text.trim() || busy) return;
     setBusy(true);
     setError(null);
     try {
-      const session = await agentService.create(task.trim());
+      const session = await agentService.create(text.trim());
       onCreated(session.id);
     } catch (err) {
       setError(err.message);
@@ -82,23 +83,9 @@ const NewTask = ({ onCreated }) => {
             </p>
           </div>
         </div>
-        <form onSubmit={start} className="rounded-2xl border border-gray-700 bg-[#2b2c33] p-3 focus-within:border-gray-500">
-          <label htmlFor="agent-task" className="sr-only">Task</label>
-          <textarea
-            id="agent-task" value={task} rows={4} autoFocus maxLength={20000}
-            onChange={(e) => setTask(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) start(e); }}
-            placeholder="Describe the task. Say what you want at the end, e.g. a summary, a draft or a list."
-            className="thin-scroll w-full resize-none bg-transparent text-sm text-gray-100 placeholder-gray-500 outline-none"
-          />
-          <div className="flex items-center justify-between gap-3 pt-2">
-            <span className="text-xs text-gray-500">Ctrl+Enter to start</span>
-            <button type="submit" disabled={!task.trim() || busy}
-              className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">
-              {busy ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} Start
-            </button>
-          </div>
-        </form>
+        <AgentInput text={task} onTextChange={setTask} busy={busy} autoFocus
+          placeholder="Describe the task. Say what you want at the end, e.g. a summary, a draft or a list."
+          onSend={async (text) => { setTask(text); await start(null, text); }} />
         {error && <p role="alert" className="mt-3 text-sm text-red-300">{error}</p>}
         {browser && !browser.available && (
           <p className="mt-3 text-xs text-gray-500">
@@ -335,7 +322,6 @@ const Session = ({ sessionId, onChanged }) => {
   const [session, setSession] = useState(null);
   const [events, setEvents] = useState([]);
   const [error, setError] = useState(null);
-  const [instruction, setInstruction] = useState('');
   const [busy, setBusy] = useState(false);
   const [scheduling, setScheduling] = useState(false);
   const lastSeq = useRef(0);
@@ -381,10 +367,11 @@ const Session = ({ sessionId, onChanged }) => {
     setError(null);
     try {
       await fn();
-      setInstruction('');
       changed();
+      return true;
     } catch (err) {
       setError(err.message);
+      return false;   // the input gives the text back
     } finally {
       setBusy(false);
     }
@@ -449,34 +436,21 @@ const Session = ({ sessionId, onChanged }) => {
         </div>
       </div>
 
-      <div className="border-t border-gray-700/60 px-4 py-3">
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-2">
+      <div className="px-4 pb-4 pt-2">
+        <div className="mx-auto w-full max-w-3xl space-y-2">
           {error && <p role="alert" className="text-sm text-red-300">{error}</p>}
-          {active && (
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-sm text-gray-400">You can close this page; the agent keeps working.</span>
-              <button type="button" disabled={busy} onClick={() => act(() => agentService.stop(sessionId))}
-                className="flex items-center gap-1.5 rounded-lg border border-gray-600 px-3 py-1.5 text-sm text-gray-200 hover:bg-white/5 disabled:opacity-50">
-                <Square size={13} /> Stop
-              </button>
-            </div>
-          )}
-          {session.status === 'waiting' && <p className="text-sm text-amber-200">The agent is waiting for you above.</p>}
-          {canInstruct && (
-            <form className="flex gap-2" onSubmit={(e) => {
-              e.preventDefault();
-              act(() => agentService.continue(sessionId, instruction.trim() || null));
-            }}>
-              <label htmlFor="agent-instruction" className="sr-only">Instruction</label>
-              <input id="agent-instruction" value={instruction} onChange={(e) => setInstruction(e.target.value)} maxLength={20000}
-                placeholder={session.status === 'done' ? 'Ask for more, e.g. "Now draft an email about it"' : 'Optional: a new instruction'}
-                className="min-w-0 flex-1 rounded-lg border border-gray-600 bg-transparent px-3 py-2 text-sm text-gray-100 outline-none focus:border-gray-400" />
-              <button type="submit" disabled={busy || (!canContinue && !instruction.trim())}
-                className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">
-                {busy ? <Loader2 size={14} className="animate-spin" /> : canContinue && !instruction.trim() ? <Play size={14} /> : <Send size={14} />}
-                {canContinue && !instruction.trim() ? 'Continue' : 'Send'}
-              </button>
-            </form>
+          {session.status === 'waiting' && <p className="text-center text-sm text-amber-200">The agent is waiting for you above.</p>}
+          {active && <p className="text-center text-xs text-gray-500">You can close this page; the agent keeps working.</p>}
+          {(active || canInstruct) && (
+            <AgentInput
+              working={active}
+              busy={busy}
+              onStop={() => act(() => agentService.stop(sessionId))}
+              allowEmpty={canContinue}
+              emptyLabel="Continue"
+              placeholder={session.status === 'done' ? 'Ask for more, e.g. "Now draft an email about it"' : 'Add an instruction, or continue'}
+              onSend={(text) => act(() => agentService.continue(sessionId, text || null))}
+            />
           )}
         </div>
       </div>

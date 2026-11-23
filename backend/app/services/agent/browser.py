@@ -37,8 +37,18 @@ from app.services.agent import store
 STORAGE = Path(__file__).resolve().parents[2] / "storage" / "browser"
 INTEGRATIONS = STORAGE / "integrations"
 SITES_KEY = "browser_sites"
+OPTIONS_KEY = "browser_options"
 ACCESS = ("read", "write")
 POLL_SECONDS = 20
+
+
+def build_minutes() -> int:
+    """BROWSER_BUILD_MINUTES: the time budget for building one website tool (default 40)."""
+    import os
+    try:
+        return min(240, max(1, int(os.getenv("BROWSER_BUILD_MINUTES") or 40)))
+    except ValueError:
+        return 40
 MAX_RESULT_CHARS = 20_000
 _NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
@@ -93,6 +103,34 @@ def _save_sites(sites: dict[str, str]) -> None:
         else:
             row.value = json.dumps(sites)
         db.commit()
+
+
+def get_options() -> dict:
+    """{"show_window": bool}: show the browser in a window on this computer while it works."""
+    with _session() as db:
+        row = db.get(AppSetting, OPTIONS_KEY)
+        try:
+            stored = json.loads(row.value) if row else {}
+        except (TypeError, ValueError):
+            stored = {}
+    return {"show_window": bool(stored.get("show_window"))}
+
+
+def set_options(show_window: bool) -> dict:
+    with _session() as db:
+        row = db.get(AppSetting, OPTIONS_KEY)
+        value = json.dumps({"show_window": bool(show_window)})
+        if row is None:
+            db.add(AppSetting(key=OPTIONS_KEY, value=value))
+        else:
+            row.value = value
+        db.commit()
+    return get_options()
+
+
+def _engine(args: list[str]) -> browser_engine.EngineClient:
+    """An engine process; with "show the window" on, Chromium opens in a window you can watch."""
+    return browser_engine.EngineClient(args + (["--headed"] if get_options()["show_window"] else []))
 
 
 def _permit(origin: str, effect: str, task: str) -> Optional[str]:
@@ -274,7 +312,7 @@ def delete_tool(name: str) -> None:
 
 
 def _run_saved(name: str, tool_input: Any, session_id: str) -> str:
-    client = browser_engine.EngineClient(["serve", "--artifact", str(INTEGRATIONS / name)])
+    client = _engine(["serve", "--artifact", str(INTEGRATIONS / name)])
     try:
         view = client.call(name, {"input": tool_input if tool_input is not None else {}}, timeout=600)
         if isinstance(view, dict) and view.get("job_id") and view.get("status") in ("running", "input_required"):
@@ -313,7 +351,7 @@ def Browser_task(url: str, task: str, effect: Literal["read", "write"] = "read",
     INTEGRATIONS.mkdir(parents=True, exist_ok=True)
     name = tool_name(task)
     stopped = _stopped(session_id)
-    client = browser_engine.EngineClient(["mint", "--root", str(INTEGRATIONS)])
+    client = _engine(["mint", "--root", str(INTEGRATIONS), "--timeout-seconds", str(build_minutes() * 60)])
     try:
         arguments = {"name": name, "url": url, "intent": task, "effect": effect}
         if input:

@@ -67,6 +67,8 @@ def config() -> dict:
         out["contextTokens"] = int(context)
     if (llm.env("BROWSER_REASONING_EFFORT") or "").lower() in ("1", "true", "yes", "on"):
         out["reasoningEffort"] = True
+    if (llm.env("BROWSER_STRICT_TOOLS") or "").lower() in ("0", "false", "no", "off"):
+        out["strictTools"] = False
     return out
 
 

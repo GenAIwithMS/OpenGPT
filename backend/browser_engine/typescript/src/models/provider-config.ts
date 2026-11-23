@@ -28,6 +28,8 @@ export const ModelConfig = Schema.Struct({
   contextTokens: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.greaterThanOrEqualTo(16_000))),
   /** Send a reasoning effort on chat APIs (only for models that accept it). */
   reasoningEffort: Schema.optional(Schema.Boolean),
+  /** Keep strict tool schemas on chat APIs (default true); false for servers that reject them. */
+  strictTools: Schema.optional(Schema.Boolean),
 });
 export type ModelConfig = Schema.Schema.Type<typeof ModelConfig>;
 
@@ -66,7 +68,10 @@ export const makeModelProvider = (config: ModelConfig): ModelProvider => {
     });
     return { getModel: (name) => openai.getModel(named(name)) };
   }
-  const options = config.reasoningEffort === undefined ? {} : { reasoningEffort: config.reasoningEffort };
+  const options = {
+    ...(config.reasoningEffort === undefined ? {} : { reasoningEffort: config.reasoningEffort }),
+    ...(config.strictTools === undefined ? {} : { strictTools: config.strictTools }),
+  };
   if (config.api === "chat") {
     const openai = new OpenAIProvider({
       useResponses: false,

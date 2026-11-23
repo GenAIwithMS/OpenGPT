@@ -20,9 +20,10 @@ const usage = `OpenGPT MCP
 Options
   --endpoint URL     Attach to native Playwright
   --headed           Show local Chromium
+  --timeout-seconds N  Time budget for a build (default 1200)
 
-The mint root defaults to ./integrations. Supply model credentials in the environment to
-mint. Serving makes no model request and needs no model credentials.
+The mint root defaults to ./integrations. Minting uses the model provider OpenGPT passes on a
+pipe (BROWSER_ENGINE_CONFIG_FD). Serving makes no model request.
 Stdout is reserved for MCP. Human questions use provide_input through your MCP client.
 `;
 
@@ -60,6 +61,7 @@ export const runMcpCli = (
               artifact: { type: "string" },
               endpoint: { type: "string" },
               headed: { type: "boolean" },
+              "timeout-seconds": { type: "string" },
             },
           }),
         catch: localError,
@@ -71,8 +73,12 @@ export const runMcpCli = (
       const mode = positionals[0];
       if (positionals.length !== 1 || (mode !== "mint" && mode !== "serve"))
         return yield* Effect.fail(new Error("Choose mint or serve. See --help."));
+      const seconds = values["timeout-seconds"] === undefined ? undefined : Number(values["timeout-seconds"]);
+      if (seconds !== undefined && !(Number.isInteger(seconds) && seconds >= 60 && seconds <= 14_400))
+        return yield* Effect.fail(new Error("--timeout-seconds must be a whole number from 60 to 14400."));
       const engine = {
         ...options,
+        ...(seconds === undefined ? {} : { timeoutMs: seconds * 1000 }),
         browser: {
           ...options.browser,
           ...(values.headed === undefined ? {} : { headless: !values.headed }),

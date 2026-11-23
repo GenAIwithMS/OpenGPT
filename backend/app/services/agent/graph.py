@@ -118,9 +118,15 @@ def build_tools_and_prompt(thread: str) -> tuple[list, str]:
     # The browser engine (Node 24, built): website tools.
     from app.services import browser_engine
     from app.services.agent import browser
-    if browser_engine.unavailable_reason() is None:
+    reason = browser_engine.unavailable_reason()
+    if reason is None:
         tools.extend(browser.TOOLS)
         text += "\n\n" + browser.PROMPT
+    else:
+        text += ("\n\nYou have no browser tools here: OpenGPT's browser isn't set up (" + reason + ") "
+                 "If the user asks you to use a website, say that, and that Settings > Browser shows "
+                 "how to turn it on. You never control the user's own browser; with the browser set "
+                 "up you use OpenGPT's own and ask the user for any login.")
     return tools, text
 
 

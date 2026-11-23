@@ -197,14 +197,15 @@ it("reads several files in one call, in order, each as its own host read", async
         source: expect.stringContaining("Publish through finish_build"),
         nextOffset: null,
       }),
+      // A limit below the smallest read (12000 code units) reads that much: here, the rest.
       {
         kind: "untrusted_source",
         path: "src/tool.ts",
-        source: "default",
+        source: "default {};",
         offset: 7,
         total: 18,
         offsetUnit: "UTF-16 code units",
-        nextOffset: 14,
+        nextOffset: null,
       },
       expect.objectContaining({
         path: "src/missing.ts",

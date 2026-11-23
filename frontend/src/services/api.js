@@ -273,6 +273,8 @@ export const agentService = {
 // The agent's browser: availability, site permissions, saved website tools.
 export const browserService = {
   status: async () => (await api.get('/browser/status')).data,
+  options: async () => (await api.get('/browser/options')).data,
+  setOptions: async (options) => (await api.put('/browser/options', options)).data,
   sites: async () => (await api.get('/browser/sites')).data.sites,
   setSite: async (url, access) => (await api.put('/browser/sites', { url, access })).data.sites,
   removeSite: async (url) => (await api.delete('/browser/sites', { params: { url } })).data.sites,
