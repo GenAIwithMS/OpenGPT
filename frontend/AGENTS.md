@@ -12,11 +12,12 @@ npm run build    # the check to run before you finish (there is no lint step)
 
 | Path | Role |
 |---|---|
-| `src/App.jsx` | Reads the URL (`/chat`, `/chat/<id>`, `/project/<id>`, `/code`, `/code/<id>`, `?temporary-chat=true`) and lays out the sidebar, chat, project or Code page, settings popup, search window and keyboard shortcuts. |
+| `src/App.jsx` | Reads the URL (`/chat`, `/chat/<id>`, `/project/<id>`, `/code`, `/code/<id>`, `/agent`, `/agent/<id>`, `?temporary-chat=true`) and lays out the sidebar, chat, project, Code or Agent page, settings popup, search window and keyboard shortcuts. |
 | `src/services/api.js` | Every backend call. One `xxxService` object per area (chat, settings, connectors, skills, providers, code). |
 | `src/hooks/` | State per screen: chat streaming (`useChat`), threads, coding sessions and workspace, settings. |
 | `src/components/` | Chat UI, sidebar, search window, message rendering. |
 | `src/components/code/` | The Code page. |
+| `src/components/agent/` | The Agent page. |
 | `src/components/settings/` | The settings popup: one page per section, shared `controls.jsx`. |
 | `src/components/ui/` | Small generic pieces (prompt input, code block, tooltip). |
 | `src/lib/` | Plain helpers: shortcuts, preferences, notifications, citations. |

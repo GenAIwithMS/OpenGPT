@@ -11,6 +11,7 @@ SettingsModal ── navigation (SECTIONS, searchable) + the chosen page
 ├─ PersonalizationPage  Profile tab, Memory tab (MemoryTab), Knowledge tab (documents)
 ├─ ConnectorsPage       added connectors, Browse catalog, Create, sign-in
 ├─ SkillsPage           skills by source, detail, Explore, Add
+├─ BrowserPage          the agent's browser: ready or what's missing, websites, saved website tools
 └─ DeveloperPage        models in use, providers
    └─ LocalModels       Find local models: running servers, downloaded models
 UserMenu                footer menu (Account, Settings, help links)
@@ -33,6 +34,7 @@ Every page uses these instead of its own styles: `PageHeader`, `Section`,
 | Memory | `/api/settings/memories`, switches in `/api/settings` (`memory`) | `settingsService` |
 | Connectors | `/api/connectors` | `connectorsService` |
 | Skills | `/api/skills` | `skillsService` |
+| Browser | `/api/browser` | `browserService` |
 | Developer | `/api/providers`, `/api/providers/local` | `providersService` |
 
 Pages other than General and Personalization load their own data when they

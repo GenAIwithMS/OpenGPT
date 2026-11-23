@@ -23,7 +23,7 @@ Which model service OpenGPT uses, and which model does each job.
   server's port doesn't answer, the error names the server, how to start it,
   and how many of its models are downloaded.
 - **Active provider and per-job models**: `model` (chat), `small_model`,
-  `research_model`, `blog_model`, `coding_model`. Empty means the provider's
+  `research_model`, `blog_model`, `coding_model`, `agent_model`, `browser_build_model`, `browser_review_model`. Empty means the provider's
   default.
 - `llm.settings()` returns the active provider and models; saving calls
   `llm.reload()`, so chat uses the new choice at once, and restarts the

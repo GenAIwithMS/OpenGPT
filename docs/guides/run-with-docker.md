@@ -1,7 +1,8 @@
 # Run with Docker
 
-The image `genaiwithms/opengpt` holds the backend, the built frontend and the
-coding agent. MySQL runs as a second container. Nothing secret is in the
+The image `genaiwithms/opengpt` holds the backend, the built frontend, the
+coding agent and the agent's browser (the browser engine with Node.js 24 and
+Chromium, which adds a few hundred MB). MySQL runs as a second container. Nothing secret is in the
 image: settings come from `backend/.env` and environment variables.
 
 ## Start
@@ -59,6 +60,13 @@ The Code page works on folders in the `opengpt-data` volume
 (`/data/projects`). To work on folders from your computer, mount them there,
 for example under `volumes:` add `- ./my-projects:/data/projects`.
 
+## The agent's browser
+
+The browser works in the image as it is: Settings > Browser should say it's
+ready. Saved website tools are kept in the storage volume
+(`app/storage/browser/integrations`); the browser itself starts empty for
+every task. Scheduled tasks run only while the container is running.
+
 ## Open it to your network
 
 The app treats itself as local because the port is published on 127.0.0.1.
@@ -96,7 +104,8 @@ How the image works: [Dockerfile](../../Dockerfile).
 ## How the published image is built
 
 [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) runs the backend
-tests, the frontend build and the coding agent type check on every push to
+tests, the frontend build, the coding agent type check and the browser
+engine tests on every push to
 `main` and every pull request. After a push to `main` passes, it builds the
 image (linux/amd64) and pushes it to Docker Hub as `latest` and
 `sha-<commit>`. It needs two repository secrets: `DOCKERHUB_USERNAME` and

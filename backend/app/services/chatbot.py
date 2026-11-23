@@ -346,7 +346,8 @@ def retrieve_all_threads():
     """Retrieve all thread IDs from the checkpointer"""
     try:
         # Reads only thread ids, instead of loading every checkpoint.
-        return check_pointer.list_thread_ids()
+        # Agent sessions (thread id "agent-<id>") have their own page.
+        return [t for t in check_pointer.list_thread_ids() if not str(t).startswith("agent-")]
     except Exception as e:
         logger.warning(f"Error retrieving threads: {e}")
         return []

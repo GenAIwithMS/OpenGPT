@@ -73,6 +73,7 @@ OpenGPT is an open-source chat assistant built with LangGraph. It has a FastAPI 
 - **Chat with documents (RAG)**: attach PDF, Markdown or text files; several files per chat, searched together
 - **Persistent threads** in MySQL, plus **temporary chats** that are never saved
 - **Safe defaults**: local-only server, optional API token, rate limits, size limits, sanitized rendering
+- **Agent** (the Agent page, preview: not fully tested yet): give it a task and it works in the background with your tools and connected apps, asks when it needs you and before it changes anything ([Agent](#agent))
 - **Coding agent** (the Code page): works in a project folder, reads and edits code and runs commands, with live progress. It asks before editing files or running commands and shows the diff first ([Coding agent](#coding-agent))
 - **Connectors (MCP)**: add GitHub, Notion, Linear and other MCP servers by signing in, or your own by command, URL or JSON; chat and the coding agent can use their tools, and anything that changes data asks first
 - **Skills**: reusable instructions (SKILL.md) that chat and the coding agent load when a task fits; built-in ones, an Explore catalog, or create, upload and import from GitHub
@@ -167,6 +168,8 @@ cd frontend && npm install
 cd coding-agent && bun install
 ```
 
+The agent's browser (optional, macOS or Linux) needs Node.js 24; `./start.sh` builds it the first time. By hand: `cd backend/browser_engine && pnpm install --frozen-lockfile && pnpm build && node node_modules/playwright/cli.js install chromium`.
+
 ### 3. Start
 
 **Start scripts:** `./start.sh` (Linux/macOS) or `start.bat` (Windows). They start the backend on port 8000 (or `PORT` from `backend/.env`) and the frontend on port 3000, using `.venv` if present. If a port is already in use they pick the next free one and print the addresses to open. When Bun is installed they also install the coding agent's dependencies on the first run; the backend then starts the coding agent itself.
@@ -206,6 +209,22 @@ A project groups chats that share instructions and files. Every chat in it gets 
 
 Shared links open for anyone who can already reach your OpenGPT (your other devices, or others on the same server); there are no public links. See [docs/services/projects.md](docs/services/projects.md).
 
+## Agent
+
+> **Not fully tested yet.** The Agent page, its browser and scheduled tasks are built, but they need proper testing in real use. The browser has not yet finished a real website build. Treat them as a preview.
+
+The **Agent** page runs a task in the background, step by step: it writes a plan, uses the same tools as chat (search, knowledge base, skills, memory and your connectors) and ends with a summary.
+
+- **It asks first.** A question when it needs something only you know, and an approval before a connector tool changes anything. It waits as long as it takes; the sidebar shows a badge, and you can get a notification (Settings > General).
+- **Close the page any time.** It keeps working; after a restart, an interrupted session continues with **Continue**.
+- **Stop** at any time. Limits: `AGENT_MAX_STEPS` (50 model calls) and `AGENT_MAX_MINUTES` (30) per run, then **Continue** goes on. Choose its model in Settings > Models (**Agent**).
+
+- **Websites.** For sites you have no connector for, the agent can use a browser (needs Node.js 24 and the built browser engine; Settings > Browser says what is missing). It asks before it uses a site and before any change, and when a site needs a login it asks you for it on the page: the login goes only to the browser, is typed only on that site and is never saved. Each website task leaves a saved tool that runs again quickly.
+
+- **Schedules.** Run a task once, every day, on some weekdays or by a cron line, in your timezone ("every weekday at 09:00: summarise my issues and draft an update"). A scheduled run prepares everything and waits for your approval before it changes anything; an approval nobody answers within a day expires. OpenGPT must be running at that time.
+
+How to use it, and what it stores: [docs/guides/use-the-agent.md](docs/guides/use-the-agent.md). How it works: [docs/services/agent.md](docs/services/agent.md).
+
 ## Coding agent
 
 The **Code** page in the sidebar runs a coding agent on your machine. Pick or create a project, describe a task, and watch it work: its reply, its thinking, and a card for each command it runs or file it reads or edits.
@@ -244,6 +263,7 @@ Tools without a key are simply unavailable. For example, without `GOOGLE_API_KEY
 backend/        FastAPI app: routers, services, chat graph, tools, tests
 frontend/       React app (Vite, Tailwind)
 coding-agent/   Coding agent service (Bun/TypeScript), started by the backend
+backend/browser_engine/   Browser engine (Node/TypeScript), started by the backend for the agent's browser
 docs/           Developer documentation
 start.sh / start.bat   Start backend + frontend
 ```

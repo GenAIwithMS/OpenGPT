@@ -29,6 +29,11 @@ if errorlevel 1 (
     )
 )
 
+REM --- Browser engine --------------------------------------------------------
+REM The agent's browser runs on macOS and Linux (or in Docker); on Windows the
+REM Agent page works without it.
+echo The agent's browser needs macOS, Linux or Docker; on Windows the Agent page works without it.
+
 REM --- Ports -----------------------------------------------------------------
 REM A port is taken when netstat shows a TCP line for it with a foreign
 REM address ending in :0 (listening; this works in every Windows language).

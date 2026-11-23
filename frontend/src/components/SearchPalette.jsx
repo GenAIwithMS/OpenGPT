@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Code2, CornerDownLeft, FolderOpen, MessageCircle, MessageCirclePlus, MessageCircleDashed, Settings, TerminalSquare, X,
+  Bot, Code2, CornerDownLeft, FolderOpen, MessageCircle, MessageCirclePlus, MessageCircleDashed, Settings, TerminalSquare, X,
 } from 'lucide-react';
 import { codeService } from '../services/api';
 
@@ -193,6 +193,6 @@ const SearchPalette = ({ threads, onClose, onOpenChat, onOpenProject, onOpenSess
   );
 };
 
-export const searchActionIcons = { Code2, MessageCirclePlus, MessageCircleDashed, Settings };
+export const searchActionIcons = { Bot, Code2, MessageCirclePlus, MessageCircleDashed, Settings };
 
 export default SearchPalette;

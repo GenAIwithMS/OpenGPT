@@ -44,6 +44,7 @@ _ADDED_COLUMNS = [
     ("thread_metadata", "project_id", "VARCHAR(36) NULL", "idx_thread_project"),
     ("projects", "pinned", "TINYINT(1) NOT NULL DEFAULT 0", None),
     ("thread_metadata", "pinned", "TINYINT(1) NOT NULL DEFAULT 0", None),
+    ("agent_sessions", "schedule_id", "VARCHAR(36) NULL", "idx_agent_sessions_schedule"),
 ]
 
 

@@ -23,5 +23,9 @@ coding-agent/**/dist
 
 # Not needed to run
 backend/tests/
+# The browser engine is built inside the image
+backend/browser_engine/dist
+backend/browser_engine/test-results
+backend/browser_engine/playwright-report
 **/.ruff_cache
 **/.pytest_cache

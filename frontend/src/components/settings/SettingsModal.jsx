@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Code2, Keyboard, Plug, Search, SlidersHorizontal, Sparkles, User, UserCog, X,
+  Code2, Globe, Keyboard, Plug, Search, SlidersHorizontal, Sparkles, User, UserCog, X,
 } from 'lucide-react';
 import { Avatar } from './controls';
 import AccountPage from './AccountPage';
@@ -9,6 +9,7 @@ import ShortcutsPage from './ShortcutsPage';
 import PersonalizationPage from './PersonalizationPage';
 import ConnectorsPage from './ConnectorsPage';
 import SkillsPage from './SkillsPage';
+import BrowserPage from './BrowserPage';
 import DeveloperPage from './DeveloperPage';
 
 // Settings popup: navigation on the left, the chosen page on the right.
@@ -24,6 +25,7 @@ export const SECTIONS = [
     { id: 'personalization', label: 'Personalization', icon: UserCog, keywords: 'nickname instructions knowledge memory' },
     { id: 'connectors', label: 'Connectors', icon: Plug, keywords: 'mcp tools integrations' },
     { id: 'skills', label: 'Skills', icon: Sparkles, keywords: 'skill instructions explore upload github' },
+    { id: 'browser', label: 'Browser', icon: Globe, keywords: 'websites sites login agent tools permissions' },
   ] },
   { group: 'Developer', items: [
     { id: 'developer', label: 'Developer', icon: Code2, keywords: 'provider providers api key model models endpoint openai anthropic ollama lm studio llama.cpp jan local' },
@@ -79,6 +81,8 @@ const SettingsModal = ({ section, onSectionChange, onClose, settings, save, disp
     page = <ConnectorsPage />;
   } else if (current.id === 'skills') {
     page = <SkillsPage />;
+  } else if (current.id === 'browser') {
+    page = <BrowserPage />;
   } else {
     page = <DeveloperPage />;
   }

@@ -15,10 +15,11 @@ the Code page. Data is stored in MySQL.
 | `backend/app/services/coding_agent/` | Starts and talks to the coding agent | [its AGENTS.md](backend/app/services/coding_agent/AGENTS.md) |
 | `frontend/` | React + Vite + Tailwind UI | [frontend/AGENTS.md](frontend/AGENTS.md) |
 | `coding-agent/` | The coding agent service (TypeScript, Bun), a trimmed fork | [coding-agent/AGENTS.md](coding-agent/AGENTS.md) |
+| `backend/browser_engine/` | The browser engine (TypeScript, Node 24): builds website tools in a local Chromium; the backend runs it as a child process for the agent's browser | [its AGENTS.md](backend/browser_engine/AGENTS.md) |
 | `docs/` | Developer docs: architecture, configuration, one page per service, guides, decisions | [docs/README.md](docs/README.md) |
 | `README.md` | What OpenGPT is, quick start, configuration | |
-| `Dockerfile`, `docker-compose.yml`, `.dockerignore` | The `genaiwithms/opengpt` image (backend + built frontend + coding agent) and MySQL | [Run with Docker](docs/guides/run-with-docker.md) |
-| `.github/workflows/ci.yml` | CI: tests, frontend build and coding agent type check on pushes to `main` and pull requests; then builds and pushes the image to Docker Hub | [Run with Docker](docs/guides/run-with-docker.md#how-the-published-image-is-built) |
+| `Dockerfile`, `docker-compose.yml`, `.dockerignore` | The `genaiwithms/opengpt` image (backend + built frontend + coding agent + browser engine) and MySQL | [Run with Docker](docs/guides/run-with-docker.md) |
+| `.github/workflows/ci.yml` | CI: tests, frontend build, coding agent type check and browser engine tests on pushes to `main` and pull requests; then builds and pushes the image to Docker Hub | [Run with Docker](docs/guides/run-with-docker.md#how-the-published-image-is-built) |
 
 More specific `AGENTS.md` files override this one for their folder.
 
@@ -27,6 +28,9 @@ More specific `AGENTS.md` files override this one for their folder.
 ```bash
 # Backend tests: no MySQL, API keys or network needed
 cd backend && python -m unittest discover -s tests -t .
+
+# Browser engine (Node 24, pnpm): type check, unit tests
+cd backend/browser_engine && pnpm install --frozen-lockfile && pnpm typecheck && pnpm test
 
 # Frontend build (there is no separate lint step)
 cd frontend && npm run build
@@ -59,9 +63,10 @@ finish. Add or update tests with every behaviour change.
   `LICENSE`, without `.env` files, storage or databases. A new system
   dependency or folder the app needs at runtime goes in the `Dockerfile` too.
 - **Keep the licence.** `coding-agent/` is based on an MIT-licensed project;
-  keep `coding-agent/LICENSE` and its credits.
+  keep `coding-agent/LICENSE` and its credits. In `backend/browser_engine/`, keep
+  `THIRD_PARTY_NOTICES.md` and the licence headers of adapted files.
 - **Files that stay out of git:** `CODE_REVIEW_REPORT.md`,
-  `CODING_AGENT_PLAN.md`, `SETTINGS_PLAN.md` (private plans),
+  `CODING_AGENT_PLAN.md`, `SETTINGS_PLAN.md`, `AGENT_PLAN.md` (private plans),
   `instructions-to-add-settings.txt`, `personal-notes.txt`, `settings/` and
   reference screenshots in the repo root.
 - **Docs.** When you change behaviour, settings or a convention, update in

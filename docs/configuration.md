@@ -17,6 +17,9 @@ Skills) are stored in the database instead and apply at once.
 | `RESEARCH_MODEL` | `LLM_MODEL` | Deep research |
 | `BLOG_MODEL` | `LLM_MODEL` | Blog writer |
 | `CODING_AGENT_MODEL` | `LLM_MODEL` | Coding agent |
+| `AGENT_MODEL` | `LLM_MODEL` | The agent on the Agent page. Needs good tool calling |
+| `BROWSER_BUILD_MODEL` | `LLM_MODEL` | Builds website tools in the browser engine |
+| `BROWSER_REVIEW_MODEL` | `BROWSER_BUILD_MODEL` | Reviews every browser step and the finished tool |
 | `LLM_MAX_TOKENS` | `8192` | Max output tokens per call |
 
 A provider chosen in Settings > Developer overrides these (see
@@ -84,6 +87,32 @@ The database and tables are created at startup.
 | `DEEP_RESEARCH_MAX_ITERATIONS` | `3` | Rounds the research supervisor may run |
 | `DEEP_RESEARCH_MAX_TOOL_CALLS` | `6` | Searches each researcher may make |
 | `MAX_CONCURRENT_RESEARCH_UNITS` | `5` | Researchers working in parallel |
+
+## Agent
+
+The Agent page ([agent](services/agent.md)).
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `AGENT_MAX_STEPS` | `50` | Model calls per run; then the session stops and **Continue** goes on |
+| `AGENT_MAX_MINUTES` | `30` | Minutes per run; then the session stops the same way |
+| `AGENT_APPROVAL_HOURS` | `24` | A scheduled session's approval nobody answers in this time expires |
+| `AGENT_SCHEDULE_CATCH_UP` | `false` | `true`: a scheduled time missed while OpenGPT was off runs once at startup (default: skipped) |
+
+## Browser engine
+
+[Browser engine](services/browser-engine.md): builds use the active provider and
+the two browser models above.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `BROWSER_ENGINE_NODE` | `node` on PATH | The Node.js 24 binary that runs the engine |
+| `BROWSER_CONTEXT_TOKENS` | `128000` (OpenAI: as tuned) | The browser models' context window; compaction thresholds scale to it |
+| `BROWSER_REASONING_EFFORT` | `false` | Send a reasoning effort on chat APIs (only for models that accept it) |
+| `BROWSER_ENGINE_LOG_MODEL_ERRORS` | | `1`: the engine logs why a provider refused a model call (status and message, never the request) |
+| `BROWSER_ENGINE_LOG_PROGRESS` | | `1`, for debugging: one log line per model call (time, tokens, the tools called) with the start of tool inputs and results, which can include page content |
+| `BROWSER_BUILD_MINUTES` | `40` | Time budget for building one website tool; slower models need more |
+| `BROWSER_STRICT_TOOLS` | `true` | `false` for a server that rejects strict tool schemas (chat APIs only) |
 
 ## Coding agent
 

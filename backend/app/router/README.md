@@ -13,6 +13,8 @@ returns JSON or a Server-Sent Events stream. Business logic lives in
 | `skills.py` | `/api/skills` | Skills list, on/off, create, edit, upload, GitHub import, Explore catalog | `services/skills.py` |
 | `providers.py` | `/api/providers` | Model providers, testing, active provider and job models, the model menu (`/models`) | `services/providers.py`, `model_router.py` |
 | `settings.py` | `/api/settings` | Profile and general settings, knowledge base files, saved memories | `services/settings.py`, `knowledge.py`, `memory.py` |
+| `agent.py` | `/api/agent` | Agent sessions: start, events, answers, approvals, the browser's questions, stop, continue; schedules | `services/agent/` |
+| `browser.py` | `/api/browser` | The agent's browser: status, websites it may use, saved website tools | `services/agent/browser.py` |
 | `projects.py` | `/api` | Projects (`/projects`), their files, moving a chat (`/threads/{id}/project`) | `services/projects.py` |
 | `health.py` | `/api` | `GET /api/health` | |
 

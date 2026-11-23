@@ -14,10 +14,12 @@ import { useShortcuts } from './lib/shortcuts';
 import { notifyFinished } from './lib/notify';
 import { useThreads } from './hooks/useThreads';
 import { useProjects } from './hooks/useProjects';
+import { useAgentSessions } from './hooks/useAgentSessions';
+import AgentView from './components/agent/AgentView';
 import ProjectView, { NewProjectDialog, ProjectSettingsDialog } from './components/projects/ProjectView';
 import { useChat } from './hooks/useChat';
 import { useCodeWorkspace } from './hooks/useCodeWorkspace';
-import { chatService, projectService } from './services/api';
+import { agentService, chatService, projectService } from './services/api';
 import { buildAttachmentPreview, removeThreadAttachments } from './lib/attachmentPreview';
 import { Folder, X } from 'lucide-react';
 import Logo from './components/Logo';
@@ -62,6 +64,18 @@ const isCodePath = (pathname) => /^\/code(\/|$)/.test(pathname);
 // /code/<sessionId> -> that coding session; /code -> the Code landing page.
 function codeSessionIdFromPath(pathname) {
   const m = pathname.replace(/\/+$/, '').match(/^\/code\/([^/]+)$/);
+  if (!m) return null;
+  try {
+    return decodeURIComponent(m[1]);
+  } catch {
+    return null;
+  }
+}
+
+// /agent and /agent/<sessionId> show the Agent page.
+const isAgentPath = (pathname) => /^\/agent(\/|$)/.test(pathname);
+function agentSessionIdFromPath(pathname) {
+  const m = pathname.replace(/\/+$/, '').match(/^\/agent\/([^/]+)$/);
   if (!m) return null;
   try {
     return decodeURIComponent(m[1]);
@@ -156,6 +170,10 @@ function App() {
   const isCodeView = isCodePath(location.pathname);
   const codeSessionId = isCodeView ? codeSessionIdFromPath(location.pathname) : null;
   const code = useCodeWorkspace(isCodeView);
+  const isAgentView = isAgentPath(location.pathname);
+  const agentSessionId = isAgentView ? agentSessionIdFromPath(location.pathname) : null;
+  const agent = useAgentSessions(isAgentView);
+  const [agentSessionToDelete, setAgentSessionToDelete] = useState(null);
   const appSettings = useSettings();
   // Which settings page is open (null: the popup is closed).
   const [settingsSection, setSettingsSection] = useState(null);
@@ -458,6 +476,12 @@ function App() {
     navigate(next ? '/chat?temporary-chat=true' : '/chat');
   };
 
+  const handleOpenAgent = () => {
+    setIsSidebarOpen(false);
+    setResearchPanel(null);
+    navigate('/agent');
+  };
+
   const handleOpenCode = () => {
     setIsSidebarOpen(false);
     setResearchPanel(null);
@@ -644,28 +668,39 @@ function App() {
       <Sidebar
         threads={isCodeView
           ? code.sessions.map((s) => ({ thread_id: s.id, title: s.title }))
-          : threads.filter((t) => !t.project_id)}
-        currentThreadId={isCodeView ? codeSessionId : currentThreadId}
+          : isAgentView
+            ? agent.sessions.map((s) => ({ thread_id: s.id, title: s.title }))
+            : threads.filter((t) => !t.project_id)}
+        currentThreadId={isCodeView ? codeSessionId : isAgentView ? agentSessionId : currentThreadId}
         onThreadSelect={isCodeView
           ? (id) => { setIsSidebarOpen(false); navigate(`/code/${encodeURIComponent(id)}`); }
-          : handleThreadSelect}
+          : isAgentView
+            ? (id) => { setIsSidebarOpen(false); navigate(`/agent/${encodeURIComponent(id)}`); }
+            : handleThreadSelect}
         onNewThread={handleNewThread}
         onThreadRename={isCodeView
           ? (id, title) => code.renameSession(id, title).catch((e) => setAppError(e.message))
-          : updateThreadTitle}
-        onThreadDelete={isCodeView ? setCodeSessionToDelete : handleThreadDelete}
-        listLabel={isCodeView ? (code.project ? `Sessions · ${code.project.name}` : 'Sessions') : 'Recents'}
-        emptyText={isCodeView ? (code.project ? 'No sessions yet' : 'Open a folder to start') : 'No chats yet'}
+          : isAgentView
+            ? (id, title) => agentService.rename(id, title).then(agent.refresh).catch((e) => setAppError(e.message))
+            : updateThreadTitle}
+        onThreadDelete={isCodeView ? setCodeSessionToDelete : isAgentView ? setAgentSessionToDelete : handleThreadDelete}
+        listLabel={isCodeView ? (code.project ? `Sessions · ${code.project.name}` : 'Sessions')
+          : isAgentView ? 'Agent sessions' : 'Recents'}
+        emptyText={isCodeView ? (code.project ? 'No sessions yet' : 'Open a folder to start')
+          : isAgentView ? 'No tasks yet' : 'No chats yet'}
         isSidebarOpen={isSidebarOpen}
         toggleSidebar={toggleSidebar}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={toggleSidebarCollapse}
         isCodeActive={isCodeView}
         onOpenCode={handleOpenCode}
+        isAgentActive={isAgentView}
+        onOpenAgent={handleOpenAgent}
+        agentNeedsYou={agent.needsYou}
         displayName={appSettings.displayName}
         onOpenSettings={(section) => { setIsSidebarOpen(false); setSettingsSection(section); }}
         onOpenSearch={() => { setIsSidebarOpen(false); setSearchOpen(true); }}
-        projects={isCodeView ? null : projects}
+        projects={isCodeView || isAgentView ? null : projects}
         currentProjectId={currentProjectId}
         onOpenProject={handleOpenProject}
         onNewProject={(moveThreadId = null) => { setIsSidebarOpen(false); setNewProjectOpen({ moveThreadId }); }}
@@ -675,8 +710,8 @@ function App() {
         onRenameProject={handleRenameProject}
         onDeleteProject={setProjectToDelete}
         onPinProject={handlePinProject}
-        onPinThread={isCodeView ? null : handlePinThread}
-        onMoveThread={isCodeView ? null : handleMoveThread}
+        onPinThread={isCodeView || isAgentView ? null : handlePinThread}
+        onMoveThread={isCodeView || isAgentView ? null : handleMoveThread}
       />
 
       {projectSettingsId && (
@@ -703,6 +738,7 @@ function App() {
             { id: 'temporary', title: 'Temporary chat', icon: searchActionIcons.MessageCircleDashed,
               run: startTemporaryChat },
             { id: 'code', title: 'OpenGPT Code', icon: searchActionIcons.Code2, run: handleOpenCode },
+            { id: 'agent', title: 'Agent', icon: searchActionIcons.Bot, run: handleOpenAgent },
             { id: 'settings', title: 'Settings', icon: searchActionIcons.Settings, run: () => setSettingsSection('general') },
           ]}
         />
@@ -726,6 +762,12 @@ function App() {
           status={code.status}
           workspace={code}
           onSessionCreated={(id) => { navigate(`/code/${encodeURIComponent(id)}`); code.refreshSessions(); }}
+        />
+      ) : isAgentView ? (
+        <AgentView
+          sessionId={agentSessionId}
+          onCreated={(id) => { navigate(`/agent/${encodeURIComponent(id)}`); agent.refresh(); }}
+          onChanged={agent.refresh}
         />
       ) : urlProjectId ? (
         <main className="flex-1 min-w-0 flex flex-col h-screen relative pt-14 lg:pt-0">
@@ -919,6 +961,28 @@ function App() {
         }}
         title="Delete Session"
         message="Delete this coding session and its history? Files the agent changed in the project stay as they are."
+        confirmText="Delete"
+        cancelText="Cancel"
+        danger={true}
+      />
+
+      {/* Delete an agent session */}
+      <ConfirmationModal
+        isOpen={Boolean(agentSessionToDelete)}
+        onClose={() => setAgentSessionToDelete(null)}
+        onConfirm={async () => {
+          const id = agentSessionToDelete;
+          setAgentSessionToDelete(null);
+          try {
+            await agentService.remove(id);
+            agent.refresh();
+            if (id === agentSessionId) navigate('/agent');
+          } catch (e) {
+            setAppError(e.message || 'Could not delete the session.');
+          }
+        }}
+        title="Delete Session"
+        message="Delete this agent session and its history? Changes it already made in your apps stay as they are."
         confirmText="Delete"
         cancelText="Cancel"
         danger={true}

@@ -246,6 +246,42 @@ export const projectService = {
   removeFile: async (id, fileId) => { await api.delete(`/projects/${enc(id)}/files/${enc(fileId)}`); },
 };
 
+// Agent sessions (the Agent page). See backend/app/services/agent/.
+export const agentService = {
+  list: async () => (await api.get('/agent/sessions')).data.sessions,
+  // The session and its events after `after` (an event's seq).
+  get: async (id, after = 0) => (await api.get(`/agent/sessions/${enc(id)}`, { params: { after } })).data,
+  create: async (task) => (await api.post('/agent/sessions', { task })).data,
+  rename: async (id, title) => (await api.put(`/agent/sessions/${enc(id)}`, { title })).data,
+  answer: async (id, text) => (await api.post(`/agent/sessions/${enc(id)}/answer`, { text })).data,
+  decide: async (id, decision) => (await api.post(`/agent/sessions/${enc(id)}/approval`, { decision })).data,
+  // Answers to the browser's questions (logins, codes, choices): they go to the browser engine only.
+  browserInput: async (id, requestId, answers) => {
+    await api.post(`/agent/sessions/${enc(id)}/browser-input`, { request_id: requestId, answers });
+  },
+  stop: async (id) => (await api.post(`/agent/sessions/${enc(id)}/stop`)).data,
+  continue: async (id, message = null) => (await api.post(`/agent/sessions/${enc(id)}/continue`, { message })).data,
+  remove: async (id) => { await api.delete(`/agent/sessions/${enc(id)}`); },
+  // Scheduled tasks: {task, title?, repeat: once|daily|weekly|cron, time, date, days, cron, timezone, enabled}
+  schedules: async () => (await api.get('/agent/schedules')).data.schedules,
+  createSchedule: async (spec) => (await api.post('/agent/schedules', spec)).data,
+  updateSchedule: async (id, changes) => (await api.put(`/agent/schedules/${enc(id)}`, changes)).data,
+  deleteSchedule: async (id) => { await api.delete(`/agent/schedules/${enc(id)}`); },
+  runSchedule: async (id) => (await api.post(`/agent/schedules/${enc(id)}/run`)).data,
+};
+
+// The agent's browser: availability, site permissions, saved website tools.
+export const browserService = {
+  status: async () => (await api.get('/browser/status')).data,
+  options: async () => (await api.get('/browser/options')).data,
+  setOptions: async (options) => (await api.put('/browser/options', options)).data,
+  sites: async () => (await api.get('/browser/sites')).data.sites,
+  setSite: async (url, access) => (await api.put('/browser/sites', { url, access })).data.sites,
+  removeSite: async (url) => (await api.delete('/browser/sites', { params: { url } })).data.sites,
+  tools: async () => (await api.get('/browser/tools')).data.tools,
+  deleteTool: async (name) => { await api.delete(`/browser/tools/${enc(name)}`); },
+};
+
 // App settings (the Settings popup). See backend/app/services/settings.py.
 export const settingsService = {
   // {profile, general, display_name}
