@@ -69,9 +69,9 @@ cd backend/browser_engine && pnpm typecheck && pnpm test  # only if you changed 
 
 ## Security
 
-Please don't report security problems in a public issue. Contact the
-maintainers privately (on GitHub: the repository's Security tab, "Report a
-vulnerability", when it is enabled).
+Please don't report security problems in a public issue. See
+[SECURITY.md](SECURITY.md): report them privately through the repository's
+Security tab, "Report a vulnerability".
 
 ## Licence
 
