@@ -325,7 +325,7 @@ New tables and columns (for example projects and pinned chats) are added automat
 - **Questions** (setup, model providers, connectors, the coding agent): ask in [Discussions Q&A](https://github.com/GenAIwithMS/OpenGPT/discussions/categories/q-a). Check [Troubleshooting](#troubleshooting) first.
 - **Ideas**: start a thread in [Discussions Ideas](https://github.com/GenAIwithMS/OpenGPT/discussions/categories/ideas).
 - **Bugs**: open an [issue](https://github.com/GenAIwithMS/OpenGPT/issues/new/choose).
-- **Security problems**: report them privately through [Security advisories](https://github.com/GenAIwithMS/OpenGPT/security/advisories/new), not in public.
+- **Security problems**: report them privately through [Security advisories](https://github.com/GenAIwithMS/OpenGPT/security/advisories/new), not in public. See [SECURITY.md](SECURITY.md) for what's supported and what to expect.
 
 Never post your `backend/.env`, API keys or tokens.
 
